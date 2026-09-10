@@ -1,0 +1,595 @@
+<title>The LAB Decision Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+:root{
+  --ground:#EDEEF0;
+  --surface:#FFFFFF;
+  --surface-2:#E2E5E9;
+  --ink:#12161C;
+  --ink-soft:#565E6B;
+  --ink-faint:#8B939F;
+  --rule:#C6CBD2;
+  --rule-soft:#D9DDE2;
+  --accent:#BF2E2A;
+  --accent-soft:#F7E3E1;
+  --shadow:0 1px 2px rgba(18,22,28,.06), 0 8px 24px -16px rgba(18,22,28,.28);
+
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#13171D;
+    --surface:#1A1F27;
+    --surface-2:#232A34;
+    --ink:#E9EBEE;
+    --ink-soft:#9BA4B1;
+    --ink-faint:#6C7684;
+    --rule:#2E353F;
+    --rule-soft:#242B34;
+    --accent:#FF6E60;
+    --accent-soft:#3A2320;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#13171D;
+  --surface:#1A1F27;
+  --surface-2:#232A34;
+  --ink:#E9EBEE;
+  --ink-soft:#9BA4B1;
+  --ink-faint:#6C7684;
+  --rule:#2E353F;
+  --rule-soft:#242B34;
+  --accent:#FF6E60;
+  --accent-soft:#3A2320;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:17px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.page{
+  max-width:1020px;
+  margin:0 auto;
+  padding-inline:clamp(16px,4.5vw,44px);
+  padding-block:clamp(40px,7vw,76px) 0;
+}
+.prose{max-width:63ch;}
+
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.1;letter-spacing:-.018em;}
+p{margin:0;}
+dl,dd{margin:0;}
+
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11.5px;
+  font-weight:500;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+  margin:0;
+}
+
+/* ---------- masthead ---------- */
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:clamp(30px,4.5vw,48px);}
+.masthead .eyebrow{color:var(--accent);}
+.equation{
+  font-family:var(--display);
+  font-weight:800;
+  font-size:clamp(30px,6.4vw,60px);
+  line-height:1.04;
+  letter-spacing:-.03em;
+  margin:18px 0 0;
+}
+.equation .op{color:var(--ink-faint);font-weight:600;padding-inline:.12em;}
+.masthead .lede{
+  margin-top:22px;
+  max-width:56ch;
+  font-size:19px;
+  color:var(--ink-soft);
+}
+.masthead .lede strong{color:var(--ink);font-weight:600;}
+
+/* ---------- section rhythm ---------- */
+section{padding-block:clamp(44px,6.5vw,72px);border-bottom:1px solid var(--rule);}
+.sec-head{display:flex;flex-direction:column;gap:10px;margin-bottom:30px;}
+.sec-head h2{font-size:clamp(23px,3.4vw,32px);font-weight:700;}
+.sec-head p{color:var(--ink-soft);max-width:60ch;}
+
+/* ---------- the rig ---------- */
+.rig{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:clamp(20px,3vw,38px);
+  align-items:start;
+}
+@media (max-width:760px){.rig{grid-template-columns:minmax(0,1fr);}}
+
+.factors{display:flex;flex-direction:column;gap:18px;}
+.factor{display:flex;flex-direction:column;gap:8px;}
+.factor > .flabel{
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  font-family:var(--mono);font-size:12px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--ink-soft);font-weight:500;
+}
+.factor .hint{font-family:var(--body);font-size:13.5px;letter-spacing:0;text-transform:none;color:var(--ink-faint);}
+
+.seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--surface);}
+.seg input{position:absolute;opacity:0;pointer-events:none;}
+.seg label{
+  font-family:var(--mono);font-size:12.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+  text-align:center;padding:9px 4px;cursor:pointer;color:var(--ink-soft);
+  border-right:1px solid var(--rule-soft);
+  transition:background .12s ease,color .12s ease;
+}
+.seg label:last-of-type{border-right:0;}
+.seg label:hover{background:var(--surface-2);}
+.seg input:checked + label{background:var(--ink);color:var(--ground);}
+.seg input:focus-visible + label{outline:2px solid var(--accent);outline-offset:-2px;}
+.seg.is-zeroed input:checked + label{background:var(--accent);color:#fff;}
+:root[data-theme="dark"] .seg.is-zeroed input:checked + label,
+:root:not([data-theme="light"]) .seg.is-zeroed input:checked + label{color:#1A0F0D;}
+
+/* ---------- verdict ---------- */
+.verdict{
+  background:var(--surface);
+  border:1px solid var(--rule);
+  border-radius:3px;
+  padding:clamp(18px,2.6vw,26px);
+  box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:16px;
+}
+.chain{
+  font-family:var(--mono);font-size:14px;font-weight:500;
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;color:var(--ink-soft);
+}
+.chain b{color:var(--ink);font-weight:600;}
+.chain .z{color:var(--accent);}
+.score{display:flex;align-items:baseline;gap:12px;}
+.score .num{font-family:var(--display);font-weight:800;font-size:44px;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1;}
+.score .den{font-family:var(--mono);font-size:12px;color:var(--ink-faint);letter-spacing:.1em;}
+.meter{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;}
+.meter i{display:block;height:100%;background:var(--ink);transition:width .18s ease;}
+.meter.is-zero i{background:var(--accent);}
+.vhead{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.015em;}
+.vhead.is-zero{color:var(--accent);}
+.vnote{font-size:15.5px;color:var(--ink-soft);}
+.vnote + .vnote{margin-top:-6px;}
+
+.mods{
+  margin-top:26px;padding-top:24px;border-top:1px dashed var(--rule);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:24px;
+}
+.mods > p.note{grid-column:1/-1;margin:0 0 -6px;font-size:15px;color:var(--ink-soft);max-width:74ch;}
+.mods .out{font-size:15px;color:var(--ink-soft);border-left:2px solid var(--accent);padding-left:12px;}
+
+@media (prefers-reduced-motion:reduce){*{transition:none !important;}}
+
+/* ---------- pipeline ---------- */
+.strip-wrap{overflow-x:auto;padding-bottom:10px;margin-bottom:30px;}
+.strip{display:flex;align-items:center;gap:8px;min-width:min-content;}
+.strip .st{
+  font-family:var(--mono);font-size:12.5px;font-weight:500;white-space:nowrap;
+  padding:7px 11px;border:1px solid var(--rule);border-radius:3px;background:var(--surface);
+}
+.strip .st.key{border-color:var(--ink);}
+.strip .ar{color:var(--ink-faint);font-family:var(--mono);font-size:12px;}
+
+.defs{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:22px 34px;}
+.def{display:flex;flex-direction:column;gap:4px;}
+.def dt{font-family:var(--display);font-weight:700;font-size:16.5px;}
+.def dd{margin:0;font-size:15.5px;color:var(--ink-soft);}
+
+/* ---------- states ---------- */
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:2px;background:var(--rule);border:1px solid var(--rule);border-radius:3px 3px 0 0;overflow:hidden;}
+.state{background:var(--surface);padding:20px;display:flex;flex-direction:column;gap:6px;}
+.state h3{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;}
+.state p{font-size:15px;color:var(--ink-soft);}
+.scramble{
+  border:1px dashed var(--accent);border-top:0;border-radius:0 0 3px 3px;
+  background:var(--accent-soft);padding:18px 20px;
+  display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;
+}
+.scramble .tag{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);}
+.scramble p{font-size:15px;color:var(--ink-soft);max-width:64ch;}
+
+/* ---------- need ladder ---------- */
+.ladder{display:flex;flex-direction:column-reverse;gap:2px;}
+.rung{
+  display:grid;grid-template-columns:minmax(120px,158px) minmax(0,1fr);gap:8px 20px;
+  align-items:baseline;padding:13px 0;border-top:1px solid var(--rule-soft);
+}
+.rung:last-child{border-top:0;}
+.rung .rn{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;}
+.rung .rd{font-size:15.5px;color:var(--ink-soft);}
+@media (max-width:560px){.rung{grid-template-columns:minmax(0,1fr);}}
+.warn{
+  margin-top:26px;border-left:3px solid var(--accent);padding:2px 0 2px 16px;max-width:62ch;
+}
+.warn strong{font-family:var(--display);font-weight:700;}
+.warn p{font-size:15.5px;color:var(--ink-soft);}
+
+/* ---------- solve ---------- */
+.solve{display:grid;grid-template-columns:repeat(auto-fit,minmax(216px,1fr));gap:24px 32px;}
+
+/* ---------- calls ---------- */
+.calls{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:0 44px;}
+.call{padding:20px 0;border-top:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:7px;}
+.call .name{font-family:var(--mono);font-size:15.5px;font-weight:600;color:var(--accent);letter-spacing:-.01em;}
+.call .name .seq{color:var(--ink-faint);font-weight:400;}
+.call .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);}
+.call .meta b{color:var(--ink-soft);font-weight:500;}
+.call p{font-size:15.5px;color:var(--ink-soft);}
+
+/* ---------- layers ---------- */
+.layers{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:20px 34px;}
+.layer{display:flex;flex-direction:column;gap:3px;}
+.layer .lname{font-family:var(--display);font-weight:700;font-size:15.5px;}
+.layer p{font-size:14.8px;color:var(--ink-soft);}
+
+/* ---------- output ---------- */
+.out-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(20px,3vw,40px);align-items:start;}
+@media (max-width:800px){.out-grid{grid-template-columns:minmax(0,1fr);}}
+.contract{display:flex;flex-direction:column;}
+.crow{display:grid;grid-template-columns:24px minmax(96px,auto) minmax(0,1fr);gap:14px;padding:12px 0;border-top:1px solid var(--rule-soft);align-items:baseline;}
+.crow:first-child{border-top:0;}
+.crow .cn{font-family:var(--mono);font-size:12px;color:var(--ink-faint);}
+.crow .ck{font-family:var(--mono);font-size:13px;font-weight:600;}
+.crow .cv{font-size:15px;color:var(--ink-soft);}
+.sample{
+  background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  padding:clamp(18px,2.6vw,26px);box-shadow:var(--shadow);
+}
+.sample .cap{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:14px;}
+.sample .sit{font-size:15px;color:var(--ink-soft);font-style:italic;margin-bottom:18px;padding-bottom:16px;border-bottom:1px dashed var(--rule);}
+.sample ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:11px;counter-reset:s;}
+.sample li{font-size:15px;padding-left:26px;position:relative;counter-increment:s;}
+.sample li::before{content:counter(s) ".";position:absolute;left:0;font-family:var(--mono);font-size:12px;color:var(--ink-faint);top:2px;}
+.sample .k{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);display:block;}
+.sample .act{font-family:var(--mono);font-weight:600;color:var(--accent);}
+
+/* ---------- footer ---------- */
+footer{padding-block:36px 56px;display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;align-items:baseline;}
+footer p{font-size:14.5px;color:var(--ink-faint);max-width:56ch;}
+footer a{color:var(--ink);text-decoration-color:var(--accent);text-underline-offset:3px;font-family:var(--mono);font-size:13.5px;}
+footer a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">The LAB · decision engine</p>
+    <h1 class="equation">Shot&nbsp;Possibility <span class="op">=</span> Height <span class="op">×</span> Time <span class="op">×</span> Balance</h1>
+    <p class="lede">Three factors, multiplied. <strong>Any factor at zero is a zero</strong>, no matter how large the other two are — which is why defending is a subtraction problem and attacking is a purchase.</p>
+  </header>
+
+  <section id="engine">
+    <div class="sec-head">
+      <p class="eyebrow">Read the situation</p>
+      <h2>It's a product, not a sum</h2>
+      <p>Set the three factors and watch what the read is worth. Then take one to zero and watch what the other two are suddenly worth.</p>
+    </div>
+
+    <div class="rig">
+      <div class="factors">
+        <div class="factor">
+          <span class="flabel">Height <span class="hint">where the release point sits</span></span>
+          <div class="seg" data-seg="h">
+            <input type="radio" name="h" id="h0" value="0"><label for="h0">Zero</label>
+            <input type="radio" name="h" id="h1" value="1"><label for="h1">Low</label>
+            <input type="radio" name="h" id="h3" value="3" checked><label for="h3">High</label>
+          </div>
+        </div>
+        <div class="factor">
+          <span class="flabel">Time <span class="hint">steps before pressure arrives</span></span>
+          <div class="seg" data-seg="t">
+            <input type="radio" name="t" id="t0" value="0"><label for="t0">Zero</label>
+            <input type="radio" name="t" id="t1" value="1" checked><label for="t1">Low</label>
+            <input type="radio" name="t" id="t3" value="3"><label for="t3">High</label>
+          </div>
+        </div>
+        <div class="factor">
+          <span class="flabel">Balance <span class="hint">weight over base</span></span>
+          <div class="seg" data-seg="b">
+            <input type="radio" name="b" id="b0" value="0"><label for="b0">Zero</label>
+            <input type="radio" name="b" id="b1" value="1"><label for="b1">Low</label>
+            <input type="radio" name="b" id="b3" value="3" checked><label for="b3">High</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="verdict">
+        <p class="chain" id="chain"></p>
+        <div class="score">
+          <span class="num" id="num">9</span>
+          <span class="den">of 27</span>
+        </div>
+        <div class="meter" id="meter"><i id="fill"></i></div>
+        <p class="vhead" id="vhead"></p>
+        <p class="vnote" id="vnote"></p>
+        <p class="vnote" id="vdef"></p>
+      </div>
+    </div>
+
+    <div class="mods">
+      <p class="note">Orientation and Certainty complete the Read. Neither multiplies — they tell you where the product points, and how much you're allowed to commit to it.</p>
+      <div class="factor">
+        <span class="flabel">Orientation <span class="hint">hips, eyes, stick</span></span>
+        <div class="seg" data-seg="o">
+          <input type="radio" name="o" id="o1" value="toward" checked><label for="o1">To goal</label>
+          <input type="radio" name="o" id="o2" value="away"><label for="o2">Away</label>
+        </div>
+        <p class="out" id="oout"></p>
+      </div>
+      <div class="factor">
+        <span class="flabel">Certainty <span class="hint">how clean is the read</span></span>
+        <div class="seg" data-seg="c">
+          <input type="radio" name="c" id="c1" value="low" checked><label for="c1">Low</label>
+          <input type="radio" name="c" id="c2" value="mod"><label for="c2">Moderate</label>
+          <input type="radio" name="c" id="c3" value="high"><label for="c3">High</label>
+        </div>
+        <p class="out" id="cout"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="pipeline">
+    <div class="sec-head">
+      <p class="eyebrow">The pipeline</p>
+      <h2>Reason in this order, every time</h2>
+      <p>A wrong answer is usually a skipped stage, not a bad final choice. The order is the discipline.</p>
+    </div>
+
+    <div class="strip-wrap">
+      <div class="strip">
+        <span class="st">Context</span><span class="ar">→</span>
+        <span class="st">See</span><span class="ar">→</span>
+        <span class="st key">Read</span><span class="ar">→</span>
+        <span class="st key">State</span><span class="ar">→</span>
+        <span class="st key">Need</span><span class="ar">→</span>
+        <span class="st">Solve</span><span class="ar">→</span>
+        <span class="st">Predict</span><span class="ar">→</span>
+        <span class="st">Organize</span><span class="ar">→</span>
+        <span class="st">Reassess</span><span class="ar">→</span>
+        <span class="st">Adapt</span>
+      </div>
+    </div>
+
+    <dl class="defs">
+      <div class="def"><dt>Context</dt><dd>Score, clock, field position, personnel, what the last three possessions taught both sides. Context sets the price of a mistake.</dd></div>
+      <div class="def"><dt>See</dt><dd>Perception only. Collapsing See into Read is how you defend the picture you expected instead of the one in front of you.</dd></div>
+      <div class="def"><dt>Read</dt><dd>Height × Time × Balance, plus Orientation and Certainty.</dd></div>
+      <div class="def"><dt>State</dt><dd>Defensive, Neutral or Offensive — who is dictating. Scramble sits over the top.</dd></div>
+      <div class="def"><dt>Need</dt><dd>The rung you're actually on. The single strongest constraint on which actions are legal.</dd></div>
+      <div class="def"><dt>Solve</dt><dd>Weigh Risk, Consequence, Cost and Target, then choose one action.</dd></div>
+      <div class="def"><dt>Predict</dt><dd>Name what the opponent does in response — one beat, concretely. You can't cover a reaction you never named.</dd></div>
+      <div class="def"><dt>Organize</dt><dd>Move, Cover, Recover. Everyone has exactly one job. Recover is the one that gets dropped, and it decides whether the next rep starts in Scramble.</dd></div>
+      <div class="def"><dt>Reassess</dt><dd>Re-run See → Read. Mandatory. You acted, so this is a different situation now.</dd></div>
+      <div class="def"><dt>Adapt</dt><dd>Adjust the solve, or step the Need. Dropping a rung isn't failure; refusing to drop is.</dd></div>
+    </dl>
+  </section>
+
+  <section id="state">
+    <div class="sec-head">
+      <p class="eyebrow">State</p>
+      <h2>Three states, and a layer over all of them</h2>
+    </div>
+    <div class="states">
+      <div class="state"><h3>Defensive</h3><p>They hold the initiative. You are responding.</p></div>
+      <div class="state"><h3>Neutral</h3><p>Neither side holds it. The next action decides who does.</p></div>
+      <div class="state"><h3>Offensive</h3><p>You hold the initiative. They are responding.</p></div>
+    </div>
+    <div class="scramble">
+      <span class="tag">Scramble</span>
+      <p>A condition layer, not a fourth state — it overlays whichever state you're in, so always name both. Scramble means the map is stale: assignments are no longer where they were drawn. Reassess frequency goes up, and commitment thresholds go up with it.</p>
+    </div>
+  </section>
+
+  <section id="need">
+    <div class="sec-head">
+      <p class="eyebrow">Need</p>
+      <h2>A ladder, climbed one rung at a time</h2>
+      <p>Climbing is earned, not chosen. You move up when the rung below is actually satisfied — not when you'd prefer to be higher.</p>
+    </div>
+    <div class="ladder">
+      <div class="rung"><span class="rn">Survive</span><span class="rd">Don't lose it right now. Deny the immediate shot or the immediate turnover.</span></div>
+      <div class="rung"><span class="rn">Recover</span><span class="rd">Get body, feet and position back to legal — repay the debt the last action created.</span></div>
+      <div class="rung"><span class="rn">Stabilize</span><span class="rd">Re-establish structure. Everyone knows who has whom again.</span></div>
+      <div class="rung"><span class="rn">Build</span><span class="rd">Accumulate advantage. Shape, spacing, numbers.</span></div>
+      <div class="rung"><span class="rn">Pressure</span><span class="rd">Force the opponent into a decision they don't want.</span></div>
+      <div class="rung"><span class="rn">Finish</span><span class="rd">Convert the advantage.</span></div>
+    </div>
+    <div class="warn">
+      <p><strong>Rung-skipping is the most common error in the model.</strong> A player on Survive who reaches for a Build action doesn't get Build — they get a worse Survive. Name the rung before choosing the action.</p>
+    </div>
+  </section>
+
+  <section id="solve">
+    <div class="sec-head">
+      <p class="eyebrow">Solve</p>
+      <h2>Four weights on every candidate action</h2>
+    </div>
+    <dl class="solve">
+      <div class="def"><dt>Risk</dt><dd>How likely is this to fail?</dd></div>
+      <div class="def"><dt>Consequence</dt><dd>If it fails, how bad? Independent of Risk — a high-risk, low-consequence action is often the right one.</dd></div>
+      <div class="def"><dt>Cost</dt><dd>What it spends even when it <em>works</em>: legs, position, Recovery Debt, a teammate's slot.</dd></div>
+      <div class="def"><dt>Target</dt><dd>What it's aimed at. Aim at the factor — "this takes Time." An action without a named target is effort, not a solve.</dd></div>
+    </dl>
+  </section>
+
+  <section id="calls">
+    <div class="sec-head">
+      <p class="eyebrow">Vocabulary</p>
+      <h2>Seven calls, used exactly</h2>
+      <p>Never paraphrased, never blended, never swapped for a generic coaching synonym. The compression is the point: the call has to survive being shouted and mean the same thing to everyone who hears it.</p>
+    </div>
+    <div class="calls">
+      <div class="call">
+        <span class="name">Respect the X</span>
+        <span class="meta"><span>State <b>Def / Neutral</b></span><span>Rung <b>Stabilize +</b></span><span>Layer <b>Threat</b></span></span>
+        <p>The anchor point that generates the danger stays in your accounting even when the ball is elsewhere. Failing to respect it shows up one beat later as a Scramble that "came out of nowhere."</p>
+      </div>
+      <div class="call">
+        <span class="name">The Triangle <span class="seq">speedup → counter → exit</span></span>
+        <span class="meta"><span>State <b>Offensive</b></span><span>Rung <b>Build / Pressure</b></span><span>Layer <b>Tempo</b></span></span>
+        <p>Three beats run as one unit. How you <em>buy</em> a missing factor instead of waiting for it. Illegal on Survive or Recover — the speedup beat borrows Balance you don't have.</p>
+      </div>
+      <div class="call">
+        <span class="name">Own space not lines</span>
+        <span class="meta"><span>State <b>Any</b></span><span>Rung <b>Any</b></span><span>Layer <b>Cost</b></span></span>
+        <p>Occupy and hold area. Don't chase a line or defend where someone just was. Space is cheap to hold and expensive to chase — the lowest-cost way to stay connected when structure is stale.</p>
+      </div>
+      <div class="call">
+        <span class="name">Go Stay Go</span>
+        <span class="meta"><span>State <b>Def / Neutral</b></span><span>Rung <b>Stabilize / Pressure</b></span><span>Layer <b>Tempo</b></span></span>
+        <p>A tempo break inside a single approach. The <em>Stay</em> beat is information — it makes the opponent declare before you commit. Reversible by design, which is why it's the low-Certainty call.</p>
+      </div>
+      <div class="call">
+        <span class="name">Hip Pocket Over</span>
+        <span class="meta"><span>State <b>Defensive</b></span><span>Rung <b>Pressure</b></span><span>Layer <b>Initiative</b></span></span>
+        <p>Taking a factor away by position rather than by effort. A committing call: high Certainty only, and the debt has to be paid before it's legal.</p>
+      </div>
+      <div class="call">
+        <span class="name">Cover Cover Sit</span>
+        <span class="meta"><span>State <b>Defensive</b></span><span>Rung <b>Survive → Stabilize</b></span><span>Layer <b>Recovery Debt</b></span></span>
+        <p>Two cover beats, then settle. <em>Sit</em> is the deliberate refusal to borrow — how you stop a Scramble compounding, not how you end a possession.</p>
+      </div>
+      <div class="call">
+        <span class="name">Oh Slide Go</span>
+        <span class="meta"><span>State <b>Def / Scramble</b></span><span>Rung <b>Survive / Stabilize</b></span><span>Layer <b>Threat</b></span></span>
+        <p>Recognize, slide, commit. Fully committing: it creates Recovery Debt and hands someone else the Cover job, so it's only legal when Organize can actually fill that job.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="layers">
+    <div class="sec-head">
+      <p class="eyebrow">Outer layers</p>
+      <h2>Nine lenses, not nine stages</h2>
+      <p>Reach for one when the pipeline gives a sound answer that keeps failing, or to explain why a correct solve was still the wrong solve. One lens, occasionally two — never a checklist of all nine.</p>
+    </div>
+    <div class="layers">
+      <div class="layer"><span class="lname">Tempo</span><p>The rate at which decisions are demanded. A weapon independent of speed.</p></div>
+      <div class="layer"><span class="lname">Initiative</span><p>Who is dictating. It can change hands without the ball moving.</p></div>
+      <div class="layer"><span class="lname">Recovery Debt</span><p>Position and energy owed from a previous action, payable before the next one is legal. Usually why a rung can't be climbed.</p></div>
+      <div class="layer"><span class="lname">Threat</span><p>What they <em>could</em> do, as distinct from what they're doing. Why you defend an empty space.</p></div>
+      <div class="layer"><span class="lname">Pattern Memory</span><p>What this opponent has already shown tonight. It raises or lowers Certainty — and a good opponent will spend a rep buying a false one.</p></div>
+      <div class="layer"><span class="lname">Error Classification</span><p>See, Read, State, Need, Solve, Organize and Execution errors are coached differently. Classify before correcting.</p></div>
+      <div class="layer"><span class="lname">Cost</span><p>What an action spends when it <em>succeeds</em>. Sustainability is a Cost problem, not a Risk problem.</p></div>
+      <div class="layer"><span class="lname">Pace</span><p>Your own rate of output. Pace is what you spend; Tempo is what you impose.</p></div>
+      <div class="layer"><span class="lname">Pressure</span><p>Force applied to shrink their Time and Balance. Pressure that doesn't shrink a named factor is just effort.</p></div>
+    </div>
+  </section>
+
+  <section id="output">
+    <div class="sec-head">
+      <p class="eyebrow">The output</p>
+      <h2>Four parts, and nothing else</h2>
+    </div>
+    <div class="out-grid">
+      <div class="contract">
+        <div class="crow"><span class="cn">1</span><span class="ck">Read</span><span class="cv">H/T/B named concretely — "one step of cushion," not "limited."</span></div>
+        <div class="crow"><span class="cn">2</span><span class="ck">State + Need</span><span class="cv">Both named. Scramble stated as a layer.</span></div>
+        <div class="crow"><span class="cn">3</span><span class="ck">Action</span><span class="cv">One action, in the vocabulary. Not a menu, not a contingency tree.</span></div>
+        <div class="crow"><span class="cn">4</span><span class="ck">Why</span><span class="cv">One line. If it needs a paragraph, the Read was wrong.</span></div>
+      </div>
+      <div class="sample">
+        <p class="cap">Worked example</p>
+        <p class="sit">Ball carrier picks his head up at the top — feet under him, stick up. You're a step and a half off, no help declared. He beat you from this exact look once already tonight.</p>
+        <ol>
+          <li><span class="k">Read</span> Height high, stick up and loaded. Time moderate, a step and a half of cushion and closing. Balance high, feet under him. Orientation square. Certainty low — he showed this look once already.</li>
+          <li><span class="k">State + Need</span> Neutral. Need: Stabilize.</li>
+          <li><span class="k">Action</span> <span class="act">Go Stay Go</span></li>
+          <li><span class="k">Why</span> Low Certainty makes a commit illegal, so the Stay beat buys the information before I spend the cushion.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>The LAB decision engine. The coach runs as a Claude Code skill — clone the repo and describe a rep.</p>
+    <a href="https://github.com/TP4L/the-lab">github.com/TP4L/the-lab</a>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  var num=document.getElementById('num'),fill=document.getElementById('fill'),meter=document.getElementById('meter'),
+      chain=document.getElementById('chain'),vhead=document.getElementById('vhead'),vnote=document.getElementById('vnote'),
+      vdef=document.getElementById('vdef'),oout=document.getElementById('oout'),cout=document.getElementById('cout');
+
+  var NAMES={h:'Height',t:'Time',b:'Balance'};
+
+  function val(n){var el=document.querySelector('input[name="'+n+'"]:checked');return el?el.value:'0';}
+
+  function render(){
+    var v={h:+val('h'),t:+val('t'),b:+val('b')};
+    var product=v.h*v.t*v.b;
+    var zeros=['h','t','b'].filter(function(k){return v[k]===0;});
+
+    ['h','t','b'].forEach(function(k){
+      var seg=document.querySelector('[data-seg="'+k+'"]');
+      seg.classList.toggle('is-zeroed',v[k]===0);
+    });
+
+    chain.innerHTML=['h','t','b'].map(function(k){
+      var word=v[k]===0?'0':(v[k]===1?'low':'high');
+      var cls=v[k]===0?'z':'';
+      return NAMES[k]+' <b class="'+cls+'">'+word+'</b>';
+    }).join(' <span>×</span> ');
+
+    num.textContent=product;
+    meter.classList.toggle('is-zero',product===0);
+    fill.style.width=(product===0?100:Math.round(product/27*100))+'%';
+
+    if(product===0){
+      vhead.textContent='No shot.';
+      vhead.classList.add('is-zero');
+      var list=zeros.map(function(k){return NAMES[k];});
+      var subj=list.length===1?list[0]+' is zero':list.join(' and ')+' are zero';
+      vnote.textContent=subj+', so the product collapses no matter how large the rest is.';
+      vdef.textContent='This is the whole defensive job — you never needed all three.';
+    } else {
+      vhead.classList.remove('is-zero');
+      if(product<=3){vhead.textContent='Not a shot yet.';}
+      else if(product<=9){vhead.textContent='Shot is forming.';}
+      else if(product<27){vhead.textContent='Live shot.';}
+      else {vhead.textContent='Everything is there.';}
+
+      var lowest=['h','t','b'].reduce(function(a,k){return v[k]<v[a]?k:a;},'h');
+      var allHigh=v.h===3&&v.t===3&&v.b===3;
+      vnote.textContent=allHigh
+        ? 'All three are high. Take whichever one you can actually reach — reaching is the constraint now, not choosing.'
+        : 'Cheapest factor to collapse: '+NAMES[lowest]+'. It is already the smallest number in the product.';
+      vdef.textContent='Attacking this read means buying the factor you are short of — name it before choosing the move.';
+    }
+
+    oout.textContent = val('o')==='away'
+      ? 'Oriented away: not a shot yet — a shot one turn from now. That turn is Time you can attack.'
+      : 'Oriented to goal: the factors point at the target.';
+
+    var c=val('c');
+    cout.textContent = c==='low'
+      ? 'Reversible calls only — Go Stay Go, Cover Cover Sit. Buy information before you buy position.'
+      : c==='mod'
+        ? 'Hold shape. Commit only once they have declared.'
+        : 'Committing calls are legal — Hip Pocket Over, Oh Slide Go.';
+  }
+
+  document.querySelectorAll('.seg input').forEach(function(i){i.addEventListener('change',render);});
+  render();
+})();
+</script>
