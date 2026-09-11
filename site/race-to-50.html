@@ -87,7 +87,7 @@ button{cursor:pointer;background:none;border:none;}
 }
 .ticker{
   margin-left:auto;display:flex;align-items:center;gap:14px;
-  min-width:0;
+  min-width:0;overflow:hidden;
 }
 .tick{
   display:flex;align-items:baseline;gap:5px;
@@ -107,6 +107,9 @@ button{cursor:pointer;background:none;border:none;}
 .live.is-off{color:var(--faint);}
 .live.is-off::before{background:var(--faint);animation:none;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+@media (max-width:540px){ .tick-leader{display:none;} }
+@media (max-width:360px){ .tick-games{display:none;} }
 
 .gear{
   flex:none;width:34px;height:34px;border-radius:8px;
@@ -319,15 +322,15 @@ p{margin:0;}
 .side-head{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);}
 .chips{display:flex;flex-wrap:wrap;gap:6px;}
 .chip{
-  display:inline-flex;align-items:center;gap:6px;
+  display:inline-flex;align-items:center;gap:0;
   padding:6px 8px 6px 10px;border-radius:8px;
   background:var(--deck-hi);border:1px solid var(--line-hi);
   font-family:var(--display);font-weight:700;font-size:17px;line-height:1;
 }
-.chip::before{content:"#";color:var(--faint);font-size:.75em;}
+.chip::before{content:"#";color:var(--faint);font-size:.75em;margin-right:1px;}
 .chip-x{
   color:var(--faint);font-family:var(--ui);font-size:15px;line-height:1;
-  padding:0 2px;border-radius:4px;
+  padding:0 2px;margin-left:8px;border-radius:4px;
 }
 .chip-x:hover{color:var(--flag);}
 .addbtn{
@@ -357,13 +360,19 @@ p{margin:0;}
 .log{display:flex;flex-direction:column;gap:1px;background:var(--line);border-radius:10px;overflow:hidden;}
 .log-row{
   background:var(--deck);padding:10px 12px;
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 10px;
 }
-.log-teams{display:flex;align-items:center;gap:6px;font-family:var(--display);font-weight:700;font-size:16px;line-height:1;flex:1;min-width:0;}
-.log-side{color:var(--dim);}
+.log-teams{
+  display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;gap:8px;min-width:0;
+  font-family:var(--display);font-weight:700;font-size:15px;line-height:1;
+}
+.log-side{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.log-side:first-child{text-align:right;}
 .log-side.w{color:var(--chalk);}
 .log-sc{font-family:var(--display);font-weight:800;font-size:19px;line-height:1;white-space:nowrap;}
-.log-when{font-size:10.5px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;}
+.log-meta{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+.log-when{font-size:10px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;}
 
 /* ─────────── sheet / picker ─────────── */
 .sheet{
@@ -1059,8 +1068,10 @@ function screenScore(){
         + '<span class="log-sc num">' + g.p1 + '&ndash;' + g.p2 + '</span>'
         + '<span class="log-side' + (w2 ? ' w' : '') + '">' + g.s2.map(function(n){return '#'+n;}).join(' ') + '</span>'
       + '</div>'
-      + '<span class="log-when">' + ago(g.at) + '</span>'
-      + '<button class="btn-quiet" data-undo="' + esc(g.id) + '">Undo</button>'
+      + '<div class="log-meta">'
+        + '<span class="log-when">' + ago(g.at) + '</span>'
+        + '<button class="btn-quiet" data-undo="' + esc(g.id) + '" style="padding:2px 0">Undo</button>'
+      + '</div>'
     + '</div>';
   }).join('');
 
@@ -1220,8 +1231,8 @@ function tickerHtml(){
   var live = st.rows.filter(function (r){ return !r.done; })[0];
   var bits = '<span class="live' + (store.mode === 'live' ? '' : ' is-off') + '">'
            + (store.mode === 'live' ? 'Live' : 'Local') + '</span>';
-  if (st.gameCount) bits += '<span class="tick">Games <span class="num">' + st.gameCount + '</span></span>';
-  if (live && live.points > 0) bits += '<span class="tick">Leader <span class="num">#' + live.num + '</span></span>';
+  if (st.gameCount) bits += '<span class="tick tick-games">Games <span class="num">' + st.gameCount + '</span></span>';
+  if (live && live.points > 0) bits += '<span class="tick tick-leader">Leader <span class="num">#' + live.num + '</span></span>';
   return bits;
 }
 
@@ -1276,7 +1287,7 @@ function checkChampion(){
     + '<p class="champ-label">' + (st.champs.length > 1 ? 'Co-champions' : 'Champion') + '</p>'
     + '<div class="champ-num num">' + st.champs.join(' &middot; ') + '</div>'
     + '<div class="champ-hit">Reached ' + m.target + '</div>'
-    + '<p class="champ-name">' + esc(names.join(' &amp; ')) + ' &middot; ' + pts + ' points</p>'
+    + '<p class="champ-name">' + names.map(esc).join(' &amp; ') + ' &middot; ' + pts + ' points</p>'
     + '<p class="champ-sub">That is the night. Finish the rally you are in, then come shake a hand.</p>'
     + '<button class="btn btn-primary" data-champ-close="1" style="margin-top:16px">Final leaderboard</button>';
   el.hidden = false;
