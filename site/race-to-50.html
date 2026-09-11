@@ -1,0 +1,1713 @@
+<title>Race to 50</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&display=swap">
+
+<style>
+/* The LAB runs this at night, on phones, courtside, and on a TV above the
+   courts. The page commits to the brand's night palette in every viewer
+   theme rather than following the host — a scoreboard that flips to white
+   mid-event is a worse scoreboard. Every colour is painted explicitly. */
+:root{
+  color-scheme:dark;
+  --night:#060E17;
+  --deck:#0C1926;
+  --deck-hi:#132638;
+  --line:#1C3248;
+  --line-hi:#2A4A68;
+  --chalk:#ECF3FA;
+  --dim:#8BA5BD;
+  --faint:#5A7489;
+  --volt:#17A9F5;
+  --volt-hi:#5CC6FF;
+  --volt-deep:#0A4E7A;
+  --win:#35D98A;
+  --heat:#FFB224;
+  --gold:#FFC93C;
+  --flag:#FF5C4D;
+
+  --display:"Barlow Condensed","Oswald","Arial Narrow",system-ui,sans-serif;
+  --ui:"Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+
+  --tabs-h:64px;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--night);
+  color:var(--chalk);
+  font-family:var(--ui);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+}
+button,input,select{font:inherit;color:inherit;}
+button{cursor:pointer;background:none;border:none;}
+:focus-visible{outline:2px solid var(--volt-hi);outline-offset:2px;border-radius:4px;}
+[hidden]{display:none !important;}
+
+.num{font-variant-numeric:tabular-nums;}
+
+/* ─────────── shell ─────────── */
+.app{
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  background:
+    radial-gradient(120% 60% at 50% 0%,rgba(23,169,245,.10),transparent 60%),
+    var(--night);
+}
+
+.topbar{
+  position:sticky;top:0;z-index:40;
+  background:rgba(6,14,23,.92);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.topbar-in{
+  max-width:960px;margin:0 auto;
+  padding-inline:16px;padding-block:10px;
+  display:flex;align-items:center;gap:12px;
+}
+.wordmark{
+  font-family:var(--display);
+  font-weight:800;font-size:20px;letter-spacing:.02em;
+  text-transform:uppercase;line-height:1;
+  display:flex;align-items:center;gap:5px;
+  white-space:nowrap;
+}
+.wordmark b{color:var(--volt);font-weight:800;}
+.pip{
+  width:9px;height:9px;border-radius:50%;
+  background:var(--volt);
+  box-shadow:0 0 0 2px rgba(23,169,245,.25);
+  flex:none;
+}
+.ticker{
+  margin-left:auto;display:flex;align-items:center;gap:14px;
+  min-width:0;
+}
+.tick{
+  display:flex;align-items:baseline;gap:5px;
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap;
+}
+.tick span{color:var(--chalk);font-weight:700;font-size:13px;letter-spacing:0;}
+.live{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--win);
+}
+.live::before{
+  content:"";width:7px;height:7px;border-radius:50%;background:var(--win);
+  animation:pulse 2.4s ease-in-out infinite;
+}
+.live.is-off{color:var(--faint);}
+.live.is-off::before{background:var(--faint);animation:none;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+.gear{
+  flex:none;width:34px;height:34px;border-radius:8px;
+  border:1px solid var(--line);color:var(--dim);
+  display:grid;place-items:center;
+}
+.gear:hover{background:var(--deck-hi);color:var(--chalk);}
+
+main{
+  flex:1;
+  width:100%;max-width:560px;margin:0 auto;
+  padding-inline:16px;
+  padding-block:20px calc(var(--tabs-h) + 28px);
+}
+.board-wide main{max-width:960px;}
+
+/* ─────────── tabs ─────────── */
+.tabs{
+  position:fixed;left:0;right:0;bottom:0;z-index:45;
+  height:var(--tabs-h);
+  background:rgba(9,20,32,.96);
+  backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);
+  display:flex;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tabs-in{max-width:560px;margin:0 auto;display:flex;width:100%;}
+.tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--faint);
+  font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  border-top:2px solid transparent;margin-top:-1px;
+}
+.tab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.tab[aria-current="true"]{color:var(--volt);border-top-color:var(--volt);}
+.tab:hover{color:var(--chalk);}
+
+/* ─────────── type ─────────── */
+.eyebrow{
+  font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);margin:0;
+}
+h1,h2,h3{margin:0;font-family:var(--display);text-transform:uppercase;line-height:1;letter-spacing:.01em;}
+h1{font-weight:800;font-size:clamp(38px,11vw,54px);font-style:italic;letter-spacing:-.01em;}
+h1 em{font-style:italic;color:var(--volt);}
+h2{font-weight:700;font-size:24px;}
+h3{font-weight:700;font-size:17px;letter-spacing:.04em;}
+p{margin:0;}
+.lede{color:var(--dim);font-size:14.5px;max-width:46ch;}
+
+.stack{display:flex;flex-direction:column;gap:18px;}
+.stack-sm{display:flex;flex-direction:column;gap:10px;}
+
+/* ─────────── panels ─────────── */
+.panel{
+  background:var(--deck);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px;
+}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-bottom:12px;
+}
+
+.rule{height:1px;background:var(--line);border:0;margin:0;}
+
+/* ─────────── buttons ─────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px 18px;border-radius:10px;
+  font-weight:700;font-size:14px;letter-spacing:.04em;text-transform:uppercase;
+  border:1px solid transparent;
+  transition:background .15s ease,border-color .15s ease,transform .08s ease;
+}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:var(--volt);color:#04121D;}
+.btn-primary:hover{background:var(--volt-hi);}
+.btn-primary:disabled{background:var(--line);color:var(--faint);cursor:not-allowed;}
+.btn-ghost{border-color:var(--line-hi);color:var(--chalk);}
+.btn-ghost:hover{background:var(--deck-hi);}
+.btn-quiet{color:var(--dim);font-size:12px;letter-spacing:.08em;padding:8px 10px;}
+.btn-quiet:hover{color:var(--chalk);}
+.btn-danger{border-color:rgba(255,92,77,.45);color:var(--flag);}
+.btn-danger:hover{background:rgba(255,92,77,.12);}
+.btn-block{width:100%;}
+
+/* ─────────── number grid ─────────── */
+.grid-nums{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(60px,1fr));
+  gap:8px;
+}
+.numcell{
+  aspect-ratio:1;
+  border:1px solid var(--line-hi);
+  border-radius:10px;
+  background:var(--deck);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-family:var(--display);font-weight:700;font-size:26px;line-height:1;
+  color:var(--chalk);
+  transition:border-color .15s ease,background .15s ease;
+}
+.numcell small{
+  font-family:var(--ui);font-size:9px;font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--faint);
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-inline:4px;
+}
+.numcell:hover:not(:disabled){border-color:var(--volt);background:var(--deck-hi);}
+.numcell:disabled{cursor:not-allowed;color:var(--faint);background:#0A1520;border-color:var(--line);}
+.numcell.is-you{border-color:var(--volt);background:rgba(23,169,245,.12);color:var(--volt-hi);}
+.numcell.is-picked{border-color:var(--win);background:rgba(53,217,138,.12);color:var(--win);}
+
+/* ─────────── player card ─────────── */
+.jersey{
+  display:flex;align-items:center;gap:16px;
+}
+.jersey-num{
+  font-family:var(--display);font-style:italic;font-weight:800;
+  font-size:76px;line-height:.82;letter-spacing:-.02em;
+  color:var(--chalk);
+}
+.jersey-num::before{content:"#";font-size:.42em;vertical-align:.55em;color:var(--volt);margin-right:.04em;}
+.jersey-meta{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.jersey-name{font-weight:700;font-size:18px;overflow:hidden;text-overflow:ellipsis;}
+
+.qr-card{
+  background:#FFFFFF;
+  border-radius:12px;
+  padding:14px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+.qr-card svg{display:block;width:100%;height:auto;max-width:230px;}
+.qr-cap{
+  font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:#4A5B6B;text-align:center;
+}
+
+.statrow{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-radius:10px;overflow:hidden;}
+.stat{background:var(--deck);padding:12px 10px;display:flex;flex-direction:column;gap:2px;align-items:center;}
+.stat b{font-family:var(--display);font-weight:800;font-size:30px;line-height:1;}
+.stat small{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);text-align:center;}
+.stat.is-togo b{color:var(--heat);}
+.stat.is-done b{color:var(--win);}
+
+/* ─────────── lanes (the leaderboard) ─────────── */
+.lanes{display:flex;flex-direction:column;gap:1px;background:var(--line);border-radius:10px;overflow:hidden;}
+.lane{
+  background:var(--deck);
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr) auto;
+  align-items:center;gap:10px;
+  padding:10px 12px;
+  position:relative;
+}
+.lane.is-you{background:var(--deck-hi);}
+.lane.is-champ{background:linear-gradient(90deg,rgba(255,201,60,.16),rgba(255,201,60,.03));}
+.rank{
+  width:26px;height:26px;border-radius:50%;
+  display:grid;place-items:center;
+  font-family:var(--display);font-weight:800;font-size:15px;line-height:1;
+  background:var(--line);color:var(--dim);
+}
+.rank.r1{background:var(--gold);color:#2A1F00;}
+.rank.r2{background:#B8C6D4;color:#101B26;}
+.rank.r3{background:#C98A4B;color:#20120A;}
+.rank.top{background:var(--volt-deep);color:var(--volt-hi);}
+
+.lane-id{display:flex;align-items:baseline;gap:7px;min-width:0;}
+.lane-num{font-family:var(--display);font-weight:800;font-size:20px;line-height:1;}
+.lane-num::before{content:"#";font-size:.6em;color:var(--faint);}
+.lane-name{font-size:12.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lane-body{min-width:0;display:flex;flex-direction:column;gap:6px;}
+
+.rail{height:6px;border-radius:3px;background:#0A1723;overflow:hidden;position:relative;}
+.rail i{
+  display:block;height:100%;border-radius:3px;
+  background:linear-gradient(90deg,var(--volt-deep),var(--volt));
+  transition:width .5s cubic-bezier(.2,.8,.2,1);
+}
+.rail.is-heat i{background:linear-gradient(90deg,#8A5A00,var(--heat));}
+.rail.is-done i{background:linear-gradient(90deg,#0E7A4A,var(--win));}
+
+.lane-score{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+.lane-pts{font-family:var(--display);font-weight:800;font-size:26px;line-height:1;}
+.lane-togo{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);white-space:nowrap;}
+.lane-togo.is-heat{color:var(--heat);}
+.lane-togo.is-done{color:var(--win);}
+
+.closest{
+  border:1px solid rgba(23,169,245,.35);
+  background:linear-gradient(180deg,rgba(23,169,245,.13),rgba(23,169,245,.03));
+  border-radius:12px;padding:14px 16px;
+  display:flex;align-items:center;gap:14px;
+}
+.closest-num{font-family:var(--display);font-style:italic;font-weight:800;font-size:44px;line-height:.85;color:var(--volt-hi);}
+.closest-num::before{content:"#";font-size:.45em;vertical-align:.5em;color:var(--volt);}
+.closest-txt{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.closest-txt b{font-size:15px;font-weight:700;}
+.closest-txt small{font-size:10.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--volt-hi);}
+
+/* ─────────── score entry ─────────── */
+.sides{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.side{
+  border:1px solid var(--line);border-radius:12px;background:var(--deck);
+  padding:12px;display:flex;flex-direction:column;gap:10px;
+  min-height:150px;
+}
+.side.is-active{border-color:var(--volt);}
+.side-head{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);}
+.chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 8px 6px 10px;border-radius:8px;
+  background:var(--deck-hi);border:1px solid var(--line-hi);
+  font-family:var(--display);font-weight:700;font-size:17px;line-height:1;
+}
+.chip::before{content:"#";color:var(--faint);font-size:.75em;}
+.chip-x{
+  color:var(--faint);font-family:var(--ui);font-size:15px;line-height:1;
+  padding:0 2px;border-radius:4px;
+}
+.chip-x:hover{color:var(--flag);}
+.addbtn{
+  border:1px dashed var(--line-hi);border-radius:8px;
+  padding:9px;color:var(--dim);
+  font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+}
+.addbtn:hover{border-color:var(--volt);color:var(--volt-hi);}
+
+.scorebox{display:flex;flex-direction:column;gap:6px;align-items:center;margin-top:auto;}
+.scoreval{
+  width:100%;text-align:center;
+  font-family:var(--display);font-weight:800;font-size:44px;line-height:1;
+  background:#0A1723;border:1px solid var(--line-hi);border-radius:10px;
+  padding:6px 4px;
+  -moz-appearance:textfield;
+}
+.scoreval::-webkit-outer-spin-button,.scoreval::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.steppers{display:flex;gap:6px;width:100%;}
+.step{
+  flex:1;border:1px solid var(--line-hi);border-radius:8px;padding:8px 0;
+  font-size:18px;font-weight:700;line-height:1;color:var(--dim);
+}
+.step:hover{background:var(--deck-hi);color:var(--chalk);}
+
+
+.log{display:flex;flex-direction:column;gap:1px;background:var(--line);border-radius:10px;overflow:hidden;}
+.log-row{
+  background:var(--deck);padding:10px 12px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.log-teams{display:flex;align-items:center;gap:6px;font-family:var(--display);font-weight:700;font-size:16px;line-height:1;flex:1;min-width:0;}
+.log-side{color:var(--dim);}
+.log-side.w{color:var(--chalk);}
+.log-sc{font-family:var(--display);font-weight:800;font-size:19px;line-height:1;white-space:nowrap;}
+.log-when{font-size:10.5px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;}
+
+/* ─────────── sheet / picker ─────────── */
+.sheet{
+  position:fixed;inset:0;z-index:60;
+  background:rgba(3,8,13,.72);
+  display:flex;align-items:flex-end;justify-content:center;
+  padding:16px;
+}
+.sheet-in{
+  width:100%;max-width:520px;
+  background:var(--deck);border:1px solid var(--line-hi);
+  border-radius:14px;padding:16px;
+  max-height:82dvh;overflow:auto;
+  display:flex;flex-direction:column;gap:14px;
+}
+
+/* ─────────── forms ─────────── */
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);}
+.field input,.field select{
+  background:#0A1723;border:1px solid var(--line-hi);border-radius:9px;
+  padding:11px 12px;font-size:15px;width:100%;
+}
+.field input:focus,.field select:focus{border-color:var(--volt);outline:none;}
+.field .hint{font-size:12px;color:var(--faint);}
+.fields2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* ─────────── notices ─────────── */
+.notice{
+  border-radius:10px;padding:11px 13px;
+  font-size:12.5px;line-height:1.45;
+  border:1px solid var(--line-hi);background:var(--deck-hi);color:var(--dim);
+}
+.notice b{color:var(--chalk);font-weight:700;}
+.notice.warn{border-color:rgba(255,178,36,.4);background:rgba(255,178,36,.08);color:#F0D8A8;}
+.notice.warn b{color:var(--heat);}
+
+.empty{
+  text-align:center;padding:26px 16px;
+  border:1px dashed var(--line-hi);border-radius:12px;
+  display:flex;flex-direction:column;gap:6px;align-items:center;
+}
+.empty b{font-family:var(--display);font-weight:700;font-size:19px;text-transform:uppercase;}
+.empty p{font-size:13px;color:var(--faint);max-width:34ch;}
+
+#toast{
+  position:fixed;left:50%;bottom:calc(var(--tabs-h) + 16px);
+  transform:translateX(-50%) translateY(8px);
+  z-index:70;
+  background:var(--deck-hi);border:1px solid var(--line-hi);
+  border-radius:10px;padding:11px 16px;
+  font-size:13px;font-weight:600;
+  box-shadow:0 10px 30px -10px rgba(0,0,0,.8);
+  opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;
+  max-width:calc(100vw - 32px);text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.bad{border-color:rgba(255,92,77,.5);color:#FFC9C3;}
+
+/* ─────────── champion takeover ─────────── */
+.takeover{
+  position:fixed;inset:0;z-index:80;
+  background:
+    radial-gradient(90% 60% at 50% 22%,rgba(255,201,60,.20),transparent 62%),
+    #05101B;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;text-align:center;gap:8px;
+  overflow:auto;
+}
+#confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.takeover>*{position:relative;}
+.trophy{font-size:52px;line-height:1;}
+.champ-label{font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);}
+.champ-num{
+  font-family:var(--display);font-style:italic;font-weight:800;
+  font-size:clamp(64px,22vw,132px);line-height:.82;letter-spacing:-.02em;
+}
+.champ-num::before{content:"#";font-size:.4em;vertical-align:.6em;color:var(--gold);}
+.champ-hit{
+  font-family:var(--display);font-style:italic;font-weight:800;
+  font-size:clamp(46px,17vw,104px);line-height:.85;color:var(--gold);
+}
+.champ-name{font-size:17px;font-weight:700;color:var(--chalk);}
+.champ-sub{font-size:13px;color:var(--dim);max-width:36ch;}
+
+@media (max-width:400px){
+  .sides{gap:8px;}
+  .side{padding:10px;}
+  .jersey-num{font-size:62px;}
+}
+@media (min-width:900px){
+  .board-wide .lane{grid-template-columns:44px minmax(0,1fr) auto;padding:14px 18px;gap:16px;}
+  .board-wide .lane-num{font-size:26px;}
+  .board-wide .lane-pts{font-size:34px;}
+  .board-wide .rank{width:32px;height:32px;font-size:18px;}
+  .board-wide .rail{height:8px;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;}
+}
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="wordmark">THE<b>LAB</b><i class="pip"></i></div>
+      <div class="ticker" id="ticker"></div>
+      <button class="gear" id="gearBtn" aria-label="Event setup" title="Event setup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="main"></main>
+
+  <nav class="tabs" aria-label="Sections">
+    <div class="tabs-in" id="tabs"></div>
+  </nav>
+</div>
+
+<div id="sheet" class="sheet" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="champion" class="takeover" role="dialog" aria-modal="true" aria-label="Champion" hidden></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   QR encoder — byte mode, versions 1-10, EC level L/M.
+   Self-contained so a player's card renders with no network at all.
+   ══════════════════════════════════════════════════════════════════════ */
+var QR = (function () {
+  var BLOCKS = {
+    L: [null, [7,1,19,0,0],[10,1,34,0,0],[15,1,55,0,0],[20,1,80,0,0],[26,1,108,0,0],
+        [18,2,68,0,0],[20,2,78,0,0],[24,2,97,0,0],[30,2,116,0,0],[18,2,68,2,69]],
+    M: [null, [10,1,16,0,0],[16,1,28,0,0],[26,1,44,0,0],[18,2,32,0,0],[24,2,43,0,0],
+        [16,4,27,0,0],[18,4,31,0,0],[22,2,38,2,39],[22,3,36,2,37],[26,4,43,1,44]]
+  };
+  var ALIGN = [null,[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+  var EC_BITS = {L:1,M:0};
+
+  var EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+  (function(){ var x=1; for(var i=0;i<255;i++){EXP[i]=x;LOG[x]=i;x<<=1;if(x&0x100)x^=0x11d;}
+    for(var j=255;j<512;j++)EXP[j]=EXP[j-255]; })();
+  function gmul(a,b){ return (a===0||b===0)?0:EXP[LOG[a]+LOG[b]]; }
+
+  function rsGen(deg){
+    var poly=[1];
+    for(var d=0;d<deg;d++){
+      var next=new Array(poly.length+1).fill(0);
+      for(var i=0;i<poly.length;i++){ next[i]^=poly[i]; next[i+1]^=gmul(poly[i],EXP[d]); }
+      poly=next;
+    }
+    return poly;
+  }
+  function rsEncode(data,ecLen){
+    var gen=rsGen(ecLen), res=new Array(ecLen).fill(0);
+    for(var i=0;i<data.length;i++){
+      var f=data[i]^res[0]; res.shift(); res.push(0);
+      if(f!==0) for(var j=0;j<ecLen;j++) res[j]^=gmul(gen[j+1],f);
+    }
+    return res;
+  }
+
+  function utf8(t){
+    if(typeof TextEncoder!=='undefined') return Array.from(new TextEncoder().encode(t));
+    var s=unescape(encodeURIComponent(t)),o=[];
+    for(var i=0;i<s.length;i++)o.push(s.charCodeAt(i));
+    return o;
+  }
+  function capCw(v,ec){ var b=BLOCKS[ec][v]; return b[1]*b[2]+b[3]*b[4]; }
+  function pickVersion(len,ec){
+    for(var v=1;v<=10;v++){
+      var cb=v<10?8:16;
+      if(4+cb+len*8 <= capCw(v,ec)*8) return v;
+    }
+    return -1;
+  }
+
+  function codewords(bytes,v,ec){
+    var cb=v<10?8:16, capBits=capCw(v,ec)*8, bits=[];
+    function put(val,len){ for(var i=len-1;i>=0;i--) bits.push((val>>>i)&1); }
+    put(4,4); put(bytes.length,cb);
+    for(var i=0;i<bytes.length;i++) put(bytes[i],8);
+    put(0,Math.min(4,capBits-bits.length));
+    while(bits.length%8!==0) bits.push(0);
+    var dcw=[];
+    for(var b=0;b<bits.length;b+=8){ var val=0; for(var k=0;k<8;k++) val=(val<<1)|bits[b+k]; dcw.push(val); }
+    var pad=[0xec,0x11],p=0;
+    while(dcw.length<capBits/8) dcw.push(pad[p++%2]);
+
+    var spec=BLOCKS[ec][v], ecLen=spec[0], blocks=[], ecb=[], off=0, g;
+    for(g=0;g<spec[1];g++){ blocks.push(dcw.slice(off,off+spec[2])); off+=spec[2]; }
+    for(g=0;g<spec[3];g++){ blocks.push(dcw.slice(off,off+spec[4])); off+=spec[4]; }
+    for(g=0;g<blocks.length;g++) ecb.push(rsEncode(blocks[g],ecLen));
+    var out=[], maxD=Math.max(spec[2],spec[4]), i2, j2;
+    for(i2=0;i2<maxD;i2++) for(j2=0;j2<blocks.length;j2++) if(i2<blocks[j2].length) out.push(blocks[j2][i2]);
+    for(i2=0;i2<ecLen;i2++) for(j2=0;j2<ecb.length;j2++) out.push(ecb[j2][i2]);
+    return out;
+  }
+
+  function grid(n){ var g=[]; for(var i=0;i<n;i++) g.push(new Int8Array(n).fill(-1)); return g; }
+
+  function finder(m,r,c){
+    for(var i=-1;i<=7;i++) for(var j=-1;j<=7;j++){
+      var rr=r+i, cc=c+j;
+      if(rr<0||cc<0||rr>=m.length||cc>=m.length) continue;
+      var on=(i>=0&&i<=6&&(j===0||j===6))||(j>=0&&j<=6&&(i===0||i===6))||(i>=2&&i<=4&&j>=2&&j<=4);
+      m[rr][cc]=on?1:0;
+    }
+  }
+  function versionBits(v){
+    var rem=v;
+    for(var i=0;i<12;i++) rem=((rem<<1)^(((rem>>>11)&1)*0x1f25))&0xfff;
+    return (v<<12)|rem;
+  }
+  function formatBits(ec,mask){
+    var data=(EC_BITS[ec]<<3)|mask, rem=data;
+    for(var i=0;i<10;i++) rem=((rem<<1)^(((rem>>>9)&1)*0x537))&0x3ff;
+    return ((data<<10)|rem)^0x5412;
+  }
+
+  function functional(m,v){
+    var n=m.length,i,j;
+    finder(m,0,0); finder(m,0,n-7); finder(m,n-7,0);
+    for(i=8;i<n-8;i++){ var t=i%2===0?1:0; m[6][i]=t; m[i][6]=t; }
+    var ctr=ALIGN[v], last=ctr.length-1;
+    for(i=0;i<ctr.length;i++) for(j=0;j<ctr.length;j++){
+      if((i===0&&j===0)||(i===0&&j===last)||(i===last&&j===0)) continue;
+      var r=ctr[i], c=ctr[j];
+      for(var dy=-2;dy<=2;dy++) for(var dx=-2;dx<=2;dx++)
+        m[r+dy][c+dx]=Math.max(Math.abs(dy),Math.abs(dx))!==1?1:0;
+    }
+    m[4*v+9][8]=1;
+    for(i=0;i<=8;i++){ if(m[8][i]===-1)m[8][i]=0; if(m[i][8]===-1)m[i][8]=0; }
+    for(i=0;i<8;i++){ if(m[8][n-1-i]===-1)m[8][n-1-i]=0; if(m[n-1-i][8]===-1)m[n-1-i][8]=0; }
+    if(v>=7){
+      var vb=versionBits(v);
+      for(i=0;i<18;i++){
+        var b=(vb>>i)&1;
+        m[Math.floor(i/3)][n-11+(i%3)]=b;
+        m[n-11+(i%3)][Math.floor(i/3)]=b;
+      }
+    }
+  }
+
+  function placeData(m,fn,cw){
+    var n=m.length, bi=0, total=cw.length*8, col=n-1, up=true;
+    while(col>0){
+      if(col===6) col--;
+      for(var s=0;s<n;s++){
+        var row=up?n-1-s:s;
+        for(var k=0;k<2;k++){
+          var c=col-k;
+          if(fn[row][c]!==-1) continue;
+          var bit=0;
+          if(bi<total) bit=(cw[bi>>3]>>(7-(bi&7)))&1;
+          bi++;
+          m[row][c]=bit;
+        }
+      }
+      up=!up; col-=2;
+    }
+  }
+
+  function maskAt(k,i,j){
+    switch(k){
+      case 0: return (i+j)%2===0;
+      case 1: return i%2===0;
+      case 2: return j%3===0;
+      case 3: return (i+j)%3===0;
+      case 4: return (Math.floor(i/2)+Math.floor(j/3))%2===0;
+      case 5: return ((i*j)%2)+((i*j)%3)===0;
+      case 6: return (((i*j)%2)+((i*j)%3))%2===0;
+      default: return ((((i+j)%2)+((i*j)%3))%2)===0;
+    }
+  }
+
+  var RUN=[1,0,1,1,1,0,1];
+  function penalty(m){
+    var n=m.length, score=0, i, j, dark=0;
+    function line(get){
+      var s=0, run=1;
+      for(var k=1;k<n;k++){
+        if(get(k)===get(k-1)) run++;
+        else { if(run>=5) s+=3+(run-5); run=1; }
+      }
+      if(run>=5) s+=3+(run-5);
+      return s;
+    }
+    for(i=0;i<n;i++){
+      (function(r){ score+=line(function(k){return m[r][k];}); })(i);
+      (function(c){ score+=line(function(k){return m[k][c];}); })(i);
+    }
+    for(i=0;i<n-1;i++) for(j=0;j<n-1;j++){
+      var v=m[i][j];
+      if(v===m[i][j+1]&&v===m[i+1][j]&&v===m[i+1][j+1]) score+=3;
+    }
+    function hit(get,k){
+      for(var t=0;t<7;t++) if(get(k+t)!==RUN[t]) return false;
+      var before=true, after=true, t2;
+      for(t2=1;t2<=4;t2++) if(get(k-t2)!==0){ before=false; break; }
+      for(t2=0;t2<4;t2++) if(get(k+7+t2)!==0){ after=false; break; }
+      return before||after;
+    }
+    for(i=0;i<n;i++) for(j=0;j<=n-7;j++){
+      (function(r,c){
+        if(hit(function(k){return k<0||k>=n?0:m[r][k];},c)) score+=40;
+        if(hit(function(k){return k<0||k>=n?0:m[k][c];},r)) score+=40;
+      })(i,j);
+    }
+    for(i=0;i<n;i++) for(j=0;j<n;j++) if(m[i][j]===1) dark++;
+    score+=Math.floor(Math.abs((dark*100)/(n*n)-50)/5)*10;
+    return score;
+  }
+
+  function clone(m){ return m.map(function(r){ return Int8Array.from(r); }); }
+
+  function encode(text, ecLevel){
+    var ec = BLOCKS[ecLevel] ? ecLevel : 'M';
+    var bytes = utf8(String(text));
+    var v = pickVersion(bytes.length, ec);
+    if(v < 0){
+      if(ec === 'M') return encode(text, 'L');
+      throw new Error('QR payload too long');
+    }
+    var n = v*4+17, cw = codewords(bytes, v, ec);
+    var fn = grid(n); functional(fn, v);
+    var base = clone(fn); placeData(base, fn, cw);
+    var best=null, bestScore=Infinity, bestMask=0;
+    for(var k=0;k<8;k++){
+      var cand=clone(base), i, j;
+      for(i=0;i<n;i++) for(j=0;j<n;j++){ if(fn[i][j]===-1 && maskAt(k,i,j)) cand[i][j]^=1; }
+      var bits=formatBits(ec,k);
+      for(i=0;i<=5;i++) cand[i][8]=(bits>>i)&1;
+      cand[7][8]=(bits>>6)&1; cand[8][8]=(bits>>7)&1; cand[8][7]=(bits>>8)&1;
+      for(i=9;i<15;i++) cand[8][14-i]=(bits>>i)&1;
+      for(i=0;i<8;i++) cand[8][n-1-i]=(bits>>i)&1;
+      for(i=8;i<15;i++) cand[n-15+i][8]=(bits>>i)&1;
+      cand[n-8][8]=1;
+      var s=penalty(cand);
+      if(s<bestScore){ bestScore=s; best=cand; bestMask=k; }
+    }
+    var out=[];
+    for(var r=0;r<n;r++){ var row=[]; for(var c=0;c<n;c++) row.push(best[r][c]&1); out.push(row); }
+    return { size:n, version:v, modules:out };
+  }
+
+  return { encode: encode };
+})();
+
+/* Render a QR matrix as one <svg> path — crisp at any size, prints cleanly. */
+function qrSvg(text, alt){
+  var m;
+  try { m = QR.encode(text, 'M'); }
+  catch (e) { return '<div class="qr-cap">Code too long to display</div>'; }
+  var q = 4, dim = m.size + q*2, d = '';
+  for (var r = 0; r < m.size; r++){
+    for (var c = 0; c < m.size; c++){
+      if (m.modules[r][c]) d += 'M' + (c+q) + ' ' + (r+q) + 'h1v1h-1z';
+    }
+  }
+  return '<svg viewBox="0 0 '+dim+' '+dim+'" shape-rendering="crispEdges" role="img" aria-label="'+esc(alt||'QR code')+'">'
+       + '<rect width="'+dim+'" height="'+dim+'" fill="#FFFFFF"/>'
+       + '<path d="'+d+'" fill="#0A1520"/></svg>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Storage — the artifact db when this page is running live for a group,
+   a local fallback so the page still works opened on its own.
+   ══════════════════════════════════════════════════════════════════════ */
+var DEFAULTS = { name:'Race to 50', target:50, maxPlayers:18, courts:3, gameMinutes:10, link:'' };
+
+var store = {
+  mode: 'local',          // 'live' once the shared db answers
+  meta: {},
+  players: {},            // num -> {num,name,device,joinedAt}
+  games: {},              // id  -> {id,s1,s2,p1,p2,at,court}
+  db: null,
+  ready: false
+};
+
+var LS = {
+  get: function (k, d) {
+    try { var v = localStorage.getItem('lab50.' + k); return v ? JSON.parse(v) : d; }
+    catch (e) { return d; }
+  },
+  set: function (k, v) {
+    try { localStorage.setItem('lab50.' + k, JSON.stringify(v)); } catch (e) {}
+  }
+};
+
+var deviceId = LS.get('device', null);
+if (!deviceId) { deviceId = 'd' + Math.random().toString(36).slice(2, 10); LS.set('device', deviceId); }
+
+var ui = {
+  screen: null,
+  entry: LS.get('entry', { s1: [], s2: [], p1: 0, p2: 0, court: 1 }),
+  dismissedChamp: LS.get('dismissedChamp', '')
+};
+
+/* ── local-mode persistence ── */
+function localLoad(){
+  store.meta = LS.get('meta', {});
+  store.players = LS.get('players', {});
+  store.games = LS.get('games', {});
+}
+function localSave(){
+  LS.set('meta', store.meta);
+  LS.set('players', store.players);
+  LS.set('games', store.games);
+}
+
+/* ── writes route to whichever backend is live ── */
+function putMeta(patch){
+  Object.assign(store.meta, patch);
+  if (store.mode === 'live') return store.db.doc('event/meta').set(store.meta);
+  localSave(); render(); return Promise.resolve();
+}
+function putPlayer(p){
+  store.players[p.num] = p;
+  if (store.mode === 'live') return store.db.doc('players/' + p.num).set(p);
+  localSave(); render(); return Promise.resolve();
+}
+function putGame(g){
+  store.games[g.id] = g;
+  if (store.mode === 'live') return store.db.doc('games/' + g.id).set(g);
+  localSave(); render(); return Promise.resolve();
+}
+function dropGame(id){
+  delete store.games[id];
+  if (store.mode === 'live') return store.db.doc('games/' + id).delete();
+  localSave(); render(); return Promise.resolve();
+}
+function dropAll(){
+  var ids = Object.keys(store.games), nums = Object.keys(store.players);
+  store.games = {}; store.players = {};
+  if (store.mode === 'live'){
+    return Promise.all(
+      ids.map(function (id){ return store.db.doc('games/' + id).delete(); })
+        .concat(nums.map(function (n){ return store.db.doc('players/' + n).delete(); }))
+    );
+  }
+  localSave(); render(); return Promise.resolve();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Standings — every total is derived from the game log, never stored.
+   That makes an undo exact and keeps two phones from racing a counter.
+   ══════════════════════════════════════════════════════════════════════ */
+function meta(){
+  var m = {};
+  for (var k in DEFAULTS) m[k] = (store.meta && store.meta[k] != null && store.meta[k] !== '') ? store.meta[k] : DEFAULTS[k];
+  m.target = Math.max(1, Number(m.target) || DEFAULTS.target);
+  m.maxPlayers = Math.max(2, Math.min(60, Number(m.maxPlayers) || DEFAULTS.maxPlayers));
+  return m;
+}
+
+function gamesInOrder(){
+  return Object.keys(store.games)
+    .map(function (k){ return store.games[k]; })
+    .filter(function (g){ return g && Array.isArray(g.s1) && Array.isArray(g.s2); })
+    .sort(function (a, b){ return (a.at || 0) - (b.at || 0) || String(a.id).localeCompare(String(b.id)); });
+}
+
+function standings(){
+  var m = meta(), log = gamesInOrder();
+  var totals = {}, played = {};
+
+  function seen(n){ if (totals[n] == null){ totals[n] = 0; played[n] = 0; } }
+  Object.keys(store.players).forEach(function (n){ seen(Number(n)); });
+
+  var champs = [], champAt = null;
+  log.forEach(function (g){
+    var crossed = [];
+    [[g.s1, g.p1], [g.s2, g.p2]].forEach(function (pair){
+      pair[0].forEach(function (n){
+        seen(n);
+        var before = totals[n];
+        totals[n] += Number(pair[1]) || 0;
+        played[n] += 1;
+        if (before < m.target && totals[n] >= m.target) crossed.push(n);
+      });
+    });
+    if (!champs.length && crossed.length){ champs = crossed.slice().sort(function(a,b){return a-b;}); champAt = g.at || 0; }
+  });
+
+  var rows = Object.keys(totals).map(function (n){
+    var num = Number(n), p = store.players[num];
+    return {
+      num: num,
+      name: (p && p.name) || '',
+      checkedIn: !!p,
+      isYou: !!(p && p.device === deviceId),
+      points: totals[num],
+      games: played[num],
+      toGo: Math.max(0, m.target - totals[num]),
+      done: totals[num] >= m.target
+    };
+  });
+
+  rows.sort(function (a, b){
+    return b.points - a.points || a.games - b.games || a.num - b.num;
+  });
+  rows.forEach(function (r, i){ r.rank = i + 1; });
+
+  return { rows: rows, champs: champs, champAt: champAt, target: m.target, gameCount: log.length, log: log };
+}
+
+function you(){
+  var mine = null;
+  Object.keys(store.players).forEach(function (n){
+    if (store.players[n] && store.players[n].device === deviceId) mine = store.players[n];
+  });
+  return mine;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Helpers
+   ══════════════════════════════════════════════════════════════════════ */
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c){
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+  });
+}
+function label(p){ return p && p.name ? p.name : ''; }
+function ago(t){
+  if (!t) return '';
+  var s = Math.round((Date.now() - t) / 1000);
+  if (s < 45) return 'just now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  return Math.round(s / 3600) + 'h ago';
+}
+var toastTimer = null;
+function toast(msg, bad){
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (bad ? ' bad' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function (){ el.className = ''; }, 3200);
+}
+function saveEntry(){ LS.set('entry', ui.entry); }
+
+/* The payload a scorer's phone reads. With an event link set it is a deep
+   link any phone camera can open; without one it is a plain token that the
+   in-page scanner still understands. */
+function playerPayload(num){
+  var link = (store.meta && store.meta.link || '').trim();
+  if (link) return link.split('#')[0] + '#add=' + num;
+  return 'LAB50-P' + num;
+}
+function eventPayload(){
+  var link = (store.meta && store.meta.link || '').trim();
+  return link ? link.split('#')[0] : '';
+}
+function parsePayload(text){
+  if (!text) return null;
+  var m = String(text).match(/(?:#|[?&])(?:add|p)=(\d{1,3})\b/) || String(text).match(/LAB50-P(\d{1,3})\b/i);
+  if (m) return Number(m[1]);
+  if (/^\d{1,3}$/.test(String(text).trim())) return Number(String(text).trim());
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Screens
+   ══════════════════════════════════════════════════════════════════════ */
+function screenJoin(){
+  var m = meta(), st = standings(), mine = you();
+  var cells = '';
+  for (var i = 1; i <= m.maxPlayers; i++){
+    var p = store.players[i];
+    var taken = !!p, isYou = taken && p.device === deviceId;
+    cells += '<button class="numcell' + (isYou ? ' is-you' : '') + '" data-join="' + i + '"'
+          + (taken && !isYou ? ' disabled' : '') + '>'
+          + i
+          + '<small>' + (isYou ? 'you' : taken ? esc(label(p) || 'taken') : '') + '</small>'
+          + '</button>';
+  }
+
+  var ev = eventPayload();
+
+  return '<div class="stack">'
+    + '<div class="stack-sm">'
+      + '<p class="eyebrow">' + esc(m.name) + ' &middot; The LAB</p>'
+      + '<h1>Race to <em>' + m.target + '</em></h1>'
+      + '<p class="lede">Rally scoring, one point per rally. Every point you score counts &mdash; win or lose. '
+      + 'New partners and new opponents each round. First to ' + m.target + ' wins.</p>'
+    + '</div>'
+
+    + (mine ? '' : '<div class="panel"><div class="panel-head"><h3>Pick your number</h3>'
+        + '<span class="eyebrow">' + st.rows.filter(function(r){return r.checkedIn;}).length + ' / ' + m.maxPlayers + ' in</span></div>'
+        + '<div class="grid-nums">' + cells + '</div>'
+        + '<p class="hint" style="margin-top:12px;font-size:12px;color:var(--faint)">Tap the number on your paddle tag. Greyed-out numbers are already taken.</p>'
+      + '</div>')
+
+    + (ev ? '<div class="panel"><div class="panel-head"><h3>Event code</h3><span class="eyebrow">Scan to join</span></div>'
+        + '<div class="qr-card">' + qrSvg(ev, 'QR code to join the event')
+        + '<div class="qr-cap">Point a phone camera here</div></div></div>'
+      : '<div class="notice"><b>Organizer:</b> open setup (top right) and paste this page’s link to turn on the event QR code and the scannable player cards.</div>')
+
+    + '<div class="panel"><div class="panel-head"><h3>Format</h3></div>'
+      + '<div class="statrow">'
+        + '<div class="stat"><b class="num">' + m.courts + '</b><small>Courts</small></div>'
+        + '<div class="stat"><b class="num">' + m.gameMinutes + '</b><small>Min games</small></div>'
+        + '<div class="stat"><b class="num">' + m.target + '</b><small>To win</small></div>'
+      + '</div>'
+    + '</div>'
+  + '</div>';
+}
+
+function screenCard(){
+  var mine = you();
+  if (!mine) return screenJoin();
+  var st = standings(), m = meta();
+  var row = st.rows.filter(function (r){ return r.num === mine.num; })[0]
+        || { points:0, games:0, toGo:m.target, rank:st.rows.length + 1, done:false };
+  var leader = st.rows[0];
+  var behind = leader && leader.num !== mine.num ? leader.points - row.points : 0;
+
+  return '<div class="stack">'
+    + '<div class="jersey">'
+      + '<div class="jersey-num num">' + mine.num + '</div>'
+      + '<div class="jersey-meta">'
+        + '<p class="eyebrow">Your player card</p>'
+        + (mine.name ? '<div class="jersey-name">' + esc(mine.name) + '</div>' : '')
+        + '<div style="display:flex;gap:4px;flex-wrap:wrap">'
+          + '<button class="btn-quiet" data-edit-name="1" style="padding-left:0">'
+            + (mine.name ? 'Change name' : 'Add your name') + '</button>'
+          + '<button class="btn-quiet" data-change-num="1">Change number</button>'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+
+    + '<div class="panel">'
+      + '<div class="qr-card">'
+        + qrSvg(playerPayload(mine.num), 'QR code for player ' + mine.num)
+        + '<div class="qr-cap">Player ' + mine.num + ' &middot; show after each game</div>'
+      + '</div>'
+      + '<p class="hint" style="margin-top:12px;font-size:12px;color:var(--faint);text-align:center">'
+        + 'The scorer scans this to add you to a result.</p>'
+    + '</div>'
+
+    + '<div class="statrow">'
+      + '<div class="stat"><b class="num">' + row.points + '</b><small>Points</small></div>'
+      + '<div class="stat"><b class="num">' + row.games + '</b><small>Games</small></div>'
+      + '<div class="stat ' + (row.done ? 'is-done' : 'is-togo') + '"><b class="num">'
+        + (row.done ? m.target : row.toGo) + '</b><small>' + (row.done ? 'Reached' : 'To go') + '</small></div>'
+    + '</div>'
+
+    + '<div class="notice">'
+      + (row.done
+          ? '<b>You hit ' + m.target + '.</b> Nice night.'
+          : st.gameCount === 0
+            ? '<b>Rank &mdash;</b> the board opens up once the first scores come in.'
+            : '<b>Rank ' + row.rank + ' of ' + st.rows.length + '.</b> '
+              + (behind > 0 ? behind + ' point' + (behind === 1 ? '' : 's') + ' behind #' + leader.num + '.' : 'You are leading.'))
+    + '</div>'
+
+    + '<button class="btn btn-primary btn-block" data-go="score">Report a score</button>'
+  + '</div>';
+}
+
+function sideHtml(which){
+  var arr = ui.entry[which === 1 ? 's1' : 's2'];
+  var chips = arr.map(function (n){
+    return '<span class="chip">' + n + '<button class="chip-x" data-drop="' + which + ':' + n
+      + '" aria-label="Remove player ' + n + ' from side ' + which + '">&times;</button></span>';
+  }).join('');
+  return '<div class="side' + (arr.length ? ' is-active' : '') + '">'
+    + '<div class="side-head">Side ' + which + '</div>'
+    + '<div class="chips">' + chips + '</div>'
+    + (arr.length < 2 ? '<button class="addbtn" data-add="' + which + '">+ Add player</button>' : '')
+    + '<div class="scorebox">'
+      + '<input class="scoreval num" type="number" inputmode="numeric" min="0" max="99" '
+        + 'id="score' + which + '" aria-label="Points scored by side ' + which + '" '
+        + 'value="' + (which === 1 ? ui.entry.p1 : ui.entry.p2) + '" data-score="' + which + '">'
+      + '<div class="steppers">'
+        + '<button class="step" data-step="' + which + ':-1" aria-label="Subtract a point from side ' + which + '">&minus;</button>'
+        + '<button class="step" data-step="' + which + ':1" aria-label="Add a point to side ' + which + '">+</button>'
+      + '</div>'
+    + '</div>'
+  + '</div>';
+}
+
+function screenScore(){
+  var st = standings(), m = meta();
+  var e = ui.entry;
+  var canSubmit = e.s1.length && e.s2.length && (Number(e.p1) > 0 || Number(e.p2) > 0);
+
+  var recent = st.log.slice(-6).reverse().map(function (g){
+    var w1 = g.p1 >= g.p2, w2 = g.p2 >= g.p1;
+    return '<div class="log-row">'
+      + '<div class="log-teams">'
+        + '<span class="log-side' + (w1 ? ' w' : '') + '">' + g.s1.map(function(n){return '#'+n;}).join(' ') + '</span>'
+        + '<span class="log-sc num">' + g.p1 + '&ndash;' + g.p2 + '</span>'
+        + '<span class="log-side' + (w2 ? ' w' : '') + '">' + g.s2.map(function(n){return '#'+n;}).join(' ') + '</span>'
+      + '</div>'
+      + '<span class="log-when">' + ago(g.at) + '</span>'
+      + '<button class="btn-quiet" data-undo="' + esc(g.id) + '">Undo</button>'
+    + '</div>';
+  }).join('');
+
+  return '<div class="stack">'
+    + '<div class="stack-sm">'
+      + '<p class="eyebrow">Report score</p>'
+      + '<h2>Who played, and what did they score?</h2>'
+      + '<p class="lede">Add each player, then enter the points that side scored. Everyone on a side is credited the same points.</p>'
+    + '</div>'
+
+    + '<div class="sides">' + sideHtml(1) + sideHtml(2) + '</div>'
+
+    + '<button class="btn btn-primary btn-block" data-submit="1"' + (canSubmit ? '' : ' disabled') + '>'
+      + (canSubmit ? 'Submit score' : 'Add players and points') + '</button>'
+
+    + '<div style="display:flex;gap:8px">'
+      + '<button class="btn btn-ghost" style="flex:1" data-scan="1">Scan a card</button>'
+      + '<button class="btn btn-ghost" style="flex:1" data-clear="1">Clear</button>'
+    + '</div>'
+
+    + (recent
+        ? '<div><div class="panel-head"><h3>Recent games</h3><span class="eyebrow">' + st.gameCount + ' total</span></div>'
+          + '<div class="log">' + recent + '</div></div>'
+        : '<div class="empty"><b>No games yet</b><p>The first result you submit starts the race. '
+          + 'Games are ' + m.gameMinutes + ' minutes, rally scoring.</p></div>')
+  + '</div>';
+}
+
+function screenBoard(){
+  var st = standings(), m = meta(), mine = you();
+  var live = st.rows.filter(function (r){ return !r.done; });
+  var closest = live[0];
+
+  var lanes = st.rows.map(function (r){
+    var pct = Math.min(100, Math.round((r.points / m.target) * 100));
+    var heat = !r.done && r.toGo <= Math.max(5, Math.round(m.target * 0.12));
+    var isChamp = st.champs.indexOf(r.num) >= 0;
+    return '<div class="lane' + (r.isYou ? ' is-you' : '') + (isChamp ? ' is-champ' : '') + '">'
+      + '<div class="rank ' + (r.rank === 1 ? 'r1' : r.rank === 2 ? 'r2' : r.rank === 3 ? 'r3' : r.rank <= 6 ? 'top' : '') + ' num">' + r.rank + '</div>'
+      + '<div class="lane-body">'
+        + '<div class="lane-id">'
+          + '<span class="lane-num num">' + r.num + '</span>'
+          + '<span class="lane-name">' + esc(r.name || (r.checkedIn ? '' : 'not checked in')) + '</span>'
+        + '</div>'
+        + '<div class="rail' + (r.done ? ' is-done' : heat ? ' is-heat' : '') + '"><i style="width:' + pct + '%"></i></div>'
+      + '</div>'
+      + '<div class="lane-score">'
+        + '<span class="lane-pts num">' + r.points + '</span>'
+        + '<span class="lane-togo ' + (r.done ? 'is-done' : heat ? 'is-heat' : '') + '">'
+          + (r.done ? 'reached ' + m.target : r.toGo + ' to go') + '</span>'
+      + '</div>'
+    + '</div>';
+  }).join('');
+
+  return '<div class="stack">'
+    + '<div class="stack-sm">'
+      + '<p class="eyebrow">Live leaderboard &middot; ' + st.gameCount + ' game' + (st.gameCount === 1 ? '' : 's') + ' in</p>'
+      + '<h2>Closest to ' + m.target + '</h2>'
+    + '</div>'
+
+    + (closest && closest.points > 0
+        ? '<div class="closest">'
+          + '<div class="closest-num num">' + closest.num + '</div>'
+          + '<div class="closest-txt">'
+            + '<small>' + closest.toGo + ' point' + (closest.toGo === 1 ? '' : 's') + ' from ' + m.target + '</small>'
+            + '<b>' + esc(closest.name || 'Player ' + closest.num) + ' &middot; ' + closest.points + ' points</b>'
+            + '<small style="color:var(--faint);letter-spacing:.06em;text-transform:none;font-weight:600">'
+              + closest.games + ' game' + (closest.games === 1 ? '' : 's') + ' played</small>'
+          + '</div>'
+        + '</div>'
+        : '')
+
+    + (st.rows.length
+        ? '<div class="lanes" aria-live="polite">' + lanes + '</div>'
+        : '<div class="empty"><b>The board is empty</b><p>It fills the moment the first score is reported. '
+          + 'Every point a player scores counts toward ' + m.target + ' &mdash; win or lose.</p></div>')
+
+    + (mine ? '' : '<button class="btn btn-ghost btn-block" data-go="join">Join the event</button>')
+  + '</div>';
+}
+
+function screenSetup(){
+  var m = meta(), ev = eventPayload(), st = standings();
+  return '<div class="stack">'
+    + '<div class="stack-sm">'
+      + '<p class="eyebrow">Organizer</p>'
+      + '<h2>Event setup</h2>'
+      + '<p class="lede">Everything here is shared with every phone in the event.</p>'
+    + '</div>'
+
+    + '<div class="panel stack-sm">'
+      + '<div class="field"><label for="fName">Event name</label>'
+        + '<input id="fName" type="text" value="' + esc(m.name) + '" data-meta="name"></div>'
+      + '<div class="fields2">'
+        + '<div class="field"><label for="fTarget">Race to</label>'
+          + '<input id="fTarget" type="number" min="1" max="500" value="' + m.target + '" data-meta="target"></div>'
+        + '<div class="field"><label for="fMax">Players</label>'
+          + '<input id="fMax" type="number" min="2" max="60" value="' + m.maxPlayers + '" data-meta="maxPlayers"></div>'
+      + '</div>'
+      + '<div class="fields2">'
+        + '<div class="field"><label for="fCourts">Courts</label>'
+          + '<input id="fCourts" type="number" min="1" max="12" value="' + m.courts + '" data-meta="courts"></div>'
+        + '<div class="field"><label for="fMins">Game minutes</label>'
+          + '<input id="fMins" type="number" min="1" max="60" value="' + m.gameMinutes + '" data-meta="gameMinutes"></div>'
+      + '</div>'
+    + '</div>'
+
+    + '<div class="panel stack-sm">'
+      + '<div class="field">'
+        + '<label for="fLink">Event link</label>'
+        + '<input id="fLink" type="url" placeholder="https://&hellip;" value="' + esc(store.meta.link || '') + '" data-meta="link">'
+        + '<p class="hint">Paste this page’s own address. It turns the event QR code and every player card into a link '
+        + 'any phone camera can open &mdash; no app, no in-page scanner.</p>'
+      + '</div>'
+      + (ev ? '<div class="qr-card">' + qrSvg(ev, 'QR code to join the event')
+              + '<div class="qr-cap">' + esc(m.name) + ' &middot; scan to join</div></div>'
+            : '')
+    + '</div>'
+
+    + '<div class="panel stack-sm">'
+      + '<div class="panel-head"><h3>Danger zone</h3></div>'
+      + '<p class="lede" style="font-size:13px">Clears every score and check-in for a fresh night. '
+        + st.gameCount + ' game' + (st.gameCount === 1 ? '' : 's') + ' and '
+        + st.rows.filter(function(r){return r.checkedIn;}).length + ' player'
+        + (st.rows.filter(function(r){return r.checkedIn;}).length === 1 ? '' : 's') + ' will be removed.</p>'
+      + '<button class="btn btn-danger btn-block" data-reset="1">Start a new event</button>'
+    + '</div>'
+
+    + '<div class="notice">'
+      + (store.mode === 'live'
+          ? '<b>Live.</b> Scores sync to every phone on this link within a second or two.'
+          : '<b>This device only.</b> The shared scoreboard is not connected here, so scores stay in this browser.')
+    + '</div>'
+  + '</div>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Render
+   ══════════════════════════════════════════════════════════════════════ */
+function tabsHtml(){
+  var mine = you();
+  var items = [
+    mine
+      ? { id:'card', label:'My card', icon:'<rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M7 10h4M7 14h7"></path>' }
+      : { id:'join', label:'Join', icon:'<path d="M12 5v14M5 12h14"></path>' },
+    { id:'score', label:'Score', icon:'<path d="M4 7h16M4 12h16M4 17h9"></path>' },
+    { id:'board', label:'Board', icon:'<path d="M5 20V10M12 20V4M19 20v-7"></path>' }
+  ];
+  return items.map(function (t){
+    return '<button class="tab" data-go="' + t.id + '" aria-current="' + (ui.screen === t.id) + '">'
+      + '<svg viewBox="0 0 24 24">' + t.icon + '</svg>' + t.label + '</button>';
+  }).join('');
+}
+
+function tickerHtml(){
+  var st = standings(), m = meta();
+  var live = st.rows.filter(function (r){ return !r.done; })[0];
+  var bits = '<span class="live' + (store.mode === 'live' ? '' : ' is-off') + '">'
+           + (store.mode === 'live' ? 'Live' : 'Local') + '</span>';
+  if (st.gameCount) bits += '<span class="tick">Games <span class="num">' + st.gameCount + '</span></span>';
+  if (live && live.points > 0) bits += '<span class="tick">Leader <span class="num">#' + live.num + '</span></span>';
+  return bits;
+}
+
+function render(){
+  var mine = you();
+  if (!ui.screen) ui.screen = mine ? 'card' : 'join';
+  if (ui.screen === 'card' && !mine) ui.screen = 'join';
+  if (ui.screen === 'join' && mine) ui.screen = 'card';
+
+  var html = ui.screen === 'join'  ? screenJoin()
+           : ui.screen === 'card'  ? screenCard()
+           : ui.screen === 'score' ? screenScore()
+           : ui.screen === 'board' ? screenBoard()
+           : screenSetup();
+
+  document.getElementById('main').innerHTML = html;
+  document.getElementById('tabs').innerHTML = tabsHtml();
+  document.getElementById('ticker').innerHTML = tickerHtml();
+  document.querySelector('.app').classList.toggle('board-wide', ui.screen === 'board');
+  checkChampion();
+}
+
+function go(screen){
+  ui.screen = screen;
+  render();
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Champion takeover
+   ══════════════════════════════════════════════════════════════════════ */
+function checkChampion(){
+  var st = standings(), m = meta();
+  var el = document.getElementById('champion');
+  if (!st.champs.length){ el.hidden = true; el.innerHTML = ''; return; }
+
+  var sig = st.champs.join(',') + '@' + st.champAt;
+  if (ui.dismissedChamp === sig){ el.hidden = true; return; }
+  if (!el.hidden && el.dataset.sig === sig) return;
+
+  var names = st.champs.map(function (n){
+    var p = store.players[n];
+    return p && p.name ? p.name : 'Player ' + n;
+  });
+  var rows = st.rows.filter(function (r){ return st.champs.indexOf(r.num) >= 0; });
+  var pts = rows.length ? rows[0].points : m.target;
+
+  el.dataset.sig = sig;
+  el.innerHTML =
+      '<canvas id="confetti" aria-hidden="true"></canvas>'
+    + '<div class="trophy" aria-hidden="true">&#127942;</div>'
+    + '<p class="champ-label">' + (st.champs.length > 1 ? 'Co-champions' : 'Champion') + '</p>'
+    + '<div class="champ-num num">' + st.champs.join(' &middot; ') + '</div>'
+    + '<div class="champ-hit">Reached ' + m.target + '</div>'
+    + '<p class="champ-name">' + esc(names.join(' &amp; ')) + ' &middot; ' + pts + ' points</p>'
+    + '<p class="champ-sub">That is the night. Finish the rally you are in, then come shake a hand.</p>'
+    + '<button class="btn btn-primary" data-champ-close="1" style="margin-top:16px">Final leaderboard</button>';
+  el.hidden = false;
+  confetti();
+}
+
+function confetti(){
+  var cv = document.getElementById('confetti');
+  if (!cv) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var ctx = cv.getContext('2d');
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.scale(dpr, dpr);
+
+  var colors = ['#FFC93C', '#17A9F5', '#35D98A', '#ECF3FA', '#FF5C4D'];
+  var bits = [];
+  for (var i = 0; i < 140; i++){
+    bits.push({
+      x: Math.random() * W,
+      y: -20 - Math.random() * H,
+      w: 5 + Math.random() * 6,
+      h: 8 + Math.random() * 9,
+      vy: 1.4 + Math.random() * 2.6,
+      vx: -0.8 + Math.random() * 1.6,
+      rot: Math.random() * Math.PI,
+      vr: -0.09 + Math.random() * 0.18,
+      c: colors[(Math.random() * colors.length) | 0]
+    });
+  }
+  var start = Date.now();
+  (function frame(){
+    if (document.getElementById('champion').hidden) return;
+    ctx.clearRect(0, 0, W, H);
+    bits.forEach(function (b){
+      b.y += b.vy; b.x += b.vx; b.rot += b.vr;
+      if (b.y > H + 24){ b.y = -20; b.x = Math.random() * W; }
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.fillStyle = b.c;
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      ctx.restore();
+    });
+    if (Date.now() - start < 9000) requestAnimationFrame(frame);
+    else ctx.clearRect(0, 0, W, H);
+  })();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Sheets — player picker, name, scanner
+   ══════════════════════════════════════════════════════════════════════ */
+var sheetEl = document.getElementById('sheet');
+function openSheet(html){
+  sheetEl.innerHTML = '<div class="sheet-in">' + html + '</div>';
+  sheetEl.hidden = false;
+}
+function closeSheet(){
+  stopScanner();
+  sheetEl.hidden = true;
+  sheetEl.innerHTML = '';
+}
+sheetEl.addEventListener('click', function (e){ if (e.target === sheetEl) closeSheet(); });
+
+function openPicker(which){
+  var m = meta(), taken = ui.entry.s1.concat(ui.entry.s2);
+  var cells = '';
+  for (var i = 1; i <= m.maxPlayers; i++){
+    var p = store.players[i], picked = taken.indexOf(i) >= 0;
+    cells += '<button class="numcell' + (picked ? ' is-picked' : '') + '" data-pick="' + which + ':' + i + '"'
+          + (picked ? ' disabled' : '') + '>' + i
+          + '<small>' + (picked ? 'added' : p ? esc(label(p) || 'in') : '') + '</small></button>';
+  }
+  openSheet(
+      '<div class="panel-head"><h3>Add to side ' + which + '</h3>'
+    + '<button class="btn-quiet" data-close="1">Close</button></div>'
+    + '<div class="grid-nums">' + cells + '</div>'
+    + '<button class="btn btn-ghost btn-block" data-scan="' + which + '">Scan the player’s card</button>'
+  );
+}
+
+function openNumberPicker(){
+  var m = meta(), mine = you(), cells = '';
+  for (var i = 1; i <= m.maxPlayers; i++){
+    var p = store.players[i], isYou = p && p.device === deviceId;
+    cells += '<button class="numcell' + (isYou ? ' is-you' : '') + '" data-join="' + i + '"'
+          + (p && !isYou ? ' disabled' : '') + '>' + i
+          + '<small>' + (isYou ? 'you' : p ? esc(label(p) || 'taken') : '') + '</small></button>';
+  }
+  openSheet(
+      '<div class="panel-head"><h3>Change your number</h3>'
+    + '<button class="btn-quiet" data-close="1">Close</button></div>'
+    + '<div class="grid-nums">' + cells + '</div>'
+    + '<p class="hint" style="font-size:12px;color:var(--faint)">Your points follow the games you played, '
+    + 'not the number &mdash; switching keeps every score already reported under the old number.</p>'
+  );
+}
+
+function openName(){
+  var mine = you();
+  openSheet(
+      '<div class="panel-head"><h3>Your name</h3><button class="btn-quiet" data-close="1">Close</button></div>'
+    + '<div class="field"><label for="fPlayerName">Shown on the leaderboard</label>'
+    + '<input id="fPlayerName" type="text" maxlength="18" placeholder="First name" value="'
+    + esc(mine && mine.name || '') + '"></div>'
+    + '<button class="btn btn-primary btn-block" data-savename="1">Save</button>'
+  );
+  setTimeout(function (){ var f = document.getElementById('fPlayerName'); if (f) f.focus(); }, 40);
+}
+
+/* ── camera scanner (best effort; the deep-link path always works) ── */
+var scanState = { stream: null, raf: 0, detector: null };
+function stopScanner(){
+  if (scanState.raf) cancelAnimationFrame(scanState.raf);
+  scanState.raf = 0;
+  if (scanState.stream){
+    scanState.stream.getTracks().forEach(function (t){ t.stop(); });
+    scanState.stream = null;
+  }
+}
+function openScanner(which){
+  var supported = typeof window.BarcodeDetector !== 'undefined'
+    && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+
+  if (!supported){
+    openSheet(
+        '<div class="panel-head"><h3>Scan a card</h3><button class="btn-quiet" data-close="1">Close</button></div>'
+      + '<div class="notice warn"><b>This browser can’t scan inside the page.</b> '
+      + 'Use the phone’s own camera app on the player’s QR code &mdash; it opens this page with that '
+      + 'player already added. Set the event link in setup first, or just tap the number below.</div>'
+      + '<button class="btn btn-ghost btn-block" data-add="' + which + '">Pick the number instead</button>'
+    );
+    return;
+  }
+
+  openSheet(
+      '<div class="panel-head"><h3>Scan a card</h3><button class="btn-quiet" data-close="1">Close</button></div>'
+    + '<video id="cam" playsinline muted style="width:100%;border-radius:10px;background:#000;aspect-ratio:1"></video>'
+    + '<p class="hint" style="font-size:12px;color:var(--faint)">Point at the player’s QR code.</p>'
+    + '<button class="btn btn-ghost btn-block" data-add="' + which + '">Pick the number instead</button>'
+  );
+
+  var video = document.getElementById('cam');
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(function (stream){
+      scanState.stream = stream;
+      video.srcObject = stream;
+      return video.play();
+    })
+    .then(function (){
+      scanState.detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      (function tick(){
+        if (!scanState.stream) return;
+        scanState.detector.detect(video).then(function (codes){
+          if (codes && codes.length){
+            var num = parsePayload(codes[0].rawValue);
+            if (num){ closeSheet(); addToSide(which, num); return; }
+          }
+          scanState.raf = requestAnimationFrame(tick);
+        }).catch(function (){ scanState.raf = requestAnimationFrame(tick); });
+      })();
+    })
+    .catch(function (){
+      openSheet(
+          '<div class="panel-head"><h3>Scan a card</h3><button class="btn-quiet" data-close="1">Close</button></div>'
+        + '<div class="notice warn"><b>No camera here.</b> The page could not open a camera in this view. '
+        + 'Use the phone’s camera app on the player’s code, or pick the number.</div>'
+        + '<button class="btn btn-ghost btn-block" data-add="' + which + '">Pick the number instead</button>'
+      );
+    });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Actions
+   ══════════════════════════════════════════════════════════════════════ */
+function addToSide(which, num){
+  var m = meta();
+  if (num < 1 || num > m.maxPlayers){ toast('Player ' + num + ' is outside 1–' + m.maxPlayers, true); return; }
+  var other = which === 1 ? ui.entry.s2 : ui.entry.s1;
+  var self = which === 1 ? ui.entry.s1 : ui.entry.s2;
+  if (self.indexOf(num) >= 0){ toast('#' + num + ' is already on side ' + which); return; }
+  if (other.indexOf(num) >= 0){ toast('#' + num + ' is on the other side', true); return; }
+  if (self.length >= 2){ toast('Side ' + which + ' already has two players', true); return; }
+  self.push(num);
+  saveEntry();
+  if (ui.screen !== 'score') go('score'); else render();
+}
+
+function claim(num){
+  var m = meta();
+  var existing = store.players[num];
+  if (existing && existing.device !== deviceId){ toast('#' + num + ' is taken', true); return; }
+
+  var mine = you();
+  var finish = function (){
+    var rec = { num: num, name: (mine && mine.name) || '', device: deviceId, joinedAt: Date.now() };
+    return putPlayer(rec).then(function (){
+      if (mine && mine.num !== num){
+        delete store.players[mine.num];
+        if (store.mode === 'live') return store.db.doc('players/' + mine.num).delete();
+        localSave();
+      }
+    }).then(function (){
+      closeSheet();
+      go('card');
+      toast('You are player #' + num);
+    });
+  };
+
+  if (store.mode !== 'live'){ finish(); return; }
+
+  var ref = store.db.doc('players/' + num);
+  ref.acquire({ holder: deviceId, ttlMs: 4000 })
+    .then(function (res){
+      if (!res.acquired) throw new Error('busy');
+      return ref.get();
+    })
+    .then(function (snap){
+      var d = snap.exists ? snap.data() : null;
+      if (d && d.device && d.device !== deviceId) throw new Error('taken');
+      return finish();
+    })
+    .catch(function (err){
+      if (err && err.message === 'busy') toast('Someone is claiming #' + num + ' right now', true);
+      else if (err && err.message === 'taken') toast('#' + num + ' was just taken', true);
+      else toast('Could not claim #' + num + '. Try again.', true);
+      render();
+    });
+}
+
+function submitScore(){
+  var e = ui.entry, m = meta();
+  if (!e.s1.length || !e.s2.length){ toast('Add at least one player to each side', true); return; }
+  var p1 = Math.max(0, Number(e.p1) || 0), p2 = Math.max(0, Number(e.p2) || 0);
+  if (p1 === 0 && p2 === 0){ toast('Enter the points each side scored', true); return; }
+
+  var g = {
+    id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    s1: e.s1.slice(), s2: e.s2.slice(),
+    p1: p1, p2: p2,
+    at: Date.now(), by: deviceId, court: e.court || 1
+  };
+
+  // A player scored on without checking in still belongs on the board.
+  var pending = g.s1.concat(g.s2)
+    .filter(function (n){ return !store.players[n]; })
+    .map(function (n){ return putPlayer({ num: n, name: '', device: '', joinedAt: Date.now() }); });
+
+  Promise.all(pending)
+    .then(function (){ return putGame(g); })
+    .then(function (){
+      ui.entry = { s1: [], s2: [], p1: 0, p2: 0, court: e.court || 1 };
+      saveEntry();
+      toast('Score recorded');
+      go('board');
+    })
+    .catch(function (){ toast('Could not save that score. Check the connection and try again.', true); });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Events
+   ══════════════════════════════════════════════════════════════════════ */
+document.addEventListener('click', function (ev){
+  var t = ev.target.closest('[data-go],[data-join],[data-add],[data-pick],[data-drop],[data-step],'
+    + '[data-submit],[data-clear],[data-undo],[data-reset],[data-scan],[data-close],[data-savename],'
+    + '[data-edit-name],[data-change-num],[data-champ-close]');
+  if (!t) return;
+  var d = t.dataset;
+
+  if (d.go){ closeSheet(); go(d.go); return; }
+  if (d.join){ claim(Number(d.join)); return; }
+  if (d.add){ openPicker(Number(d.add)); return; }
+  if (d.pick){
+    var parts = d.pick.split(':');
+    closeSheet();
+    addToSide(Number(parts[0]), Number(parts[1]));
+    return;
+  }
+  if (d.drop){
+    var dp = d.drop.split(':'), side = Number(dp[0]), num = Number(dp[1]);
+    var arr = side === 1 ? ui.entry.s1 : ui.entry.s2;
+    var ix = arr.indexOf(num);
+    if (ix >= 0) arr.splice(ix, 1);
+    saveEntry(); render();
+    return;
+  }
+  if (d.step){
+    var sp = d.step.split(':'), w = Number(sp[0]), delta = Number(sp[1]);
+    var key = w === 1 ? 'p1' : 'p2';
+    ui.entry[key] = Math.max(0, Math.min(99, (Number(ui.entry[key]) || 0) + delta));
+    saveEntry(); render();
+    return;
+  }
+  if (d.submit){ submitScore(); return; }
+  if (d.clear){
+    ui.entry = { s1: [], s2: [], p1: 0, p2: 0, court: ui.entry.court || 1 };
+    saveEntry(); render();
+    return;
+  }
+  if (d.undo){
+    dropGame(d.undo).then(function (){ toast('Game removed'); });
+    return;
+  }
+  if (d.reset){
+    if (!window.confirm('Clear every score and check-in for a new event? This cannot be undone.')) return;
+    dropAll().then(function (){
+      ui.dismissedChamp = ''; LS.set('dismissedChamp', '');
+      ui.entry = { s1: [], s2: [], p1: 0, p2: 0, court: 1 };
+      saveEntry();
+      toast('New event started');
+      go('join');
+    });
+    return;
+  }
+  if (d.scan){ openScanner(Number(d.scan) || 1); return; }
+  if (d.close){ closeSheet(); return; }
+  if (d.editName){ openName(); return; }
+  if (d.changeNum){ openNumberPicker(); return; }
+  if (d.savename){
+    var field = document.getElementById('fPlayerName');
+    var mine = you();
+    if (mine && field){
+      mine.name = field.value.trim().slice(0, 18);
+      putPlayer(mine).then(function (){ closeSheet(); render(); toast('Name saved'); });
+    } else closeSheet();
+    return;
+  }
+  if (d.champClose){
+    var st = standings();
+    ui.dismissedChamp = st.champs.join(',') + '@' + st.champAt;
+    LS.set('dismissedChamp', ui.dismissedChamp);
+    document.getElementById('champion').hidden = true;
+    go('board');
+    return;
+  }
+});
+
+document.addEventListener('keydown', function (ev){
+  if (ev.key === 'Escape' && !sheetEl.hidden) closeSheet();
+});
+
+document.addEventListener('input', function (ev){
+  var el = ev.target;
+  if (el.dataset && el.dataset.score){
+    var key = el.dataset.score === '1' ? 'p1' : 'p2';
+    ui.entry[key] = Math.max(0, Math.min(99, Number(el.value) || 0));
+    saveEntry();
+    var btn = document.querySelector('[data-submit]');
+    if (btn){
+      var ok = ui.entry.s1.length && ui.entry.s2.length && (ui.entry.p1 > 0 || ui.entry.p2 > 0);
+      btn.disabled = !ok;
+      btn.textContent = ok ? 'Submit score' : 'Add players and points';
+    }
+  }
+});
+
+document.addEventListener('change', function (ev){
+  var el = ev.target;
+  if (!el.dataset || !el.dataset.meta) return;
+  var key = el.dataset.meta;
+  var val = (key === 'name' || key === 'link') ? el.value.trim() : Number(el.value);
+  var patch = {}; patch[key] = val;
+  putMeta(patch).then(function (){ render(); toast('Saved'); })
+    .catch(function (){ toast('Could not save that setting', true); });
+});
+
+document.getElementById('gearBtn').addEventListener('click', function (){ closeSheet(); go('setup'); });
+
+/* Deep link: a phone camera reading a player card lands here. */
+function readHash(){
+  var num = parsePayload(location.hash);
+  if (num){
+    try { history.replaceState(null, '', location.pathname + location.search); }
+    catch (e) { location.hash = ''; }
+    var side = ui.entry.s1.length <= ui.entry.s2.length ? 1 : 2;
+    if (ui.entry.s1.indexOf(num) >= 0 || ui.entry.s2.indexOf(num) >= 0) toast('#' + num + ' is already added');
+    else addToSide(side, num);
+    return true;
+  }
+  return false;
+}
+window.addEventListener('hashchange', readHash);
+
+/* ══════════════════════════════════════════════════════════════════════
+   Boot
+   ══════════════════════════════════════════════════════════════════════ */
+localLoad();
+render();
+readHash();
+
+(function connect(){
+  if (!window.claude || typeof window.claude.use !== 'function') return;
+  window.claude.use('db').then(function (db){
+    if (!db) return;
+    store.db = db;
+    store.mode = 'live';
+    store.players = {};
+    store.games = {};
+
+    var onErr = function (label){
+      return function (e){
+        store.mode = 'local';
+        toast('Live scoring dropped out (' + (e && e.code ? e.code : 'error') + '). Scores may not be shared.', true);
+        render();
+      };
+    };
+
+    db.doc('event/meta').onSnapshot(function (snap){
+      store.meta = snap.exists ? snap.data() : {};
+      render();
+    }, onErr('meta'));
+
+    db.collection('players').onSnapshot(function (snap){
+      var next = {};
+      snap.docs.forEach(function (d){
+        var v = d.data();
+        if (v && v.num != null) next[Number(v.num)] = v;
+      });
+      store.players = next;
+      render();
+    }, onErr('players'));
+
+    db.collection('games').onSnapshot(function (snap){
+      var next = {};
+      snap.docs.forEach(function (d){
+        var v = d.data();
+        if (v && v.id) next[v.id] = v;
+      });
+      store.games = next;
+      render();
+    }, onErr('games'));
+  }).catch(function (){ /* stay in local mode */ });
+})();
+</script>
