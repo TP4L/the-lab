@@ -745,12 +745,17 @@ function qrSvg(text, alt){
 var DEFAULTS = { name:'Race to 50', target:50, maxPlayers:18, courts:3, gameMinutes:10, link:'' };
 
 var store = {
-  mode: 'local',          // 'live' once the shared db answers
+  // 'live'  — the Artifact shared database
+  // 'cloud' — this page hosted with its own scoreboard API
+  // 'local' — neither answered; scores stay in this browser
+  mode: 'local',
   meta: {},
   players: {},            // num -> {num,name,device,joinedAt}
   games: {},              // id  -> {id,s1,s2,p1,p2,at,court}
   db: null,
-  ready: false
+  v: 0,                   // server state version, for cheap polling
+  online: true,
+  pinSet: false
 };
 
 var LS = {
@@ -772,6 +777,82 @@ var ui = {
   dismissedChamp: LS.get('dismissedChamp', '')
 };
 
+/* ══════════════════════════════════════════════════════════════════════
+   Hosted backend — one endpoint, whole-event reads, polled for changes.
+   ══════════════════════════════════════════════════════════════════════ */
+var API = '/api/event';
+var poller = null;
+
+function adminPin(){ return LS.get('pin', '') || ''; }
+
+function apiSay(code){
+  return code === 'taken' ? 'That number was just taken'
+    : code === 'pin' ? 'Wrong organizer PIN'
+    : code === 'busy' ? 'Several scores landed at once — try that again'
+    : code === 'full' ? 'This event is already full'
+    : code === 'needs-players' ? 'Add at least one player to each side'
+    : code === 'needs-points' ? 'Enter the points each side scored'
+    : code === 'same-player' ? 'A player cannot be on both sides'
+    : code === 'not-yours' ? 'That number is checked in on another phone'
+    : 'Could not reach the scoreboard';
+}
+
+function applyCloud(data){
+  if (!data || !data.state) return;
+  store.v = data.v || 0;
+  store.pinSet = !!data.pinSet;
+  store.meta = data.state.meta || {};
+  store.players = data.state.players || {};
+  store.games = data.state.games || {};
+  store.online = true;
+  render();
+}
+
+function apiPost(op, payload){
+  var body = Object.assign({ op: op, device: deviceId }, payload || {});
+  return fetch(API, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function (res){
+    return res.json().catch(function (){ return {}; }).then(function (data){
+      if (!res.ok || data.error){
+        var err = new Error(data.error || ('http ' + res.status));
+        err.code = data.error;
+        throw err;
+      }
+      applyCloud(data);
+      return data;
+    });
+  });
+}
+
+function apiPull(){
+  return fetch(API + '?v=' + (store.v || 0), { headers: { accept: 'application/json' } })
+    .then(function (res){
+      if (!res.ok) throw new Error('http ' + res.status);
+      return res.json();
+    })
+    .then(function (data){
+      if (data.unchanged){
+        if (!store.online){ store.online = true; render(); }
+      } else applyCloud(data);
+      return data;
+    });
+}
+
+function startPolling(){
+  if (poller) return;
+  var tick = function (){
+    if (document.hidden) return;
+    apiPull().catch(function (){
+      if (store.online){ store.online = false; render(); }
+    });
+  };
+  poller = setInterval(tick, 2500);
+  document.addEventListener('visibilitychange', function (){ if (!document.hidden) tick(); });
+}
+
 /* ── local-mode persistence ── */
 function localLoad(){
   store.meta = LS.get('meta', {});
@@ -786,26 +867,31 @@ function localSave(){
 
 /* ── writes route to whichever backend is live ── */
 function putMeta(patch){
+  if (store.mode === 'cloud') return apiPost('setMeta', { patch: patch, pin: adminPin() });
   Object.assign(store.meta, patch);
   if (store.mode === 'live') return store.db.doc('event/meta').set(store.meta);
   localSave(); render(); return Promise.resolve();
 }
 function putPlayer(p){
+  if (store.mode === 'cloud') return apiPost('rename', { num: p.num, name: p.name });
   store.players[p.num] = p;
   if (store.mode === 'live') return store.db.doc('players/' + p.num).set(p);
   localSave(); render(); return Promise.resolve();
 }
 function putGame(g){
+  if (store.mode === 'cloud') return apiPost('putGame', { game: g });
   store.games[g.id] = g;
   if (store.mode === 'live') return store.db.doc('games/' + g.id).set(g);
   localSave(); render(); return Promise.resolve();
 }
 function dropGame(id){
+  if (store.mode === 'cloud') return apiPost('dropGame', { id: id });
   delete store.games[id];
   if (store.mode === 'live') return store.db.doc('games/' + id).delete();
   localSave(); render(); return Promise.resolve();
 }
 function dropAll(){
+  if (store.mode === 'cloud') return apiPost('reset', { pin: adminPin() });
   var ids = Object.keys(store.games), nums = Object.keys(store.players);
   store.games = {}; store.players = {};
   if (store.mode === 'live'){
@@ -917,15 +1003,18 @@ function saveEntry(){ LS.set('entry', ui.entry); }
 /* The payload a scorer's phone reads. With an event link set it is a deep
    link any phone camera can open; without one it is a plain token that the
    in-page scanner still understands. */
+function baseLink(){
+  var set = (store.meta && store.meta.link || '').trim();
+  if (set) return set.split('#')[0];
+  // Hosted, the page already knows its own address — nothing to configure.
+  if (store.mode === 'cloud') return (location.origin + location.pathname).split('#')[0];
+  return '';
+}
 function playerPayload(num){
-  var link = (store.meta && store.meta.link || '').trim();
-  if (link) return link.split('#')[0] + '#add=' + num;
-  return 'LAB50-P' + num;
+  var base = baseLink();
+  return base ? base + '#add=' + num : 'LAB50-P' + num;
 }
-function eventPayload(){
-  var link = (store.meta && store.meta.link || '').trim();
-  return link ? link.split('#')[0] : '';
-}
+function eventPayload(){ return baseLink(); }
 function parsePayload(text){
   if (!text) return null;
   var m = String(text).match(/(?:#|[?&])(?:add|p)=(\d{1,3})\b/) || String(text).match(/LAB50-P(\d{1,3})\b/i);
@@ -1183,13 +1272,30 @@ function screenSetup(){
       + '<div class="field">'
         + '<label for="fLink">Event link</label>'
         + '<input id="fLink" type="url" placeholder="https://&hellip;" value="' + esc(store.meta.link || '') + '" data-meta="link">'
-        + '<p class="hint">Paste this page’s own address. It turns the event QR code and every player card into a link '
-        + 'any phone camera can open &mdash; no app, no in-page scanner.</p>'
+        + '<p class="hint">' + (store.mode === 'cloud'
+            ? 'Picked up from this page automatically. Only set one if players should use a different address, such as a custom domain.'
+            : 'Paste this page’s own address. It turns the event QR code and every player card into a link '
+              + 'any phone camera can open &mdash; no app, no in-page scanner.') + '</p>'
       + '</div>'
       + (ev ? '<div class="qr-card">' + qrSvg(ev, 'QR code to join the event')
               + '<div class="qr-cap">' + esc(m.name) + ' &middot; scan to join</div></div>'
             : '')
     + '</div>'
+
+    + (store.mode === 'cloud'
+        ? '<div class="panel stack-sm">'
+          + '<div class="panel-head"><h3>Organizer PIN</h3>'
+            + '<span class="eyebrow">' + (store.pinSet ? 'Set' : 'Not set') + '</span></div>'
+          + '<p class="lede" style="font-size:13px">Anyone with the link can check in and report scores &mdash; '
+            + 'that is the point. A PIN keeps the settings above and &ldquo;start a new event&rdquo; to you.</p>'
+          + '<div class="field"><label for="fPin">'
+            + (store.pinSet ? 'Enter the PIN to unlock, or a new one to change it' : 'Choose a PIN') + '</label>'
+            + '<input id="fPin" type="text" inputmode="numeric" autocomplete="off" maxlength="12" value="'
+            + esc(adminPin()) + '"></div>'
+          + '<button class="btn btn-ghost btn-block" data-savepin="1">'
+            + (store.pinSet ? 'Unlock this phone' : 'Set PIN') + '</button>'
+        + '</div>'
+        : '')
 
     + '<div class="panel stack-sm">'
       + '<div class="panel-head"><h3>Danger zone</h3></div>'
@@ -1201,9 +1307,13 @@ function screenSetup(){
     + '</div>'
 
     + '<div class="notice">'
-      + (store.mode === 'live'
-          ? '<b>Live.</b> Scores sync to every phone on this link within a second or two.'
-          : '<b>This device only.</b> The shared scoreboard is not connected here, so scores stay in this browser.')
+      + (store.mode === 'cloud'
+          ? (store.online
+              ? '<b>Live.</b> Anyone with this link sees scores within a couple of seconds.'
+              : '<b>Offline.</b> The scoreboard is unreachable from this phone right now — it reconnects on its own.')
+          : store.mode === 'live'
+            ? '<b>Live.</b> Scores sync to every signed-in phone on this link.'
+            : '<b>This device only.</b> No shared scoreboard answered, so scores stay in this browser.')
     + '</div>'
   + '</div>';
 }
@@ -1229,8 +1339,9 @@ function tabsHtml(){
 function tickerHtml(){
   var st = standings(), m = meta();
   var live = st.rows.filter(function (r){ return !r.done; })[0];
-  var bits = '<span class="live' + (store.mode === 'live' ? '' : ' is-off') + '">'
-           + (store.mode === 'live' ? 'Live' : 'Local') + '</span>';
+  var connected = store.mode !== 'local' && store.online;
+  var word = store.mode === 'local' ? 'Local' : store.online ? 'Live' : 'Offline';
+  var bits = '<span class="live' + (connected ? '' : ' is-off') + '">' + word + '</span>';
   if (st.gameCount) bits += '<span class="tick tick-games">Games <span class="num">' + st.gameCount + '</span></span>';
   if (live && live.points > 0) bits += '<span class="tick tick-leader">Leader <span class="num">#' + live.num + '</span></span>';
   return bits;
@@ -1477,11 +1588,17 @@ function addToSide(which, num){
 }
 
 function claim(num){
-  var m = meta();
   var existing = store.players[num];
-  if (existing && existing.device !== deviceId){ toast('#' + num + ' is taken', true); return; }
+  if (existing && existing.device && existing.device !== deviceId){ toast('#' + num + ' is taken', true); return; }
 
   var mine = you();
+
+  if (store.mode === 'cloud'){
+    apiPost('claim', { num: num, name: (mine && mine.name) || '' })
+      .then(function (){ closeSheet(); go('card'); toast('You are player #' + num); })
+      .catch(function (err){ toast(apiSay(err.code), true); render(); });
+    return;
+  }
   var finish = function (){
     var rec = { num: num, name: (mine && mine.name) || '', device: deviceId, joinedAt: Date.now() };
     return putPlayer(rec).then(function (){
@@ -1531,20 +1648,27 @@ function submitScore(){
     at: Date.now(), by: deviceId, court: e.court || 1
   };
 
+  var saved = function (){
+    ui.entry = { s1: [], s2: [], p1: 0, p2: 0, court: e.court || 1 };
+    saveEntry();
+    toast('Score recorded');
+    go('board');
+  };
+  var failed = function (err){
+    toast(err && err.code ? apiSay(err.code) : 'Could not save that score. Try again.', true);
+  };
+
+  if (store.mode === 'cloud'){
+    putGame(g).then(saved).catch(failed);
+    return;
+  }
+
   // A player scored on without checking in still belongs on the board.
   var pending = g.s1.concat(g.s2)
     .filter(function (n){ return !store.players[n]; })
     .map(function (n){ return putPlayer({ num: n, name: '', device: '', joinedAt: Date.now() }); });
 
-  Promise.all(pending)
-    .then(function (){ return putGame(g); })
-    .then(function (){
-      ui.entry = { s1: [], s2: [], p1: 0, p2: 0, court: e.court || 1 };
-      saveEntry();
-      toast('Score recorded');
-      go('board');
-    })
-    .catch(function (){ toast('Could not save that score. Check the connection and try again.', true); });
+  Promise.all(pending).then(function (){ return putGame(g); }).then(saved).catch(failed);
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -1553,7 +1677,7 @@ function submitScore(){
 document.addEventListener('click', function (ev){
   var t = ev.target.closest('[data-go],[data-join],[data-add],[data-pick],[data-drop],[data-step],'
     + '[data-submit],[data-clear],[data-undo],[data-reset],[data-scan],[data-close],[data-savename],'
-    + '[data-edit-name],[data-change-num],[data-champ-close]');
+    + '[data-edit-name],[data-change-num],[data-savepin],[data-champ-close]');
   if (!t) return;
   var d = t.dataset;
 
@@ -1588,7 +1712,9 @@ document.addEventListener('click', function (ev){
     return;
   }
   if (d.undo){
-    dropGame(d.undo).then(function (){ toast('Game removed'); });
+    dropGame(d.undo)
+      .then(function (){ toast('Game removed'); })
+      .catch(function (err){ toast(apiSay(err.code), true); });
     return;
   }
   if (d.reset){
@@ -1599,19 +1725,34 @@ document.addEventListener('click', function (ev){
       saveEntry();
       toast('New event started');
       go('join');
-    });
+    }).catch(function (err){ toast(apiSay(err.code), true); });
     return;
   }
   if (d.scan){ openScanner(Number(d.scan) || 1); return; }
   if (d.close){ closeSheet(); return; }
   if (d.editName){ openName(); return; }
   if (d.changeNum){ openNumberPicker(); return; }
+  if (d.savepin){
+    var pinField = document.getElementById('fPin');
+    var next = pinField ? pinField.value.trim() : '';
+    // Typing the PIN this phone doesn't have yet unlocks with it.
+    apiPost('setPin', { pin: next, current: adminPin() || next })
+      .then(function (){
+        LS.set('pin', next);
+        toast(next ? 'PIN saved on this phone' : 'PIN removed');
+        render();
+      })
+      .catch(function (err){ toast(apiSay(err.code), true); });
+    return;
+  }
   if (d.savename){
     var field = document.getElementById('fPlayerName');
     var mine = you();
     if (mine && field){
       mine.name = field.value.trim().slice(0, 18);
-      putPlayer(mine).then(function (){ closeSheet(); render(); toast('Name saved'); });
+      putPlayer(mine)
+        .then(function (){ closeSheet(); render(); toast('Name saved'); })
+        .catch(function (err){ toast(apiSay(err.code), true); });
     } else closeSheet();
     return;
   }
@@ -1651,7 +1792,7 @@ document.addEventListener('change', function (ev){
   var val = (key === 'name' || key === 'link') ? el.value.trim() : Number(el.value);
   var patch = {}; patch[key] = val;
   putMeta(patch).then(function (){ render(); toast('Saved'); })
-    .catch(function (){ toast('Could not save that setting', true); });
+    .catch(function (err){ toast(apiSay(err.code), true); });
 });
 
 document.getElementById('gearBtn').addEventListener('click', function (){ closeSheet(); go('setup'); });
@@ -1679,9 +1820,21 @@ render();
 readHash();
 
 (function connect(){
-  if (!window.claude || typeof window.claude.use !== 'function') return;
+  var tryCloud = function (){
+    return apiPull().then(function (){
+      store.mode = 'cloud';
+      startPolling();
+      render();
+    }).catch(function (){
+      store.mode = 'local';
+      render();
+    });
+  };
+
+  if (!window.claude || typeof window.claude.use !== 'function') { tryCloud(); return; }
+
   window.claude.use('db').then(function (db){
-    if (!db) return;
+    if (!db) return tryCloud();
     store.db = db;
     store.mode = 'live';
     store.players = {};
@@ -1719,6 +1872,6 @@ readHash();
       store.games = next;
       render();
     }, onErr('games'));
-  }).catch(function (){ /* stay in local mode */ });
+  }).catch(tryCloud);
 })();
 </script>

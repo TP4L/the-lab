@@ -62,6 +62,9 @@ Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 | `.claude/skills/lab-coach/reference/examples.md` | Four worked situations, pipeline trace + output |
 | `site/index.html` | The decision engine as a readable web page |
 | `site/race-to-50.html` | Race to 50 — the live event app (check-in, QR player cards, scoring, leaderboard) |
+| `netlify/functions/event.mts` | The shared scoreboard API for the hosted deploy |
+| `build.mjs` | Wraps the app page into a standalone `public/index.html` |
+| `test/` | Scoring logic, the API, and a two-browser live-sync check |
 
 ## A note on the vocabulary file
 
@@ -82,7 +85,36 @@ counters, so undo is exact and simultaneous reports can't corrupt a
 running total. QR codes are generated in-page, so a player's card renders
 with no network.
 
-The page keeps its shared scoreboard in the artifact database when it is
-published as an Artifact, and falls back to this-device-only storage
-otherwise. Set the event link in Setup to turn on the event QR code and
-make every player card a link a phone camera can open.
+### Where the scoreboard lives
+
+One source file, `site/race-to-50.html`, runs against whichever backend
+answers:
+
+| Backend | When | Who can see it |
+|---|---|---|
+| `/api/event` | Deployed to Netlify | Anyone with the link |
+| Artifact database | Published as a Claude Artifact | Signed-in members of the org |
+| This browser | Neither answered | Just that device |
+
+Hosted, the page reads its own address, so the event QR code and every
+player card work with no setup at all.
+
+### Deploying
+
+```
+npm install
+npm test          # scoring logic + the scoreboard API
+npm run dev       # http://localhost:8899, real function, in-memory store
+npm run test:live # two browsers, one event (needs: npm i -D playwright)
+```
+
+Netlify reads `netlify.toml`: `node build.mjs` wraps the source page into
+`public/index.html`, and `netlify/functions/event.mts` serves `/api/event`
+backed by Netlify Blobs. Point a Netlify project at this repo and it
+builds with no further configuration.
+
+The whole event is one blob, and every write is conditional on the ETag
+that was read, so simultaneous reports from three courts retry instead of
+overwriting each other. Anyone with the link can check in and report a
+score — that is the format. Settings and "start a new event" sit behind an
+organizer PIN set in Setup.

@@ -1,0 +1,17 @@
+[build]
+  command = "node build.mjs"
+  environment = { NODE_VERSION = "22" }
+  publish = "public"
+  functions = "netlify/functions"
+
+# The scoreboard must never be served from a cache — a stale board during an
+# event is worse than a slow one. The page shell can be cached normally.
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

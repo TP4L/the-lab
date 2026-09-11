@@ -1,0 +1,19 @@
+{
+  "name": "the-lab-race-to-50",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Race to 50 — live event scoring for The LAB Pickleball",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/logic.test.mjs && node test/api.test.mjs",
+    "test:live": "node build.mjs && node test/live.test.mjs",
+    "dev": "node build.mjs && node test/devserver.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^11.0.3"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^6.0.0"
+  }
+}
