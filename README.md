@@ -60,6 +60,8 @@ Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 | `.claude/skills/lab-coach/reference/outer-layers.md` | The nine lenses, incl. Error Classification table |
 | `.claude/skills/lab-coach/reference/vocabulary.md` | When each call is legal — state, Need rung, layer |
 | `.claude/skills/lab-coach/reference/examples.md` | Four worked situations, pipeline trace + output |
+| `site/index.html` | The decision engine as a readable web page |
+| `site/race-to-50.html` | Race to 50 — the live event app (check-in, QR player cards, scoring, leaderboard) |
 
 ## A note on the vocabulary file
 
@@ -67,3 +69,20 @@ Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 rung it belongs to. Where a note reads as a mechanical gloss of the call itself,
 it's an inference from the framework's structure, not doctrine. Correct those in
 place; the calls and the situations they fit are the durable part.
+
+## Race to 50
+
+`site/race-to-50.html` runs an event night. Players check in by paddle
+number and get a QR player card; a scorer adds each side and the points
+they scored; the leaderboard updates live on every phone and calls out
+who is closest to 50. When someone gets there, every screen says so.
+
+Totals and the champion are derived from the game log rather than kept as
+counters, so undo is exact and simultaneous reports can't corrupt a
+running total. QR codes are generated in-page, so a player's card renders
+with no network.
+
+The page keeps its shared scoreboard in the artifact database when it is
+published as an Artifact, and falls back to this-device-only storage
+otherwise. Set the event link in Setup to turn on the event QR code and
+make every player card a link a phone camera can open.
