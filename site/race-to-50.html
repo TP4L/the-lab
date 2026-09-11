@@ -821,6 +821,7 @@ function apiPost(op, payload){
         err.code = data.error;
         throw err;
       }
+      quiet = 0;
       applyCloud(data);
       return data;
     });
@@ -835,22 +836,42 @@ function apiPull(){
     })
     .then(function (data){
       if (data.unchanged){
+        quiet++;
         if (!store.online){ store.online = true; render(); }
-      } else applyCloud(data);
+      } else {
+        quiet = 0;
+        applyCloud(data);
+      }
       return data;
     });
+}
+
+/*
+ * Poll fast while games are landing, ease off when the courts are between
+ * rounds. A room of phones each asking every two seconds all night is a lot
+ * of requests for a board that only changes when someone finishes a game.
+ */
+var quiet = 0;
+var POLL_FAST = 2000, POLL_IDLE = 8000, QUIET_BEFORE_BACKOFF = 8;
+
+function pollDelay(){
+  return quiet >= QUIET_BEFORE_BACKOFF ? POLL_IDLE : POLL_FAST;
 }
 
 function startPolling(){
   if (poller) return;
   var tick = function (){
+    poller = setTimeout(tick, pollDelay());
     if (document.hidden) return;
     apiPull().catch(function (){
       if (store.online){ store.online = false; render(); }
     });
   };
-  poller = setInterval(tick, 2500);
-  document.addEventListener('visibilitychange', function (){ if (!document.hidden) tick(); });
+  poller = setTimeout(tick, pollDelay());
+  document.addEventListener('visibilitychange', function (){
+    // Coming back to the page should feel instant, not wait out a backoff.
+    if (!document.hidden){ quiet = 0; tick(); }
+  });
 }
 
 /* ── local-mode persistence ── */
