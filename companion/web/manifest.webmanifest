@@ -1,7 +1,7 @@
 {
-  "name": "LAB Sideline",
-  "short_name": "Sideline",
-  "description": "Companion app for the LAB decision engine.",
+  "name": "THE LAB",
+  "short_name": "THE LAB",
+  "description": "Training, scores, profile and Field Notes from THE LAB.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#13171D",

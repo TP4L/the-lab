@@ -2,11 +2,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const E = require('../web/engine.js');
-const { SITUATIONS } = require('../server/seed.js');
 
 test('reproduces the four worked examples', () => {
-  const want = ['gsg', 'own', 'tri', 'ccs'];
-  SITUATIONS.slice(0, 4).forEach((s, i) => assert.equal(E.run(s.inputs).call, want[i], s.title));
+  const cases = [
+    [{ h: 3, t: 2, b: 3, cert: 'low', state: 'N', need: 2 }, 'gsg'],
+    [{ h: 0, t: 3, b: 1, cert: 'mod', state: 'D', scr: true, need: 1, debt: true }, 'own'],
+    [{ h: 1, t: 1, b: 3, cert: 'high', state: 'O', need: 3 }, 'tri'],
+    [{ h: 1, t: 3, b: 3, cert: 'mod', state: 'D', scr: true, need: 2, debt: true, cover: true }, 'ccs']
+  ];
+  cases.forEach(([input, want], i) => assert.equal(E.run(input).call, want, 'example ' + (i + 1)));
 });
 
 test('the picked call is always legal', () => {

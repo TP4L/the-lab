@@ -1,13 +1,16 @@
 {
-  "name": "lab-sideline",
+  "name": "the-lab",
   "version": "1.0.0",
   "private": true,
-  "description": "Companion app for the LAB decision engine: player profiles, film sessions, drills and practice plans.",
+  "description": "THE LAB: shared backend and installable app for trainwiththelab.com. Accounts, athlete profiles, Scoreboard Studio and the Publishing Studio.",
   "main": "server/index.js",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
-    "test": "node --disable-warning=ExperimentalWarning --test 'test/*.test.js'"
+    "test": "node --disable-warning=ExperimentalWarning --test 'test/*.test.js'",
+    "e2e": "node test/e2e/browser-journeys.js"
   }
 }

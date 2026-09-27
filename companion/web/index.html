@@ -3,38 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LAB Sideline</title>
-<meta name="description" content="Companion app for the LAB decision engine: player profiles, film sessions, drills and practice plans.">
-<meta name="theme-color" content="#12161C">
+<title>THE LAB</title>
+<meta name="description" content="THE LAB by Transcending Performance: your training, scores, profile and Field Notes.">
+<meta name="theme-color" content="#101418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+<a class="skip" href="#app">Skip to content</a>
 <header class="top">
   <div class="top-inner">
-    <a class="brand" href="#/">LAB <span>Sideline</span></a>
+    <a class="brand" href="#/">THE <span>LAB</span></a>
     <div class="top-right">
-      <span class="eq">SHOT = H × T × B</span>
-      <button class="btn sm ghost" id="key-btn" type="button" hidden>Coach key</button>
+      <button class="sync ok" id="sync" type="button" aria-live="polite">Synced</button>
     </div>
   </div>
 </header>
-<nav class="nav" aria-label="Sections">
+<main class="main" id="app" tabindex="-1"></main>
+<nav class="nav" id="nav" aria-label="Main">
   <div class="nav-inner">
     <a href="#/" data-nav="home">Home</a>
-    <a href="#/call" data-nav="call">Call</a>
-    <a href="#/players" data-nav="players">Players</a>
-    <a href="#/film" data-nav="film">Film</a>
-    <a href="#/drills" data-nav="drills">Drills</a>
-    <a href="#/plans" data-nav="plans">Plans</a>
+    <a href="#/train" data-nav="train">Train</a>
+    <a href="#/play" data-nav="play">Play</a>
+    <a href="#/learn" data-nav="learn">Learn</a>
+    <a href="#/profile" data-nav="profile">Profile</a>
   </div>
 </nav>
-<main class="main" id="app" aria-live="polite"></main>
 <div class="toast" id="toast" role="status" hidden></div>
+<script src="/lib.js"></script>
 <script src="/engine.js"></script>
 <script src="/app.js"></script>
 </body>

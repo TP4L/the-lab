@@ -1,125 +1,177 @@
 'use strict';
 const { DatabaseSync } = require('node:sqlite');
-const Engine = require('../web/engine.js');
-const seed = require('./seed.js');
 
+/* One database for the website and the app. Every table the app writes is
+   something the website reads through the same API. */
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS players (
+CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   name TEXT NOT NULL,
-  number TEXT NOT NULL DEFAULT '',
-  position TEXT NOT NULL DEFAULT '',
-  level TEXT NOT NULL DEFAULT '',
-  notes TEXT NOT NULL DEFAULT '',
-  demo INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  password_hash TEXT NOT NULL,
+  roles TEXT NOT NULL DEFAULT '["athlete"]',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-CREATE TABLE IF NOT EXISTS situations (
-  id INTEGER PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  source TEXT NOT NULL DEFAULT 'Coach',
-  positions TEXT NOT NULL DEFAULT '[]',
-  inputs TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-CREATE TABLE IF NOT EXISTS drills (
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0
+);
+
+-- Athlete profiles. A coach can create one before the athlete has an account;
+-- the athlete claims it with a one-time code, so history stays on one record.
+CREATE TABLE IF NOT EXISTS athletes (
   id INTEGER PRIMARY KEY,
+  user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
-  call TEXT NOT NULL DEFAULT '',
-  positions TEXT NOT NULL DEFAULT '[]',
-  players TEXT NOT NULL DEFAULT '',
-  minutes INTEGER NOT NULL DEFAULT 10,
-  setup TEXT NOT NULL DEFAULT '',
-  steps TEXT NOT NULL DEFAULT '',
-  points TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  hand TEXT NOT NULL DEFAULT '',
+  side TEXT NOT NULL DEFAULT '',
+  rating TEXT NOT NULL DEFAULT '',
+  goals TEXT NOT NULL DEFAULT '',
+  focus TEXT NOT NULL DEFAULT '',
+  plan TEXT NOT NULL DEFAULT '',
+  photo_media_id TEXT,
+  claim_code_hash TEXT,
+  claim_email TEXT COLLATE NOCASE,
+  claim_attempts INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-CREATE TABLE IF NOT EXISTS reps (
-  id INTEGER PRIMARY KEY,
-  player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
-  note TEXT NOT NULL DEFAULT '',
-  call TEXT NOT NULL DEFAULT '',
-  error TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+CREATE TABLE IF NOT EXISTS coach_athletes (
+  coach_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  PRIMARY KEY (coach_id, athlete_id)
 );
-CREATE TABLE IF NOT EXISTS attempts (
+
+-- Notes. visibility 'private' is coach-only; 'shared' is visible to the athlete.
+-- kind 'reflection' is written by the athlete and is always shared.
+CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY,
-  player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
-  situation_id INTEGER REFERENCES situations(id) ON DELETE CASCADE,
-  guess TEXT NOT NULL,
-  answer TEXT NOT NULL,
-  correct INTEGER NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  client_id TEXT,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('coach','reflection')),
+  visibility TEXT NOT NULL CHECK (visibility IN ('private','shared')),
+  body TEXT NOT NULL,
+  media_id TEXT,
+  session_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (author_id, client_id)
 );
-CREATE TABLE IF NOT EXISTS plans (
-  id INTEGER PRIMARY KEY,
+
+-- Uploaded photos and video. Access is checked on every download.
+CREATE TABLE IF NOT EXISTS media (
+  id TEXT PRIMARY KEY,
+  owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  athlete_id INTEGER REFERENCES athletes(id) ON DELETE CASCADE,
+  post_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
+  visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','shared','public')),
+  mime TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  file TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Training sessions (Scoreboard Studio). IDs are generated on the device so a
+-- session can start offline. Scores are an append-only event log: devices can
+-- merge by union, and undo points at the event it cancels.
+CREATE TABLE IF NOT EXISTS training_sessions (
+  id TEXT PRIMARY KEY,
+  coach_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
-  date TEXT,
-  notes TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  status TEXT NOT NULL DEFAULT 'live' CHECK (status IN ('live','complete')),
+  version INTEGER NOT NULL DEFAULT 1,
+  started_at TEXT NOT NULL,
+  completed_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-CREATE TABLE IF NOT EXISTS plan_items (
+CREATE TABLE IF NOT EXISTS training_athletes (
+  session_id TEXT NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  slot INTEGER NOT NULL,
+  PRIMARY KEY (session_id, athlete_id)
+);
+CREATE TABLE IF NOT EXISTS training_items (
+  session_id TEXT NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
+  idx INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  measure TEXT NOT NULL CHECK (measure IN ('reps','time','score','feel')),
+  target TEXT NOT NULL DEFAULT '',
+  instructions TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (session_id, idx)
+);
+CREATE TABLE IF NOT EXISTS score_events (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
+  item_idx INTEGER NOT NULL,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('make','miss','value','undo')),
+  value REAL,
+  undoes TEXT,
+  at TEXT NOT NULL,
+  author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  received_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Publishing Studio.
+CREATE TABLE IF NOT EXISTS posts (
   id INTEGER PRIMARY KEY,
-  plan_id INTEGER NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
-  drill_id INTEGER NOT NULL REFERENCES drills(id) ON DELETE CASCADE,
-  minutes INTEGER NOT NULL,
-  position INTEGER NOT NULL
+  lane TEXT NOT NULL CHECK (lane IN ('quick_read','the_work','field_study')),
+  title TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  summary TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  tags TEXT NOT NULL DEFAULT '[]',
+  author_credit TEXT NOT NULL DEFAULT '',
+  thumbnail_media_id TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','in_review','scheduled','published')),
+  review_note TEXT NOT NULL DEFAULT '',
+  publish_at TEXT,
+  published_at TEXT,
+  author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-CREATE INDEX IF NOT EXISTS reps_player ON reps(player_id);
-CREATE INDEX IF NOT EXISTS attempts_player ON attempts(player_id);
-CREATE INDEX IF NOT EXISTS plan_items_plan ON plan_items(plan_id);
+CREATE TABLE IF NOT EXISTS post_revisions (
+  id INTEGER PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  editor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  status TEXT NOT NULL,
+  snapshot TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE INDEX IF NOT EXISTS notes_athlete ON notes(athlete_id);
+CREATE INDEX IF NOT EXISTS events_session ON score_events(session_id);
+CREATE INDEX IF NOT EXISTS events_athlete ON score_events(athlete_id);
+CREATE INDEX IF NOT EXISTS posts_status ON posts(status, publish_at);
+CREATE INDEX IF NOT EXISTS media_athlete ON media(athlete_id);
 `;
 
-function open(file, opts) {
-  opts = opts || {};
+function open(file) {
   const db = new DatabaseSync(file || ':memory:');
-  db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 3000;');
   db.exec(SCHEMA);
-  const empty = db.prepare('SELECT COUNT(*) AS n FROM situations').get().n === 0
-    && db.prepare('SELECT COUNT(*) AS n FROM drills').get().n === 0;
-  if (empty && opts.seed !== false) seedContent(db, opts.demo !== false);
   return db;
 }
 
 function tx(db, fn) {
-  db.exec('BEGIN');
+  db.exec('BEGIN IMMEDIATE');
   try { const r = fn(); db.exec('COMMIT'); return r; }
   catch (e) { db.exec('ROLLBACK'); throw e; }
 }
 
-function seedContent(db, withDemo) {
-  tx(db, () => {
-    const addSit = db.prepare('INSERT INTO situations (title, description, source, positions, inputs) VALUES (?, ?, ?, ?, ?)');
-    seed.SITUATIONS.forEach(s => addSit.run(s.title, s.description, s.source, JSON.stringify(s.positions), JSON.stringify(Engine.normalize(s.inputs))));
+const now = () => new Date().toISOString();
 
-    const addDrill = db.prepare('INSERT INTO drills (name, call, positions, players, minutes, setup, steps, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    const drillIds = {};
-    seed.DRILLS.forEach(d => {
-      drillIds[d.name] = Number(addDrill.run(d.name, d.call, JSON.stringify(d.positions), d.players, d.minutes, d.setup, d.steps, d.points).lastInsertRowid);
-    });
-
-    const planId = Number(db.prepare('INSERT INTO plans (title, date, notes) VALUES (?, ?, ?)').run(seed.PLAN.title, seed.PLAN.date, seed.PLAN.notes).lastInsertRowid);
-    const addItem = db.prepare('INSERT INTO plan_items (plan_id, drill_id, minutes, position) VALUES (?, ?, ?, ?)');
-    seed.PLAN.items.forEach((it, i) => addItem.run(planId, drillIds[it.drill], it.minutes, i));
-
-    if (withDemo) {
-      const addPlayer = db.prepare('INSERT INTO players (name, number, position, level, notes, demo) VALUES (?, ?, ?, ?, ?, 1)');
-      const ids = seed.DEMO_PLAYERS.map(p => Number(addPlayer.run(p.name, p.number, p.position, p.level, p.notes).lastInsertRowid));
-      const addRep = db.prepare('INSERT INTO reps (player_id, note, call, error) VALUES (?, ?, ?, ?)');
-      seed.DEMO_REPS.forEach(r => addRep.run(ids[r.player], r.note, r.call, r.error));
-
-      // A few graded film attempts so profiles open with numbers.
-      const sits = db.prepare('SELECT id, inputs FROM situations ORDER BY id LIMIT 6').all();
-      const addAttempt = db.prepare('INSERT INTO attempts (player_id, situation_id, guess, answer, correct) VALUES (?, ?, ?, ?, ?)');
-      const guesses = [['gsg', 'own', 'ccs', 'osg', 'osg', 'hpo'], ['gsg', 'ccs', 'tri', 'ccs', 'ccs', 'ccs'], ['x', 'own', 'tri', 'own', 'osg', 'gsg']];
-      ids.forEach((pid, pi) => sits.forEach((s, si) => {
-        const answer = Engine.run(JSON.parse(s.inputs)).call;
-        const guess = guesses[pi][si];
-        addAttempt.run(pid, s.id, guess, answer, guess === answer ? 1 : 0);
-      }));
-    }
-  });
-}
-
-module.exports = { open, tx };
+module.exports = { open, tx, now };

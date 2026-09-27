@@ -51,54 +51,45 @@ parts, nothing more:
 
 Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 
-## Companion app: LAB Sideline
+## THE LAB app
 
-`companion/` is a full-stack coaching app built on the engine. It has a Node server,
-a SQLite database and a phone-first web front end. There are no dependencies to
-install; it needs Node 22.13 or newer (SQLite is built into Node).
+`companion/` is the shared backend and the installable app for
+trainwiththelab.com. It has one set of accounts and one athlete record per
+person, with training results and published posts behind one API. It is
+written for pickleball.
 
 ```
 cd companion
-npm start          # http://localhost:8787
-npm test           # engine + API tests
+ADMIN_EMAIL=you@example.com npm start   # http://localhost:8787
+npm test                                # API journeys, accounts, engine
 ```
 
-| Screen | What it does |
+The first account created with `ADMIN_EMAIL` becomes the admin. Everyone else
+signs up as an athlete, and admins grant coach, contributor and editor roles.
+It needs Node 22.13 or newer and has no dependencies.
+
+| Tab | What's in it |
 |---|---|
-| **Home** | Team dashboard: film accuracy, errors logged across the roster, which stage to coach first, most-missed film, next practice. |
-| **Call** | Tap in the Read, State, Need and solve inputs. Returns the four-part output and every call's legality. Save any read as a film situation. |
-| **Players** | Roster and player profiles: film accuracy overall and by call, an error log with classification (See to Execution), and what to coach first. |
-| **Film** | Situation library filtered by position and state, a situation editor with a live answer preview, and film sessions that save to a player's profile. |
-| **Drills** | On-field drills keyed to the call they train, filtered by call and position. Add any drill to a practice plan. |
-| **Plans** | Practice plans: ordered drills with minutes and a running clock. |
+| **Home** | Current focus, recent sessions, notes from your coach, new Field Notes, quick actions, staff shortcuts. |
+| **Train** | Scoreboard Studio: 1–10 drills measured by make/miss, score, time or feel. One-player and four-player counters with undo, working offline. Session summaries. |
+| **Play** | Matches and events. This is the next build. |
+| **Learn** | Field Notes (Quick Read, The Work, Field Study) and the decision engine. |
+| **Profile** | Player card, claiming a coach-made profile, goals, coach notes, reflections, results, account and privacy settings, account deletion. |
+| **Coach Workspace** | Roster, new profiles with claim codes, private vs shared notes, media, focus and plan. |
+| **Publishing Studio** | Drafts, uploads, preview, review, schedule, publish, revisions. |
 
-**How it works.** `companion/web/engine.js` is the decision engine. The browser and
-the server both load that same file, so the Call screen and the server's film
-grading always agree. The server grades film answers itself, so a client can't
-submit its own answer key.
+It installs to the home screen and works offline. Scores, notes, reflections
+and drafts save on the device and sync without duplicates.
 
-**Configuration** (environment variables):
-
-| Variable | Default | Effect |
-|---|---|---|
-| `PORT` | `8787` | Port to listen on |
-| `LAB_DB` | `companion/data/lab.db` | SQLite file |
-| `COACH_KEY` | unset | When set, adding, editing and deleting require this key (entered once per device from the header). Reading and running film sessions stay open. |
-| `LAB_DEMO` | `1` | On a fresh database, also load three demo players, clearly marked, so the dashboard isn't empty. Set `0` to skip. Clear them any time from Players. |
-
-A `Dockerfile` is included. Mount a volume at `/data` to keep the database.
-
-**Starter content.** The first four film situations are the worked examples. The
-other situations, the ten drills and the sample plan are starter content to edit
-into your program. Legality comes from `reference/vocabulary.md`. When more than one
-call is legal, the engine's preference order is its own reading and should be
-corrected in place, like the vocabulary notes.
+- `companion/docs/API.md` is the contract the website should build against.
+- `companion/docs/PARITY.md` lists what's done, what needs infrastructure, and
+  what remains before the iOS and Android releases.
 
 ## Layout
 
 | Path | What's in it |
 |---|---|
-| `companion/` | LAB Sideline: server, database, web app, tests |
+| `companion/` | THE LAB app: shared backend, installable app, tests, API docs |
 | `site/index.html` | Readable reference page for the engine |
 | `.claude/skills/lab-coach/SKILL.md` | The coach: equation, pipeline, output contract |
 | `.claude/skills/lab-coach/reference/pipeline.md` | Each stage in depth |
