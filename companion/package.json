@@ -1,0 +1,13 @@
+{
+  "name": "lab-sideline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Companion app for the LAB decision engine: player profiles, film sessions, drills and practice plans.",
+  "main": "server/index.js",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test 'test/*.test.js'"
+  }
+}

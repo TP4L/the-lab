@@ -1,0 +1,10 @@
+{
+  "name": "LAB Sideline",
+  "short_name": "Sideline",
+  "description": "Companion app for the LAB decision engine.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#13171D",
+  "theme_color": "#12161C",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

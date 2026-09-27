@@ -51,30 +51,54 @@ parts, nothing more:
 
 Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 
-## Companion app
+## Companion app: LAB Sideline
 
-`app/index.html` is **LAB Sideline**, a phone-first companion to the coach. It is one
-file with no build step, and it works offline (fonts fall back to system faces).
-Open it in a browser or serve the repo statically.
+`companion/` is a full-stack coaching app built on the engine. It has a Node server,
+a SQLite database and a phone-first web front end. There are no dependencies to
+install; it needs Node 22.13 or newer (SQLite is built into Node).
 
-| Tab | What it does |
+```
+cd companion
+npm start          # http://localhost:8787
+npm test           # engine + API tests
+```
+
+| Screen | What it does |
 |---|---|
-| **Call** | Tap in the Read (H/T/B, Orientation, Certainty), State + Scramble, Need rung and debt/cover. Returns the four-part output and shows which of the seven calls are legal from there, and why. |
-| **Drill** | Film-room quiz: read a rep, pick the call, see the engine's answer with its read and one-line why. Includes the four worked examples. |
-| **Log** | Record reps that went wrong, classify the error (See → Execution), and see which stage to coach first. Stored in the browser only. |
-| **Calls** | The seven calls as cards, marked reversible or committing, with where each is legal. |
+| **Home** | Team dashboard: film accuracy, errors logged across the roster, which stage to coach first, most-missed film, next practice. |
+| **Call** | Tap in the Read, State, Need and solve inputs. Returns the four-part output and every call's legality. Save any read as a film situation. |
+| **Players** | Roster and player profiles: film accuracy overall and by call, an error log with classification (See to Execution), and what to coach first. |
+| **Film** | Situation library filtered by position and state, a situation editor with a live answer preview, and film sessions that save to a player's profile. |
+| **Drills** | On-field drills keyed to the call they train, filtered by call and position. Add any drill to a practice plan. |
+| **Plans** | Practice plans: ordered drills with minutes and a running clock. |
 
-The app's call-picking is a rules engine built from `reference/vocabulary.md`
-legality plus the Certainty and Recovery Debt rules in `SKILL.md`. It reproduces the
-four worked examples. Where it has to choose between two legal calls, the
-preference order is the app's own reading and should be corrected in place,
-the same way as the vocabulary notes.
+**How it works.** `companion/web/engine.js` is the decision engine. The browser and
+the server both load that same file, so the Call screen and the server's film
+grading always agree. The server grades film answers itself, so a client can't
+submit its own answer key.
+
+**Configuration** (environment variables):
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PORT` | `8787` | Port to listen on |
+| `LAB_DB` | `companion/data/lab.db` | SQLite file |
+| `COACH_KEY` | unset | When set, adding, editing and deleting require this key (entered once per device from the header). Reading and running film sessions stay open. |
+| `LAB_DEMO` | `1` | On a fresh database, also load three demo players, clearly marked, so the dashboard isn't empty. Set `0` to skip. Clear them any time from Players. |
+
+A `Dockerfile` is included. Mount a volume at `/data` to keep the database.
+
+**Starter content.** The first four film situations are the worked examples. The
+other situations, the ten drills and the sample plan are starter content to edit
+into your program. Legality comes from `reference/vocabulary.md`. When more than one
+call is legal, the engine's preference order is its own reading and should be
+corrected in place, like the vocabulary notes.
 
 ## Layout
 
 | Path | What's in it |
 |---|---|
-| `app/index.html` | LAB Sideline, the companion app |
+| `companion/` | LAB Sideline: server, database, web app, tests |
 | `site/index.html` | Readable reference page for the engine |
 | `.claude/skills/lab-coach/SKILL.md` | The coach: equation, pipeline, output contract |
 | `.claude/skills/lab-coach/reference/pipeline.md` | Each stage in depth |
