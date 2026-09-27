@@ -26,7 +26,7 @@
   function ApiError(msg, status, data) { this.message = msg; this.status = status; this.data = data || {}; }
   ApiError.prototype = Object.create(Error.prototype);
 
-  var CACHEABLE = /^\/api\/(me|home|posts|athletes|training\/sessions|studio\/posts)/;
+  var CACHEABLE = /^\/api\/(me|home|posts|athletes|training\/sessions|studio\/posts|matches|events|leaderboard|notifications)/;
 
   function request(method, path, body) {
     var opts = { method: method, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };

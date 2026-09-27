@@ -1,7 +1,7 @@
 # Feature parity checklist
 
 Status of THE LAB app against the build brief. Last updated: this build (core
-loop and Publishing Studio, as an installable web app).
+loop, Publishing Studio and Play, as an installable web app).
 
 - **Done:** works end to end and is covered by the automated tests or the
   browser run.
@@ -23,7 +23,7 @@ loop and Publishing Studio, as an installable web app).
 |---|---|
 | Five tabs: Home, Train, Play, Learn, Profile | Done |
 | Home: focus, recent sessions, coach notes, new posts, quick actions | Done |
-| Upcoming events on Home | Next (Play build) |
+| Upcoming events on Home | Done |
 | Staff entry to Coach Workspace, Publishing Studio, Admin | Done, role-aware |
 | Loading, empty, error, permission-denied and offline states | Done |
 | Light and dark themes, keyboard focus, skip link, labelled controls | Done |
@@ -39,11 +39,11 @@ loop and Publishing Studio, as an installable web app).
 | Photo, name, hand, side, rating | Done | |
 | Goals (athlete), focus and plan (coach-owned) | Done | |
 | Session history and training results | Done | |
-| Game results | Next (Play build) | |
+| Game results | Done | Match history, W/L, status. |
 | Coach-shared notes, reflections, photos and videos | Done | |
 | Private coach notes kept separate, enforced on the server, media included | Done | Tested in journey 6. |
 | Player card with ID | Done | |
-| QR code for check-in | Next (Play build) | |
+| QR code for check-in | Done | Built-in encoder, checked against an independent decoder. |
 | Membership, cohort and course access | Next | |
 | Account recovery | Infra | Reset links work. Emailing them needs an email provider; until then admins issue links. |
 | Account deletion and privacy explanation | Done | |
@@ -73,16 +73,28 @@ loop and Publishing Studio, as an installable web app).
 | Session summary, individual and group | Done | |
 | Custom scoreboards with editable names and scoring rules | Next | |
 | Timed games, best-of formats | Next | Time measure with a stopwatch is done. |
-| Round-robin schedules | Next (Play build) | |
+| Round-robin schedules | Done | Partners, opponents, left/right sides, per-court completion checks. |
 | Voice score entry (experimental) | Next | Must be tested on real devices with earbuds and music before being called reliable. |
 
 ## 6. Games and events
 
-| Item | Status |
-|---|---|
-| Record matches, confirm or verify results, correction history | Next |
-| Event discovery, registration, check-in, courts, live scores, standings | Next |
-| Notifications and deep links | Infra + Next: web push needs VAPID keys; iOS web push only works for installed apps on iOS 16.4+. |
+| Item | Status | Notes |
+|---|---|---|
+| Record casual, training and competition matches: players, teams, sides, format, scores, date | Done | Singles and doubles; to 11/15/21, win by 1 or 2, best of 1/3/5. |
+| Link a match to an event | Done | |
+| Link a match to a training session | Partial | The API accepts `session_id`; the UI doesn't set it yet. |
+| Self-recorded, opponent-confirmed, organizer-verified, disputed | Done | Tested (journey 3 and match rules). |
+| Duplicate prevention | Done | Device IDs for retries; same players and scores within 12 hours prompts first. |
+| Correction history | Done | Every correction keeps the previous version and a reason. |
+| Event discovery, interest, registration, waitlist, participant lists | Done | |
+| QR check-in | Done | Camera scanning where the browser supports it (Chrome on Android). On iPhone Safari the organizer types the code under the QR. A native build adds scanning everywhere. |
+| Court assignments, rotations, live scores, standings | Done | Live scores refresh every 20 seconds on the event screen. |
+| Late arrivals and early departures under organizer control | Done | Check in or switch a player to "Left"; the next round adjusts. |
+| Leaderboards | Done | Confirmed and verified results only; opt-out setting. |
+| In-app notifications with deep links and per-type opt-in | Done | |
+| Phone push notifications | Infra | Web push needs VAPID keys and a push sender. On iOS it works only for home-screen installs (16.4+). Native builds use APNs/FCM. |
+| Reminders before sessions and events | Next | Needs a scheduler (cron) to send them at the right time. |
+| Team events (fixed partners), brackets | Next | |
 
 ## 7. Publishing Studio
 
@@ -138,4 +150,4 @@ loop and Publishing Studio, as an installable web app).
    logins are offered.
 7. **Real-device testing.** Courtside tap targets in sunlight, wake lock,
    video upload on cellular, iOS storage eviction for installed web apps.
-8. **Play build.** Matches, events, round robins, QR check-in, notifications.
+8. **Push.** Connect web push or native push to the notifications that already exist.

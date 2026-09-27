@@ -23,7 +23,8 @@ function createApp(opts = {}) {
   };
   const auth = createAuth(db, { secureCookies: !!opts.secureCookies });
   const r = createRouter();
-  const ctx = { db, auth, config };
+  const notifier = require('./api/notify.js').createNotifier(db);
+  const ctx = { db, auth, config, notifier };
 
   r.get('/api/health', () => ({ ok: true }));
   r.get('/api/meta', () => ({ lanes: LANES, version: 2 }));
@@ -32,6 +33,8 @@ function createApp(opts = {}) {
   require('./api/training.js')(r, ctx);
   require('./api/athletes.js')(r, ctx);
   require('./api/publishing.js')(r, ctx);
+  require('./api/play.js')(r, ctx);
+  require('./api/notify.js').routes(r, ctx);
 
   /* Home tab: one round trip for the signed-in user's day. */
   r.get('/api/home', ({ user }) => {
@@ -47,7 +50,14 @@ function createApp(opts = {}) {
     const posts = db.prepare(`SELECT id, lane, title, slug, summary, thumbnail_media_id FROM posts
       WHERE status = 'published' OR (status = 'scheduled' AND publish_at <= ?) ORDER BY COALESCE(published_at, publish_at) DESC LIMIT 4`).all(t)
       .map(p => ({ ...p, lane_name: LANES[p.lane] }));
-    const out = { athlete, sessions, shared_notes: sharedNotes, posts };
+    const events = db.prepare(`SELECT e.id, e.title, e.starts_at, e.location, e.status, ep.state, ep.checked_in_at FROM events e
+      JOIN event_people ep ON ep.event_id = e.id WHERE ep.athlete_id = ? AND ep.state IN ('registered','waitlist','interested')
+      AND e.status IN ('published','live') ORDER BY e.starts_at LIMIT 5`).all(athleteId || -1);
+    const open = db.prepare(`SELECT id, title, starts_at, location FROM events WHERE status = 'published' AND starts_at >= ? ORDER BY starts_at LIMIT 3`).all(t);
+    const unread = db.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL').get(user.id).n;
+    const toConfirm = athleteId ? db.prepare(`SELECT COUNT(*) AS n FROM matches m JOIN match_players mp ON mp.match_id = m.id
+      WHERE mp.athlete_id = ? AND m.status = 'recorded' AND m.recorded_by != ?`).get(athleteId, user.id).n : 0;
+    const out = { athlete, sessions, shared_notes: sharedNotes, posts, events, open_events: open, unread, to_confirm: toConfirm };
     if (auth.has(user, 'coach')) {
       out.coach = {
         athletes: user.roles.includes('admin') ? db.prepare('SELECT COUNT(*) AS n FROM athletes').get().n

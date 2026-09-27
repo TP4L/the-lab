@@ -19,7 +19,7 @@ function slugify(title) {
   return base + '-' + crypto.randomBytes(3).toString('hex');
 }
 
-module.exports = function publishing(r, { db, auth }) {
+module.exports = function publishing(r, { db, auth, notifier }) {
   const LIVE = `(p.status = 'published' OR (p.status = 'scheduled' AND p.publish_at <= ?))`;
 
   function canEdit(user, p) {
@@ -126,7 +126,11 @@ module.exports = function publishing(r, { db, auth }) {
     const at = isoTime(body.publish_at, 'publish_at');
     const t = now();
     if (at && at > t) return transition(user, id, ['draft', 'in_review', 'scheduled'], 'scheduled', { publish_at: at, published_at: null });
-    return transition(user, id, ['draft', 'in_review', 'scheduled'], 'published', { publish_at: t, published_at: t });
+    const wasLive = !!db.prepare('SELECT published_at FROM posts WHERE id = ?').get(id).published_at;
+    const out = transition(user, id, ['draft', 'in_review', 'scheduled'], 'published', { publish_at: t, published_at: t });
+    // Tell members about new posts (not re-publishes). Scheduled posts go out without a ping.
+    if (!wasLive) notifier.notify(db.prepare('SELECT id FROM users').all().map(u => u.id).filter(uid => uid !== user.id), 'content', `New in ${LANES[out.lane]}: ${out.title}`, out.summary || '', `#/learn/${out.slug}`);
+    return out;
   });
   r.post('/api/studio/posts/:id/unpublish', ({ user, params }) => {
     auth.require(user, 'editor');

@@ -122,13 +122,14 @@
       app.innerHTML = offlineNote(d) +
         '<div class="head"><p class="eyebrow">' + h(hi) + '</p><h1>' + h(ME.user.name.split(' ')[0]) + '</h1></div>' +
         (staffTiles ? '<div class="staff">' + staffTiles + '</div>' : '') +
+        (d.to_confirm ? '<div class="banner"><span>' + d.to_confirm + ' match score' + (d.to_confirm > 1 ? 's need' : ' needs') + ' your confirmation.</span><a class="btn sm primary" href="#/play">Review</a></div>' : '') +
         (a ? '<div class="focus-card"><p class="eyebrow">Current focus</p><p class="big">' + h(a.focus || 'No focus set yet') + '</p>' + (a.goals ? '<p class="small" style="opacity:.8">Goal: ' + h(a.goals) + '</p>' : '') + '</div>'
           : '<div class="banner"><span>Connect your athlete profile to see your focus, notes and results.</span><a class="btn sm primary" href="#/profile">Set up profile</a></div>') +
         '<div class="stack"><p class="section-title">Quick actions</p><div class="quick">' +
         (has('coach') ? '<a href="#/train/new">Start a session</a><a href="#/train/new?quick=1">Make / miss counter</a>' : '') +
         (a ? '<a href="#/profile#reflect">Add a reflection</a>' : '') +
         (has('contributor', 'editor') ? '<a href="#/studio/new">Write a post</a>' : '') +
-        '<a href="#/learn">Field Notes</a><a href="#/learn/engine">Decision engine</a></div></div>' +
+        '<a href="#/play/match/new">Record a match</a><a href="#/learn">Field Notes</a></div></div>' +
         '<div class="grid-2">' +
         '<div class="stack"><p class="section-title">' + (live ? 'Live now' : 'Recent sessions') + '</p>' + (d.sessions.length ? '<div class="list">' + d.sessions.map(function (s) {
           return '<a class="li" href="#/train/' + h(s.id) + (s.status === 'live' && has('coach') ? '/live' : '') + '"><span class="main-col"><span class="t">' + h(s.title) + '</span><span class="d">' + h(L.when(s.started_at)) + '</span></span><span class="side"><span class="tag' + (s.status === 'live' ? ' call' : '') + '">' + (s.status === 'live' ? 'Live' : 'Done') + '</span></span></a>';
@@ -137,6 +138,10 @@
           return '<div class="note"><p class="body">' + h(n.body) + '</p><p class="meta"><span class="vis shared">Shared with you</span><span>' + h(n.author || 'Coach') + '</span><span>' + h(L.when(n.created_at)) + '</span></p></div>';
         }).join('') + '</div>' : '<div class="list"><p class="empty">Nothing shared yet.</p></div>') + '</div>' +
         '</div>' +
+        '<div class="stack"><p class="section-title">Upcoming events</p>' + ((d.events.length || d.open_events.length) ? '<div class="list">' +
+          d.events.map(function (e) { return eventRow({ id: e.id, title: e.title, starts_at: e.starts_at, location: e.location, status: e.status, my_state: e.state }); }).join('') +
+          d.open_events.filter(function (o) { return !d.events.some(function (e) { return e.id === o.id; }); }).map(function (e) { return eventRow(Object.assign({ status: 'published' }, e)); }).join('') + '</div>'
+          : '<div class="list"><p class="empty">No upcoming events. <a href="#/play/events">Browse events</a>.</p></div>') + '</div>' +
         '<div class="stack"><p class="section-title">New in Field Notes</p>' + postList(d.posts) + '</div>';
     });
   };
@@ -413,14 +418,6 @@
     });
   };
 
-  /* ================= PLAY ================= */
-  views.play = function () {
-    app.innerHTML = head('Play', 'Matches and events') +
-      '<div class="coming"><p class="eyebrow">Next build</p><p>Recording matches, round robins and events is the next part of THE LAB app. It will include:</p>' +
-      '<ul><li>Casual, training and competition results with a correction history</li><li>Self-recorded, opponent-confirmed and organizer-verified results</li><li>Round robins with partners, opponents and left/right positions</li><li>Event registration, QR check-in, court assignments, live scores and standings</li></ul>' +
-      '<p class="small muted">Until then, coaches can record practice games as a session with a Score drill in Train.</p></div>';
-  };
-
   /* ================= LEARN ================= */
   var learnLane = '';
   views.learn = function () {
@@ -545,7 +542,8 @@
     app.innerHTML = offlineNote(p) +
       '<div class="pcard">' + avatar(a) + '<div><p class="pid">' + playerId(a.id) + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
       '<span>Hand <b>' + h(HANDS[a.hand] || '—') + '</b></span><span>Side <b>' + h(SIDES[a.side] || '—') + '</b></span><span>Rating <b>' + h(a.rating || '—') + '</b></span></p></div></div>' +
-      '<p class="small muted">Show your player ID (' + playerId(a.id) + ') at check-in. QR check-in arrives with events in the Play build.</p>' +
+      '<details class="more" id="qrbox"><summary>Check-in QR \u00b7 ' + playerId(a.id) + '</summary><div class="qr-wrap" id="qr"><p class="small muted">Loading\u2026</p></div></details>' +
+      '<div class="row"><a class="btn ghost" href="#/play">Match history</a><a class="btn ghost" href="#/play/leaderboard">Leaderboard</a></div>' +
       '<div class="grid-2">' +
       '<div class="stack"><p class="section-title">Development</p>' +
       '<div class="focus-card"><p class="eyebrow">Current focus · set by your coach</p><p class="big">' + h(a.focus || 'Not set yet') + '</p></div>' +
@@ -586,6 +584,12 @@
         .then(function () { L.toast('Photo updated'); route(); }, function (err) { prog.hidden = true; L.toast(err.message); });
     });
     bindSettings();
+    $('#qrbox').addEventListener('toggle', function once() {
+      $('#qrbox').removeEventListener('toggle', once);
+      api.get('/api/me/checkin').then(function (c) {
+        $('#qr').innerHTML = '<div class="qr">' + window.LabQR.svg(c.qr, { label: 'Check-in QR for ' + a.name }) + '</div><p class="small">Show this at check-in. Can\u2019t scan? Give the organizer <b class="mono">' + h(c.player_id) + '</b> or code <b class="mono">' + h(c.code) + '</b>.</p>';
+      }, function (err) { $('#qr').innerHTML = '<p class="small muted">' + h(err.status === 0 ? 'Open this once with a connection to save your QR on this device.' : err.message) + '</p>'; });
+    });
     if (location.hash.indexOf('#reflect') > 0) setTimeout(function () { $('#rtext').focus(); }, 50);
   }
 
@@ -602,6 +606,7 @@
       '<div class="field"><label class="flabel" for="cur">Current password</label><input type="password" id="cur" autocomplete="current-password"></div>' +
       '<div class="field"><label class="flabel" for="npw">New password</label><input type="password" id="npw" autocomplete="new-password"></div>' +
       '<div class="row"><button class="btn" type="submit">Change password</button></div></form></details>' +
+      '<details class="more" id="prefs"><summary>Notifications and privacy</summary><div id="prefbox" class="stack-sm"><p class="small muted">Loading\u2026</p></div></details>' +
       '<details class="more"><summary>Privacy</summary><div class="small stack-sm"><p>Your coach sees your profile, results, reflections and shared media. Other athletes never see your profile or results.</p><p>Coaches can keep private notes about you. Those are for coaching staff only. Notes marked “Shared” are the ones written for you.</p><p>Published Field Notes are public. Nothing else in THE LAB is.</p></div></details>' +
       '<details class="more"><summary>Delete account</summary><form class="form" id="delf" novalidate><p class="small">This deletes your login, your reflections and the photos and video you uploaded. If a coach created your profile, they keep the session results they recorded, no longer linked to you. This can’t be undone.</p>' +
       '<div class="field"><label class="flabel" for="dpw">Password</label><input type="password" id="dpw" autocomplete="current-password"></div>' +
@@ -609,6 +614,20 @@
       '<div class="row"><button class="btn" type="button" id="signout">Sign out</button></div></div></div>';
   }
   function bindSettings() {
+    $('#prefs').addEventListener('toggle', function once() {
+      $('#prefs').removeEventListener('toggle', once);
+      api.get('/api/me/prefs').then(function (d) {
+        $('#prefbox').innerHTML = '<p class="small muted">Notifications show in THE LAB (the bell at the top). Phone push notifications come with the store apps.</p>' + Object.keys(d.labels).map(function (k) {
+          return '<label class="tog" for="pf-' + k + '"><input type="checkbox" id="pf-' + k + '" data-pref="' + k + '"' + (d.prefs[k] ? ' checked' : '') + '><div><b>' + h(d.labels[k]) + '</b></div></label>';
+        }).join('');
+        $('#prefbox').addEventListener('change', function (e) {
+          var k = e.target.getAttribute('data-pref'); if (!k) return;
+          var body = {}; body[k] = e.target.checked;
+          api.request('PUT', '/api/me/prefs', body).then(function () { L.toast('Saved'); }, function (err) { e.target.checked = !e.target.checked; L.toast(err.message); });
+        });
+      }, function (err) { $('#prefbox').innerHTML = '<p class="small muted">' + h(err.status === 0 ? 'Settings need a connection.' : err.message) + '</p>'; });
+    });
+    if (location.hash.indexOf('#prefs') > 0) { $('#prefs').open = true; setTimeout(function () { $('#prefs').scrollIntoView(); }, 50); }
     $('#signout').addEventListener('click', function () {
       var pending = L.outbox().length;
       function go() { api.request('POST', '/api/auth/logout').then(null, function () {}).then(function () { setMe(null); location.hash = '#/signin'; }); }
@@ -946,6 +965,407 @@
     });
   };
 
+  /* ================= PLAY ================= */
+  var MATCH_KIND = { casual: 'Casual', training: 'Training', competition: 'Competition' };
+  var STATUS_CLASS = { scheduled: 'draft', recorded: 'in_review', confirmed: 'published', verified: 'published', disputed: 'scheduled' };
+  function statusPill(m) { return '<span class="status ' + STATUS_CLASS[m.status] + '">' + h(m.status_label || m.status) + '</span>'; }
+  function teamNames(m, t) {
+    return m.players.filter(function (p) { return p.team === t; }).map(function (p) { return h(p.name) + (p.side ? ' <span class="small muted">(' + p.side[0].toUpperCase() + ')</span>' : ''); }).join(' & ');
+  }
+  function scoreLine(m) { return m.games.length ? m.games.map(function (g) { return g[0] + '–' + g[1]; }).join(', ') : 'No score yet'; }
+  function matchRow(m) {
+    var res = m.result ? '<span class="result ' + (m.result === 'W' ? 'w' : 'l') + '">' + m.result + '</span>' : '';
+    return '<a class="li" href="#/play/match/' + h(m.id) + '"><span class="who">' + res + '<span class="main-col"><span class="t small">' + teamNames(m, 1) + ' <span class="muted">vs</span> ' + teamNames(m, 2) + '</span><span class="d mono">' + h(scoreLine(m)) + ' · ' + h(L.when(m.played_at)) + '</span></span></span><span class="side">' + statusPill(m) + '</span></a>';
+  }
+  function fmtEventTime(e) { return new Date(e.starts_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+
+  views.play = function () {
+    return Promise.all([
+      api.get('/api/matches').then(null, function (e) { if (e.status === 0) return []; throw e; }),
+      api.get('/api/events').then(null, function (e) { if (e.status === 0) return []; throw e; })
+    ]).then(function (res) {
+      var matches = res[0], events = res[1];
+      var pending = localMatches();
+      var confirm = matches.filter(function (m) { return m.you && m.you.can_confirm && m.status === 'recorded'; });
+      var mine = events.filter(function (e) { return e.my_state && e.my_state !== 'withdrawn' && e.status !== 'complete' && e.status !== 'cancelled'; });
+      var open = events.filter(function (e) { return (!e.my_state || e.my_state === 'withdrawn') && (e.status === 'published' || e.status === 'live'); });
+      var wins = matches.filter(function (m) { return m.result === 'W'; }).length;
+      app.innerHTML = offlineNote(matches) +
+        head('Play', 'Matches and events', matches.length ? wins + '–' + (matches.length - wins) + ' in recorded matches' : 'Record a match, or join an event.',
+          '<div class="row"><a class="btn" href="#/play/leaderboard">Leaderboard</a><a class="btn primary" href="#/play/match/new">Record match</a></div>') +
+        (confirm.length ? '<div class="stack"><p class="section-title">Needs your confirmation · ' + confirm.length + '</p><div class="list">' + confirm.map(matchRow).join('') + '</div></div>' : '') +
+        '<div class="grid-2"><div class="stack"><p class="section-title">Your events</p>' + (mine.length ? '<div class="list">' + mine.map(eventRow).join('') + '</div>' : '<div class="list"><p class="empty">You haven’t joined an event.</p></div>') +
+        '<p class="section-title">Open events</p>' + (open.length ? '<div class="list">' + open.map(eventRow).join('') + '</div>' : '<div class="list"><p class="empty">No open events right now.</p></div>') +
+        (has('coach') ? '<div class="row"><a class="btn" href="#/play/events/new">New event</a><a class="btn ghost" href="#/play/events">All events</a></div>' : '<div class="row"><a class="btn ghost" href="#/play/events">All events</a></div>') + '</div>' +
+        '<div class="stack"><p class="section-title">Your matches</p>' +
+        (pending.length ? '<div class="list">' + pending.map(function (m) { return '<div class="li"><span class="main-col"><span class="t small">' + h(m.label) + '</span><span class="d mono">' + h(m.score) + '</span></span><span class="side"><span class="status local">On device</span></span></div>'; }).join('') + '</div>' : '') +
+        (matches.length ? '<div class="list">' + matches.slice(0, 20).map(matchRow).join('') + '</div>' : '<div class="list"><p class="empty">No matches yet.</p></div>') + '</div></div>';
+    });
+  };
+  function eventRow(e) {
+    var st = e.my_state === 'registered' ? '<span class="tag ok">Registered</span>' : e.my_state === 'waitlist' ? '<span class="tag demo">Waitlist</span>' : e.my_state === 'interested' ? '<span class="tag">Interested</span>' : '';
+    return '<a class="li" href="#/play/events/' + e.id + '"><span class="main-col"><span class="t">' + h(e.title) + '</span><span class="d">' + h(fmtEventTime(e)) + (e.location ? ' · ' + h(e.location) : '') + '</span></span><span class="side">' + (e.status === 'live' ? '<span class="tag call">Live</span>' : e.status === 'draft' ? '<span class="tag">Draft</span>' : '') + st + '</span></a>';
+  }
+  function localMatches() {
+    return L.outbox().filter(function (q) { return q.path === '/api/matches' && q.method === 'POST'; }).map(function (q) {
+      return { label: q.label, score: q.body.games.map(function (g) { return g.join('–'); }).join(', ') };
+    });
+  }
+
+  /* Record a match. Offline-safe: the device picks the ID. */
+  views.matchNew = function () {
+    return api.get('/api/me').then(function (m) {
+      setMe(m);
+      if (!m.athlete_id && !has('coach')) { app.innerHTML = head('Record match', 'Set up your profile first', 'Matches attach to your athlete profile.') + '<div class="row"><a class="btn primary" href="#/profile">Go to Profile</a></div>'; return; }
+      return (has('coach') ? api.get('/api/athletes').then(null, function () { return []; }) : Promise.resolve([])).then(function (roster) {
+        var st = { kind: 'casual', game_to: 11, win_by: 2, best_of: 1, doubles: true };
+        var myName = ME.user.name;
+        function playerField(team, slot, def) {
+          var id = 'p' + team + slot;
+          var mine = def === 'me';
+          return '<div class="field pfield" data-team="' + team + '" data-slot="' + slot + '"' + (slot === 2 && !st.doubles ? ' hidden' : '') + '>' +
+            '<label class="flabel" for="' + id + '">' + (mine ? 'You' : 'Player') + '</label>' +
+            (mine ? '<input type="text" id="' + id + '" value="' + h(myName) + '" disabled data-me="1">' :
+              '<input type="text" id="' + id + '" list="roster" placeholder="Player ID (LAB-00012) or guest name" autocomplete="off">') +
+            '<div class="seg-btns sm" data-side="' + id + '"><button type="button" data-v="" aria-pressed="true">Side?</button><button type="button" data-v="left" aria-pressed="false">Left</button><button type="button" data-v="right" aria-pressed="false">Right</button></div></div>';
+        }
+        app.innerHTML = '<a class="back" href="#/play">← Play</a>' + head('Play', 'Record a match', 'Your opponents get a request to confirm the score.') +
+          (roster.length ? '<datalist id="roster">' + roster.map(function (a) { return '<option value="LAB-' + ('00000' + a.id).slice(-5) + '">' + h(a.name) + '</option>'; }).join('') + '</datalist>' : '<datalist id="roster"></datalist>') +
+          '<form class="form" id="mf" novalidate>' +
+          '<div class="form-grid"><div class="field"><span class="flabel">Type</span><div class="seg-btns" data-k="kind">' + Object.keys(MATCH_KIND).map(function (k) { return '<button type="button" data-v="' + k + '" aria-pressed="' + (st.kind === k) + '">' + MATCH_KIND[k] + '</button>'; }).join('') + '</div></div>' +
+          '<div class="field"><span class="flabel">Format</span><div class="seg-btns" data-k="doubles"><button type="button" data-v="true" aria-pressed="true">Doubles</button><button type="button" data-v="false" aria-pressed="false">Singles</button></div></div></div>' +
+          '<div class="form-grid"><div class="field"><span class="flabel">Games to</span><div class="seg-btns" data-k="game_to">' + [11, 15, 21].map(function (v) { return '<button type="button" data-v="' + v + '" aria-pressed="' + (st.game_to === v) + '">' + v + '</button>'; }).join('') + '</div></div>' +
+          '<div class="field"><span class="flabel">Win by</span><div class="seg-btns" data-k="win_by"><button type="button" data-v="2" aria-pressed="true">2</button><button type="button" data-v="1" aria-pressed="false">1</button></div></div>' +
+          '<div class="field"><span class="flabel">Best of</span><div class="seg-btns" data-k="best_of">' + [1, 3, 5].map(function (v) { return '<button type="button" data-v="' + v + '" aria-pressed="' + (st.best_of === v) + '">' + v + '</button>'; }).join('') + '</div></div></div>' +
+          '<div class="grid-2"><div class="card stack"><p class="section-title">Team 1</p>' + (m.athlete_id ? playerField(1, 1, 'me') : playerField(1, 1)) + playerField(1, 2) + '</div>' +
+          '<div class="card stack"><p class="section-title">Team 2</p>' + playerField(2, 1) + playerField(2, 2) + '</div></div>' +
+          '<div class="stack"><p class="section-title">Score</p><div id="games"></div></div>' +
+          '<div class="form-grid"><div class="field"><label class="flabel" for="when">Played</label><input type="datetime-local" id="when"></div>' +
+          '<div class="field"><label class="flabel" for="note">Note</label><input type="text" id="note" maxlength="500" placeholder="Optional"></div></div>' +
+          '<div id="dupbox"></div><div class="row"><button class="btn primary" type="submit">Save match</button></div></form>';
+        var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); $('#when').value = d.toISOString().slice(0, 16);
+        function paintGames() {
+          var prev = $$('#games input').map(function (i) { return i.value; });
+          $('#games').innerHTML = Array.apply(null, { length: st.best_of }).map(function (_, i) {
+            return '<div class="game-row"><span class="mono small">Game ' + (i + 1) + '</span><input type="number" inputmode="numeric" min="0" max="99" aria-label="Game ' + (i + 1) + ' team 1" data-g="' + i + '" data-t="0"><span class="muted">–</span><input type="number" inputmode="numeric" min="0" max="99" aria-label="Game ' + (i + 1) + ' team 2" data-g="' + i + '" data-t="1"></div>';
+          }).join('');
+          $$('#games input').forEach(function (inp, i) { if (prev[i] !== undefined) inp.value = prev[i]; });
+        }
+        paintGames();
+        $('#mf').addEventListener('click', function (e) {
+          var b = e.target.closest('.seg-btns button'); if (!b) return;
+          var box = b.parentNode, k = box.getAttribute('data-k');
+          $$('button', box).forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+          if (!k) return;
+          var v = b.getAttribute('data-v');
+          st[k] = v === 'true' ? true : v === 'false' ? false : isNaN(v) ? v : Number(v);
+          if (k === 'doubles') $$('.pfield[data-slot="2"]').forEach(function (f) { f.hidden = !st.doubles; });
+          if (k === 'best_of') paintGames();
+        });
+        var confirmDup = false;
+        $('#mf').addEventListener('submit', function (e) {
+          e.preventDefault();
+          var teams = [[], []], err = null;
+          $$('.pfield').forEach(function (f) {
+            if (f.hidden) return;
+            var t = +f.getAttribute('data-team') - 1, inp = $('input', f);
+            var side = $('[aria-pressed="true"]', $('.seg-btns', f)).getAttribute('data-v');
+            if (inp.getAttribute('data-me')) { teams[t].push({ athlete_id: ME.athlete_id, side: side }); return; }
+            var v = inp.value.trim();
+            if (!v) { err = 'Fill in every player. Use a player ID for LAB members, or a name for guests.'; return; }
+            teams[t].push(/^LAB-?\d+$/i.test(v) ? { player_id: v.toUpperCase(), side: side } : { guest_name: v, side: side });
+          });
+          if (err) return L.formError($('#mf'), err);
+          var games = [];
+          for (var g = 0; g < st.best_of; g++) {
+            var a = $('[data-g="' + g + '"][data-t="0"]').value, b = $('[data-g="' + g + '"][data-t="1"]').value;
+            if (a === '' && b === '') continue;
+            if (a === '' || b === '') return L.formError($('#mf'), 'Game ' + (g + 1) + ' needs both scores.');
+            games.push([Number(a), Number(b)]);
+          }
+          if (!games.length) return L.formError($('#mf'), 'Enter the score.');
+          var body = { id: L.uuid(), kind: st.kind, game_to: st.game_to, win_by: st.win_by, best_of: st.best_of, teams: teams, games: games, note: $('#note').value, played_at: new Date($('#when').value).toISOString() };
+          if (confirmDup) body.confirm_duplicate = true;
+          var label = teams.map(function (t) { return t.map(function (p) { return p.player_id || p.guest_name || myName.split(' ')[0]; }).join(' & '); }).join(' vs ');
+          if (!L.isOnline()) {
+            L.queue({ method: 'POST', path: '/api/matches', body: body, label: label });
+            L.toast('Saved on this device. It’ll sync when you’re online.'); location.hash = '#/play'; return;
+          }
+          api.request('POST', '/api/matches', body).then(function (r) { L.toast('Match saved'); location.hash = '#/play/match/' + r.id; }, function (err) {
+            if (err.status === 409 && err.data.duplicate_of) {
+              confirmDup = true;
+              $('#dupbox').innerHTML = '<div class="banner"><span>' + h(err.message) + '</span><span class="row"><a class="btn sm" href="#/play/match/' + h(err.data.duplicate_of) + '">View it</a><button class="btn sm primary" type="submit">Save anyway</button></span></div>';
+            } else if (err.status === 0) {
+              L.queue({ method: 'POST', path: '/api/matches', body: body, label: label });
+              L.toast('Saved on this device. It’ll sync when you’re online.'); location.hash = '#/play';
+            } else L.formError($('#mf'), err.message);
+          });
+        });
+      });
+    });
+  };
+
+  function scoreForm(m, withReason) {
+    var n = Math.max(m.games.length || 1, 1);
+    return '<form class="card form" id="sf" novalidate><p class="section-title">' + (m.status === 'scheduled' ? 'Enter score' : 'Correct score') + '</p>' +
+      '<p class="small muted">Team 1: ' + teamNames(m, 1) + ' · Team 2: ' + teamNames(m, 2) + '</p><div id="sgames">' +
+      Array.apply(null, { length: Math.max(n, m.best_of) }).map(function (_, i) {
+        var g = m.games[i] || ['', ''];
+        return '<div class="game-row"><span class="mono small">Game ' + (i + 1) + '</span><input type="number" inputmode="numeric" min="0" max="99" aria-label="Game ' + (i + 1) + ' team 1" data-g="' + i + '" data-t="0" value="' + g[0] + '"><span class="muted">–</span><input type="number" inputmode="numeric" min="0" max="99" aria-label="Game ' + (i + 1) + ' team 2" data-g="' + i + '" data-t="1" value="' + g[1] + '"></div>';
+      }).join('') + '</div>' +
+      (withReason ? '<div class="field"><label class="flabel" for="reason">What changed</label><input type="text" id="reason" maxlength="300" placeholder="e.g. Game 2 score was flipped"></div>' : '') +
+      '<div class="row"><button class="btn primary" type="submit">Save score</button><button class="btn ghost" type="button" id="scancel">Cancel</button></div></form>';
+  }
+  function readScore(form) {
+    var out = [];
+    $$('[data-t="0"]', form).forEach(function (a) {
+      var b = $('[data-g="' + a.getAttribute('data-g') + '"][data-t="1"]', form);
+      if (a.value !== '' && b.value !== '') out.push([Number(a.value), Number(b.value)]);
+    });
+    return out;
+  }
+  /* Body for PUT /api/matches/:id, keeping players as they are. */
+  function correctionBody(m, games, reason) {
+    var teams = [1, 2].map(function (t) {
+      return m.players.filter(function (p) { return p.team === t; }).map(function (p) {
+        return p.guest ? { guest_name: p.name, side: p.side } : { player_id: p.player_id, side: p.side };
+      });
+    });
+    return { version: m.version, kind: m.kind, game_to: m.game_to, win_by: m.win_by, best_of: m.best_of, played_at: m.played_at, note: m.note, teams: teams, games: games, reason: reason };
+  }
+
+  views.match = function (id) {
+    return api.get('/api/matches/' + id).then(function (m) {
+      var you = m.you || {};
+      var won = function (t) { return m.winner === t ? ' won' : ''; };
+      app.innerHTML = '<a class="back" href="' + (m.event_id ? '#/play/events/' + m.event_id : '#/play') + '">← ' + (m.event_id ? 'Event' : 'Play') + '</a>' + offlineNote(m) +
+        '<div class="head-row"><div class="head"><p class="eyebrow">' + h(MATCH_KIND[m.kind]) + (m.court ? ' · Court ' + m.court : '') + ' · to ' + m.game_to + ', win by ' + m.win_by + (m.best_of > 1 ? ', best of ' + m.best_of : '') + '</p><h1>' + h(scoreLine(m)) + '</h1><p>' + h(L.when(m.played_at)) + '</p></div>' + statusPill(m) + '</div>' +
+        '<div class="scoreboard"><div class="team' + won(1) + '"><p class="eyebrow">Team 1' + (m.winner === 1 ? ' · Won' : '') + '</p><p class="names">' + teamNames(m, 1) + '</p></div>' +
+        '<div class="games">' + m.games.map(function (g) { return '<span><b' + (g[0] > g[1] ? ' class="w"' : '') + '>' + g[0] + '</b><b' + (g[1] > g[0] ? ' class="w"' : '') + '>' + g[1] + '</b></span>'; }).join('') + '</div>' +
+        '<div class="team' + won(2) + '"><p class="eyebrow">Team 2' + (m.winner === 2 ? ' · Won' : '') + '</p><p class="names">' + teamNames(m, 2) + '</p></div></div>' +
+        '<p class="small muted">' + ({ scheduled: 'Waiting for a score.', recorded: 'Self-recorded. An opponent can confirm it.', confirmed: 'Confirmed by an opponent.', verified: 'Verified by an organizer or coach.', disputed: 'Disputed. The person who recorded it, or an organizer, can correct it.' })[m.status] + '</p>' +
+        (m.note ? '<p class="flag"><b>Note.</b> ' + h(m.note) + '</p>' : '') +
+        '<div class="row">' +
+        (you.can_confirm && m.status !== 'confirmed' ? '<button class="btn primary" type="button" id="confirm">Confirm score</button><button class="btn" type="button" id="dispute">Dispute</button>' : '') +
+        (you.can_verify && m.status !== 'verified' ? '<button class="btn primary" type="button" id="verify">Verify</button>' : '') +
+        (you.can_edit ? '<button class="btn ghost" type="button" id="edit">' + (m.status === 'scheduled' ? 'Enter score' : 'Correct score') + '</button>' : '') + '</div>' +
+        '<div id="slot"></div>' +
+        '<div class="stack"><p class="section-title">History</p><div class="list">' + m.log.map(function (l) {
+          return '<div class="li"><span class="main-col"><span class="t small">' + h({ recorded: 'Recorded', scored: 'Score entered', corrected: 'Corrected', confirmed: 'Confirmed', disputed: 'Disputed', verified: 'Verified' }[l.action] || l.action) + ' by ' + h(l.by || 'someone') + '</span>' + (l.note ? '<span class="d">' + h(l.note) + '</span>' : '') + '</span><span class="side">' + h(L.when(l.created_at)) + '</span></div>';
+        }).join('') + '</div></div>';
+      function act(path, body, msg) { return api.request('POST', '/api/matches/' + m.id + '/' + path, body || {}).then(function () { L.toast(msg); route(); }, function (err) { L.toast(err.message); }); }
+      if ($('#confirm')) $('#confirm').addEventListener('click', function () { act('confirm', null, 'Score confirmed'); });
+      if ($('#verify')) $('#verify').addEventListener('click', function () { act('verify', null, 'Verified'); });
+      if ($('#dispute')) $('#dispute').addEventListener('click', function () {
+        $('#slot').innerHTML = '<form class="card form" id="df" novalidate><div class="field"><label class="flabel" for="dn">What’s wrong with the score?</label><input type="text" id="dn" maxlength="300"></div><div class="row"><button class="btn primary" type="submit">Send dispute</button></div></form>';
+        $('#dn').focus();
+        $('#df').addEventListener('submit', function (e) { e.preventDefault(); act('dispute', { note: $('#dn').value }, 'Dispute sent'); });
+      });
+      if ($('#edit')) $('#edit').addEventListener('click', function () {
+        $('#slot').innerHTML = scoreForm(m, m.status !== 'scheduled');
+        $('#scancel').addEventListener('click', function () { $('#slot').innerHTML = ''; });
+        $('#sf').addEventListener('submit', function (e) {
+          e.preventDefault();
+          var games = readScore($('#sf')), reason = $('#reason') ? $('#reason').value : '';
+          var body = m.event_id ? { version: m.version, games: games, reason: reason } : correctionBody(m, games, reason);
+          api.request('PUT', '/api/matches/' + m.id, body).then(function () { L.toast('Score saved'); route(); }, function (err) { L.formError($('#sf'), err.message); });
+        });
+      });
+    });
+  };
+
+  /* ---------- events ---------- */
+  views.events = function () {
+    return api.get('/api/events').then(function (list) {
+      var up = list.filter(function (e) { return e.status !== 'complete' && e.status !== 'cancelled'; });
+      var past = list.filter(function (e) { return e.status === 'complete' || e.status === 'cancelled'; });
+      app.innerHTML = '<a class="back" href="#/play">← Play</a>' + offlineNote(list) + head('Play', 'Events', '', has('coach') ? '<a class="btn primary" href="#/play/events/new">New event</a>' : '') +
+        '<div class="stack"><p class="section-title">Upcoming and live</p>' + (up.length ? '<div class="list">' + up.map(eventRow).join('') + '</div>' : '<div class="list"><p class="empty">No upcoming events.</p></div>') + '</div>' +
+        (past.length ? '<div class="stack"><p class="section-title">Past</p><div class="list">' + past.map(eventRow).join('') + '</div></div>' : '');
+    });
+  };
+
+  views.eventForm = function (id) {
+    if (!has('coach')) return forbidden('Only coaches and organizers can create events.');
+    return (id ? api.get('/api/events/' + id) : Promise.resolve({ title: '', description: '', location: '', starts_at: new Date(Date.now() + 864e5).toISOString(), courts: 2, capacity: null, format: 'round_robin', game_to: 11, status: 'published' })).then(function (e) {
+      var local = function (iso) { if (!iso) return ''; var d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+      app.innerHTML = '<a class="back" href="' + (id ? '#/play/events/' + id : '#/play/events') + '">← ' + (id ? 'Event' : 'Events') + '</a>' + head('Organizer', id ? 'Edit event' : 'New event') +
+        '<form class="card form" id="ef" novalidate>' +
+        '<div class="field"><label class="flabel" for="t">Title</label><input type="text" id="t" maxlength="120" value="' + h(e.title) + '" placeholder="Thursday Round Robin"></div>' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="st">Starts</label><input type="datetime-local" id="st" value="' + local(e.starts_at) + '"></div>' +
+        '<div class="field"><label class="flabel" for="loc">Location</label><input type="text" id="loc" maxlength="200" value="' + h(e.location) + '"></div></div>' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="fmt">Format</label><select id="fmt">' + [['round_robin', 'Round robin'], ['open_play', 'Open play'], ['clinic', 'Clinic']].map(function (o) { return '<option value="' + o[0] + '"' + (e.format === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="flabel" for="courts">Courts</label><input type="number" id="courts" min="1" max="40" value="' + e.courts + '"></div>' +
+        '<div class="field"><label class="flabel" for="cap">Capacity</label><input type="number" id="cap" min="2" max="500" value="' + (e.capacity || '') + '" placeholder="No limit"></div>' +
+        '<div class="field"><label class="flabel" for="gto">Games to</label><input type="number" id="gto" min="5" max="30" value="' + e.game_to + '"></div></div>' +
+        '<div class="field"><label class="flabel" for="desc">Details</label><textarea id="desc" maxlength="4000">' + h(e.description) + '</textarea></div>' +
+        '<div class="field"><label class="flabel" for="status">Visibility</label><select id="status">' + [['draft', 'Draft (only you)'], ['published', 'Published (open for sign-ups)'], ['live', 'Live'], ['complete', 'Complete'], ['cancelled', 'Cancelled']].map(function (o) { return '<option value="' + o[0] + '"' + (e.status === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+        '<div class="row"><button class="btn primary" type="submit">Save event</button></div></form>';
+      $('#ef').addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var body = { title: $('#t').value, starts_at: $('#st').value ? new Date($('#st').value).toISOString() : '', location: $('#loc').value, format: $('#fmt').value, courts: $('#courts').value, capacity: $('#cap').value || null, game_to: $('#gto').value, description: $('#desc').value, status: $('#status').value };
+        api.request(id ? 'PUT' : 'POST', '/api/events' + (id ? '/' + id : ''), body).then(function (r) { L.toast('Event saved'); location.hash = '#/play/events/' + r.id; }, function (err) { L.formError($('#ef'), err.status === 0 ? 'Saving an event needs a connection.' : err.message); });
+      });
+    });
+  };
+
+  var eventTab = {};
+  views.event = function (id) {
+    return api.get('/api/events/' + id).then(function (e) {
+      var tab = eventTab[id] || (e.status === 'live' ? 'courts' : 'info');
+      var round = e.rounds[e.rounds.length - 1];
+      var mine = ME.athlete_id;
+      function tabs() {
+        return '<div class="chips" id="etabs">' + [['info', 'Info'], ['courts', 'Courts'], ['standings', 'Standings'], ['people', e.organizer ? 'Check-in' : 'Players']].map(function (t) { return '<button class="chip" type="button" data-v="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+      }
+      function myCourt() {
+        if (!round || !mine) return '';
+        var mm = round.matches.filter(function (m) { return m.players.some(function (p) { return p.athlete_id === mine; }); })[0];
+        if (mm) {
+          var me = mm.players.filter(function (p) { return p.athlete_id === mine; })[0];
+          var partner = mm.players.filter(function (p) { return p.team === me.team && p.athlete_id !== mine; })[0];
+          var opp = mm.players.filter(function (p) { return p.team !== me.team; }).map(function (p) { return p.name; }).join(' & ');
+          return '<div class="focus-card"><p class="eyebrow">Round ' + round.number + ' · you’re on</p><p class="big">Court ' + mm.court + ' · ' + (me.side === 'left' ? 'Left' : 'Right') + ' side</p><p class="small" style="opacity:.8">With ' + h(partner ? partner.name : '') + ' vs ' + h(opp) + '</p></div>';
+        }
+        if (round.sitting_out.some(function (p) { return p.athlete_id === mine; })) return '<div class="focus-card"><p class="eyebrow">Round ' + round.number + '</p><p class="big">You’re sitting out. You’re up next round.</p></div>';
+        return '';
+      }
+      function courts() {
+        if (!e.rounds.length) return '<div class="list"><p class="empty">No rounds yet.' + (e.organizer ? ' Check players in, then start round 1.' : ' The organizer will post courts here.') + '</p></div>';
+        return e.rounds.slice().reverse().map(function (rd, ri) {
+          var scored = rd.matches.filter(function (m) { return m.status !== 'scheduled'; }).length;
+          return '<div class="stack"><p class="section-title">Round ' + rd.number + ' · ' + scored + ' of ' + rd.matches.length + ' scored' + (rd.status === 'done' ? ' · done' : '') + '</p>' +
+            '<div class="courts">' + rd.matches.map(function (m) {
+              return '<a class="court-card' + (m.players.some(function (p) { return p.athlete_id === mine; }) ? ' mine' : '') + '" href="#/play/match/' + h(m.id) + '"><p class="eyebrow">Court ' + m.court + '</p>' +
+                [1, 2].map(function (t) { return '<p class="tm' + (m.winner === t ? ' w' : '') + '">' + m.players.filter(function (p) { return p.team === t; }).map(function (p) { return '<span>' + h(p.name) + ' <i>' + (p.side === 'left' ? 'L' : 'R') + '</i></span>'; }).join('') + '</p>'; }).join('<p class="vs">vs</p>') +
+                '<p class="sc">' + (m.status === 'scheduled' ? '<span class="check">○ Score needed</span>' : '<span class="check done">✓ ' + h(scoreLine(m)) + '</span>') + '</p></a>';
+            }).join('') + '</div>' +
+            (rd.sitting_out.length ? '<p class="small muted">Sitting out: ' + rd.sitting_out.map(function (p) { return h(p.name); }).join(', ') + '</p>' : '') + '</div>';
+        }).join('');
+      }
+      function standings() {
+        if (!e.standings.length) return '<div class="list"><p class="empty">Standings appear after the first scores.</p></div>';
+        return '<div class="table-wrap card" style="padding:0"><table class="summary-table"><thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>+/−</th></tr></thead><tbody>' +
+          e.standings.map(function (s, i) { return '<tr' + (s.athlete_id === mine ? ' class="me"' : '') + '><td class="n">' + (i + 1) + '</td><td>' + h(s.name) + '</td><td class="n">' + s.wins + '</td><td class="n">' + s.losses + '</td><td class="n">' + (s.diff > 0 ? '+' : '') + s.diff + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      }
+      function peopleTab() {
+        if (!e.organizer) return '<div class="list">' + (e.people.length ? e.people.map(function (p) { return '<div class="li"><span class="t small">' + h(p.name) + '</span></div>'; }).join('') : '<p class="empty">No one registered yet.</p>') + '</div>';
+        var active = e.people.filter(function (p) { return p.state === 'registered'; });
+        return '<div class="card stack"><p class="section-title">Check players in</p>' +
+          '<div class="row"><button class="btn primary" type="button" id="scan">Scan player QR</button></div><div id="scanbox"></div>' +
+          '<form class="row" id="codef" novalidate><input type="text" id="code" placeholder="Player ID or check-in code" aria-label="Player ID or check-in code" style="flex:1;min-width:0"><button class="btn" type="submit">Check in</button></form></div>' +
+          '<p class="small muted">' + e.counts.checked_in + ' checked in · ' + e.counts.registered + ' registered' + (e.counts.waitlist ? ' · ' + e.counts.waitlist + ' waitlist' : '') + '. Only checked-in, playing players get courts. Late arrivals join the next round; set early departures to “Left”.</p>' +
+          '<div class="list">' + e.people.map(function (p) {
+            return '<div class="li"><span class="main-col"><span class="t small">' + h(p.name) + '</span><span class="d mono">' + h(p.player_id || '') + ' · ' + h(p.state) + '</span></span><span class="side row">' +
+              (p.state === 'registered' && !p.checked_in ? '<button class="btn sm primary" type="button" data-in="' + p.athlete_id + '">Check in</button>' : '') +
+              (p.checked_in ? '<button class="btn sm ' + (p.active ? 'ghost' : '') + '" type="button" data-active="' + p.athlete_id + '" data-to="' + (p.active ? 0 : 1) + '">' + (p.active ? 'Playing · set Left' : 'Left · set Playing') + '</button>' : '') +
+              (p.state === 'waitlist' ? '<button class="btn sm" type="button" data-promote="' + p.athlete_id + '">Move in</button>' : '') + '</span></div>';
+          }).join('') + '</div>';
+      }
+      function info() {
+        return '<div class="card stack"><p class="small mono">' + h(fmtEventTime(e)) + (e.location ? ' · ' + h(e.location) : '') + '</p>' +
+          (e.description ? '<div class="small">' + L.paras(e.description) + '</div>' : '') +
+          '<p class="small muted">' + h({ round_robin: 'Round robin', open_play: 'Open play', clinic: 'Clinic' }[e.format]) + ' · ' + e.courts + ' courts · games to ' + e.game_to + (e.capacity ? ' · ' + e.counts.registered + ' of ' + e.capacity + ' spots' : ' · ' + e.counts.registered + ' registered') + (e.organizer_name ? ' · Organizer ' + h(e.organizer_name) : '') + '</p>' +
+          (ME.athlete_id && ['published', 'live'].indexOf(e.status) >= 0 ? '<div class="row">' +
+            (!e.me || e.me.state === 'withdrawn' || e.me.state === 'interested' ? '<button class="btn primary" type="button" data-reg="register">' + (e.capacity && e.counts.registered >= e.capacity ? 'Join waitlist' : 'Register') + '</button>' : '') +
+            (!e.me || e.me.state === 'withdrawn' ? '<button class="btn" type="button" data-reg="interest">Interested</button>' : '') +
+            (e.me && e.me.state !== 'withdrawn' ? '<button class="btn ghost" type="button" data-reg="withdraw">Withdraw</button>' : '') + '</div>' : '') +
+          (e.me && e.me.state !== 'withdrawn' ? '<p class="small">You’re <b>' + h(e.me.state) + '</b>' + (e.me.checked_in ? ', checked in.' : '. Show the QR on your Profile at check-in.') + '</p>' : '') +
+          (!ME.athlete_id ? '<p class="small muted">Set up your athlete profile to register.</p>' : '') + '</div>';
+      }
+      app.innerHTML = '<a class="back" href="#/play">← Play</a>' + offlineNote(e) +
+        head(e.status === 'live' ? 'Live event' : e.status === 'draft' ? 'Draft event' : 'Event', e.title, '', e.organizer ? '<div class="row"><a class="btn ghost" href="#/play/events/' + e.id + '/edit">Edit</a>' + (e.status !== 'complete' ? '<button class="btn primary" type="button" id="next">Start round ' + (e.rounds.length + 1) + '</button>' : '') + '</div>' : '') +
+        myCourt() + tabs() + '<div id="tab">' + ({ info: info, courts: courts, standings: standings, people: peopleTab })[tab]() + '</div>';
+
+      $('#etabs').addEventListener('click', function (ev) { var c = ev.target.closest('.chip'); if (c) { eventTab[id] = c.getAttribute('data-v'); route(); } });
+      $$('[data-reg]').forEach(function (b) { b.addEventListener('click', function () {
+        api.request('POST', '/api/events/' + e.id + '/' + b.getAttribute('data-reg'), {}).then(function (r) { L.toast(r.me && r.me.state === 'waitlist' ? 'Event is full. You’re on the waitlist.' : 'Updated'); route(); }, function (err) { L.toast(err.message); });
+      }); });
+      if ($('#next')) $('#next').addEventListener('click', function () {
+        var go = function (force) { api.request('POST', '/api/events/' + e.id + '/rounds', force ? { force: true } : {}).then(function () { eventTab[id] = 'courts'; L.toast('Courts posted. Players were notified.'); route(); }, function (err) {
+          if (err.status === 409) L.toast(err.message, { label: 'Start anyway', run: function () { go(true); } }); else L.toast(err.message);
+        }); };
+        go(false);
+      });
+      function checkin(body) {
+        return api.request('POST', '/api/events/' + e.id + '/checkin', body).then(function (r) { L.toast('Checked in: ' + r.checked_in.name); route(); }, function (err) { L.toast(err.message); });
+      }
+      if ($('#codef')) $('#codef').addEventListener('submit', function (ev) { ev.preventDefault(); var v = $('#code').value.trim(); if (v) checkin({ code: v }); });
+      $$('[data-in]').forEach(function (b) { b.addEventListener('click', function () { checkin({ athlete_id: Number(b.getAttribute('data-in')) }); }); });
+      $$('[data-active]').forEach(function (b) { b.addEventListener('click', function () {
+        api.request('PUT', '/api/events/' + e.id + '/people/' + b.getAttribute('data-active'), { active: b.getAttribute('data-to') === '1' }).then(function () { route(); }, function (err) { L.toast(err.message); });
+      }); });
+      $$('[data-promote]').forEach(function (b) { b.addEventListener('click', function () {
+        api.request('PUT', '/api/events/' + e.id + '/people/' + b.getAttribute('data-promote'), { state: 'registered' }).then(function () { route(); }, function (err) { L.toast(err.message); });
+      }); });
+      if ($('#scan')) $('#scan').addEventListener('click', function () { startScanner($('#scanbox'), function (text) { checkin({ code: text }); }); });
+      // Live scores: refresh while this screen is open.
+      if (e.status === 'live') {
+        var t = setInterval(function () { if (location.hash === '#/play/events/' + id && document.visibilityState === 'visible' && !$('#scanbox video') && !document.activeElement.matches('input')) route(); else if (location.hash !== '#/play/events/' + id) clearInterval(t); }, 20000);
+        window.addEventListener('hashchange', function stop() { clearInterval(t); window.removeEventListener('hashchange', stop); });
+      }
+    });
+  };
+
+  /* Camera QR scanning where the browser supports BarcodeDetector (Chrome on
+     Android). Elsewhere, the code box underneath does the same job. */
+  function startScanner(box, onCode) {
+    if (!('BarcodeDetector' in window) || !navigator.mediaDevices) {
+      box.innerHTML = '<p class="small muted">This browser can’t scan QR codes. Type the player ID or the code under their QR instead.</p>';
+      $('#code') && $('#code').focus(); return;
+    }
+    box.innerHTML = '<video playsinline muted style="width:100%;max-height:320px;border-radius:4px;background:#000"></video><div class="row"><button class="btn ghost" type="button" id="scanstop">Stop</button></div>';
+    var video = $('video', box), stream = null, stopped = false, det = new window.BarcodeDetector({ formats: ['qr_code'] });
+    function stop() { stopped = true; if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); box.innerHTML = ''; }
+    $('#scanstop').addEventListener('click', stop);
+    window.addEventListener('hashchange', stop, { once: true });
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (s) {
+      stream = s; video.srcObject = s; return video.play();
+    }).then(function tick() {
+      if (stopped) return;
+      det.detect(video).then(function (codes) {
+        var hit = codes.filter(function (c) { return /^THELAB:/i.test(c.rawValue); })[0];
+        if (hit) { try { navigator.vibrate && navigator.vibrate(40); } catch (e) {} stop(); onCode(hit.rawValue); } else setTimeout(tick, 250);
+      }, function () { setTimeout(tick, 500); });
+    }).catch(function () { box.innerHTML = '<p class="small muted">Camera unavailable. Type the player ID or code instead.</p>'; });
+  }
+
+  views.leaderboard = function () {
+    return api.get('/api/leaderboard').then(function (rows) {
+      var mine = ME.athlete_id;
+      app.innerHTML = '<a class="back" href="#/play">← Play</a>' + offlineNote(rows) + head('Play', 'Leaderboard', 'Last 90 days. Only opponent-confirmed and organizer-verified results count. You can hide yourself in Profile → Notifications and privacy.') +
+        (rows.length ? '<div class="table-wrap card" style="padding:0"><table class="summary-table"><thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>Win %</th></tr></thead><tbody>' +
+          rows.map(function (r, i) { return '<tr' + (r.athlete_id === mine ? ' class="me"' : '') + '><td class="n">' + (i + 1) + '</td><td>' + h(r.name) + ' <span class="small muted mono">' + h(r.player_id) + '</span></td><td class="n">' + r.wins + '</td><td class="n">' + r.losses + '</td><td class="n">' + r.pct + '%</td></tr>'; }).join('') +
+          '</tbody></table></div>' : '<div class="list"><p class="empty">No confirmed results yet.</p></div>');
+    });
+  };
+
+  /* ---------- notifications ---------- */
+  views.notifications = function () {
+    return api.get('/api/notifications').then(function (d) {
+      app.innerHTML = offlineNote(d) + head('Notifications', d.unread ? d.unread + ' new' : 'You’re caught up', '', d.unread ? '<button class="btn ghost" type="button" id="all">Mark all read</button>' : '') +
+        (d.items.length ? '<div class="list">' + d.items.map(function (n) {
+          return '<a class="li notif' + (n.read_at ? '' : ' unread') + '" href="' + h(n.link || '#/') + '" data-id="' + n.id + '"><span class="main-col"><span class="t small">' + h(n.title) + '</span>' + (n.body ? '<span class="d">' + h(n.body) + '</span>' : '') + '</span><span class="side">' + h(L.when(n.created_at)) + '</span></a>';
+        }).join('') + '</div>' : '<div class="list"><p class="empty">Nothing yet. Court assignments, coach feedback, match confirmations and new Field Notes show up here.</p></div>') +
+        '<p class="small"><a href="#/profile#prefs">Choose which notifications you get →</a></p>';
+      if ($('#all')) $('#all').addEventListener('click', function () { api.request('POST', '/api/notifications/read', {}).then(function () { pollBell(); route(); }); });
+      $$('.notif').forEach(function (a) { a.addEventListener('click', function () { api.request('POST', '/api/notifications/read', { id: Number(a.getAttribute('data-id')) }).then(pollBell, function () {}); }); });
+    });
+  };
+  var lastPoll = 0;
+  function pollBell(throttled) {
+    if (!ME || !L.isOnline()) return;
+    if (throttled === true && Date.now() - lastPoll < 10000) return;
+    lastPoll = Date.now();
+    api.request('GET', '/api/notifications').then(function (d) {
+      var b = $('#bell'); if (!b) return;
+      b.hidden = false; b.setAttribute('data-n', d.unread ? String(d.unread) : '');
+      b.setAttribute('aria-label', d.unread ? d.unread + ' unread notifications' : 'Notifications');
+    }, function () {});
+  }
+  setInterval(pollBell, 60000);
+  window.addEventListener('focus', pollBell);
+
   /* ================= sync screen ================= */
   views.sync = function () {
     var q = L.outbox(), failed = Store.get('failed', []), s = L.status();
@@ -977,7 +1397,9 @@
     [/^\/?$/, 'home', 'home'],
     [/^\/train$/, 'train', 'train'], [/^\/train\/new$/, 'trainNew', 'train'],
     [/^\/train\/([0-9a-f-]{36})\/live$/, 'live', 'train'], [/^\/train\/([0-9a-f-]{36})$/, 'session', 'train'],
-    [/^\/play$/, 'play', 'play'],
+    [/^\/play$/, 'play', 'play'], [/^\/play\/match\/new$/, 'matchNew', 'play'], [/^\/play\/match\/([0-9a-f-]{36})$/, 'match', 'play'],
+    [/^\/play\/events$/, 'events', 'play'], [/^\/play\/events\/new$/, 'eventForm', 'play'], [/^\/play\/events\/(\d+)$/, 'event', 'play'], [/^\/play\/events\/(\d+)\/edit$/, 'eventForm', 'play'],
+    [/^\/play\/leaderboard$/, 'leaderboard', 'play'], [/^\/notifications$/, 'notifications', ''],
     [/^\/learn$/, 'learn', 'learn', true], [/^\/learn\/engine$/, 'engine', 'learn', true], [/^\/learn\/([\w-]+)$/, 'post', 'learn', true],
     [/^\/profile$/, 'profile', 'profile'],
     [/^\/coach$/, 'coach', 'home'], [/^\/coach\/new$/, 'coachNew', 'home'], [/^\/coach\/(\d+)$/, 'coachAthlete', 'home'], [/^\/coach\/(\d+)\/code$/, 'coachCode', 'home'],
@@ -999,6 +1421,8 @@
     if (!p) { location.hash = '#/'; return; }
     if (!p.r[3] && !ME) { location.hash = '#/signin'; return; }
     $('#nav').hidden = !ME;
+    $('#bell').hidden = !ME;
+    if (ME) pollBell(true);
     $$('.nav a').forEach(function (a) { if (a.getAttribute('data-nav') === p.r[2]) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     app.innerHTML = '<p class="muted small" role="status">Loading…</p>';
     window.scrollTo(0, 0);
@@ -1018,7 +1442,7 @@
   if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
 
   // Confirm the session is still valid, then render.
-  if (ME) api.request('GET', '/api/me').then(function (m) { setMe(m); }, function (err) { if (err.status === 401) setMe(null); }).then(route);
+  if (ME) api.request('GET', '/api/me').then(function (m) { setMe(m); }, function (err) { if (err.status === 401) setMe(null); }).then(function () { route(); pollBell(); });
   else route();
   L.status(); L.flush();
 })();

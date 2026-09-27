@@ -143,6 +143,97 @@ A scheduled post goes live at its `publish_at` with no job runner needed.
 Editorial fields (`review_note`, `version`, author id) are never exposed on
 the public endpoints.
 
+## Matches
+
+The device creates the match `id` (a UUID), so a match can be recorded
+offline.
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/matches` | See the fields below. |
+| GET | `/matches?athlete_id=` | One athlete's history (your own by default), with `result` W/L from their side. |
+| GET | `/matches/:id` | Includes `log` (the correction history) and `you.{team, can_confirm, can_verify, can_edit}`. |
+| PUT | `/matches/:id` | Correction: the same fields plus `version` and `reason` (required once scored). The old version goes into the log, and status goes back to self-recorded unless an organizer edits. |
+| POST | `/matches/:id/confirm` | A player on the other team from the recorder. |
+| POST | `/matches/:id/dispute` | `{note}`. A player in the match. |
+| POST | `/matches/:id/verify` | The event organizer, a coach of any player, or an admin. |
+| DELETE | `/matches/:id` | The recorder while self-recorded, or a verifier. Not for event matches. |
+
+**`POST /matches` fields:**
+- `kind`: `casual`, `training` or `competition`
+- `game_to`: 5–30
+- `win_by`: 1 or 2
+- `best_of`: 1, 3 or 5
+- `teams`: two lists of one player each (singles) or two each (doubles)
+- `games`: a list of `[team1, team2]` scores
+- also `played_at`, `note`, `confirm_duplicate`
+
+Each player is one of `{athlete_id}` (yourself, or someone you coach),
+`{player_id: "LAB-00012"}` or `{guest_name}`, plus an optional `side` of
+`left` or `right`.
+
+**Rules:**
+- You can record matches you played in, or for athletes you coach.
+- A game can't be tied, and the match must have a winner.
+- A match with the same players and scores within 12 hours returns **409**
+  with `duplicate_of`, unless `confirm_duplicate` is sent.
+
+**Status** is one of `scheduled`, `recorded` (self-recorded), `confirmed`
+(opponent-confirmed), `verified` (organizer-verified) or `disputed`. A coach
+recording a match for athletes they coach, without playing in it, is
+verified at once.
+
+## Events, check-in, round robins
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/events` | signed in | Published events, plus your drafts. Includes `my_state`. |
+| POST | `/events` | coach | `{title, starts_at, location, description, courts, capacity, format, game_to, status}` |
+| GET | `/events/:id` | signed in | `me`, `counts`, `people`, `rounds` (with live matches), `standings`. Organizers also get player IDs and check-in state. |
+| PUT | `/events/:id` | organizer | Setting `status: "cancelled"` notifies everyone signed up. |
+| POST | `/events/:id/register` | athlete | Goes to `waitlist` when the event is at capacity. |
+| POST | `/events/:id/interest` | athlete | |
+| POST | `/events/:id/withdraw` | athlete | Moves the first waitlisted player in, and notifies them. |
+| POST | `/events/:id/checkin` | organizer | `{code}` (a QR payload `THELAB:…`, the 10-character code, or a player ID) or `{athlete_id}`. Walk-ins are registered on the spot. |
+| PUT | `/events/:id/people/:aid` | organizer | `{active}` for late arrivals and early departures; `{state}` to move people between registered, waitlist and withdrawn. |
+| POST | `/events/:id/rounds` | organizer | Starts the next round. See below. |
+| GET | `/me/checkin` | athlete | `{player_id, code, qr}` for the player card QR. |
+
+**How rounds are built.** Rounds are built one at a time from the players who
+are checked in and active right now, so late arrivals and early departures
+take effect next round.
+- Players who have played the fewest games go on court first.
+- Groupings minimise repeat partners, then repeat opponents.
+- Left and right sides follow each player's preferred side, otherwise they
+  alternate.
+- Starting a round while the current one still has unscored matches returns
+  **409** unless you send `force`.
+- Players in a round-robin match enter the score with
+  `PUT /matches/:id {version, games}`.
+
+## Leaderboard
+
+`GET /leaderboard?days=90`: only opponent-confirmed and organizer-verified
+results count. It lists only claimed profiles, and anyone can hide themselves
+with the `leaderboard` preference.
+
+## Notifications
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/notifications` | `{unread, items:[{kind, title, body, link, read_at}]}`. `link` is an in-app route (deep link). |
+| POST | `/notifications/read` | `{id}` for one, or an empty body for all. |
+| GET / PUT | `/me/prefs` | Booleans: `courts`, `up_next`, `feedback`, `matches`, `events`, `content`, `leaderboard`. |
+
+Notifications are sent for:
+- court assignments and "you're up next" when a round starts
+- shared coach feedback (private notes never notify)
+- match recorded, corrected, disputed or verified
+- moving off a waitlist, check-in, and cancellation
+- newly published posts
+
+Phone push is not wired yet. See `PARITY.md`.
+
 ## Other
 
 - `GET /home`: the signed-in user's Home tab in one call.

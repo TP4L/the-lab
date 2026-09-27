@@ -15,7 +15,7 @@ const MEDIA_TYPES = {
 };
 const MAX_MEDIA = 200 * 1024 * 1024;
 
-module.exports = function athletes(r, { db, auth, config }) {
+module.exports = function athletes(r, { db, auth, config, notifier }) {
   const claimLimit = limiter(8, 60 * 60 * 1000);
 
   function load(id) {
@@ -185,6 +185,7 @@ module.exports = function athletes(r, { db, auth, config }) {
     const id = Number(db.prepare('INSERT INTO notes (client_id, athlete_id, author_id, kind, visibility, body, media_id, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(clientId, a.id, user.id, kind, visibility, text, mediaId, sessionId).lastInsertRowid);
     if (mediaId && visibility === 'shared') db.prepare("UPDATE media SET visibility = 'shared' WHERE id = ?").run(mediaId);
+    if (kind === 'coach' && visibility === 'shared' && a.user_id) notifier.notify([a.user_id], 'feedback', `New feedback from ${user.name}`, text.slice(0, 140), '#/profile');
     return withStatus(201, db.prepare('SELECT n.*, u.name AS author FROM notes n LEFT JOIN users u ON u.id = n.author_id WHERE n.id = ?').get(id));
   });
 

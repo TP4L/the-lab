@@ -159,10 +159,128 @@ CREATE INDEX IF NOT EXISTS posts_status ON posts(status, publish_at);
 CREATE INDEX IF NOT EXISTS media_athlete ON media(athlete_id);
 `;
 
+/* Play: matches, events, round robins, check-in, notifications. */
+const PLAY = `
+ALTER TABLE athletes ADD COLUMN checkin_code TEXT;
+ALTER TABLE users ADD COLUMN prefs TEXT NOT NULL DEFAULT '{}';
+CREATE UNIQUE INDEX IF NOT EXISTS athletes_checkin ON athletes(checkin_code);
+
+CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY,
+  organizer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
+  starts_at TEXT NOT NULL,
+  ends_at TEXT,
+  capacity INTEGER,
+  courts INTEGER NOT NULL DEFAULT 2,
+  format TEXT NOT NULL DEFAULT 'round_robin' CHECK (format IN ('round_robin','open_play','clinic')),
+  game_to INTEGER NOT NULL DEFAULT 11,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','live','complete','cancelled')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- One row per athlete per event. 'active' is the organizer's switch for late
+-- arrivals and early departures: only active, checked-in players get courts.
+CREATE TABLE IF NOT EXISTS event_people (
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  state TEXT NOT NULL CHECK (state IN ('interested','registered','waitlist','withdrawn')),
+  checked_in_at TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (event_id, athlete_id)
+);
+CREATE TABLE IF NOT EXISTS rounds (
+  id INTEGER PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  number INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'live' CHECK (status IN ('live','done')),
+  sitting_out TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (event_id, number)
+);
+
+-- Matches. The recording device picks the UUID so a match can be saved offline.
+-- status: recorded (self-recorded), confirmed (by an opponent),
+-- verified (by an organizer or coach), disputed.
+CREATE TABLE IF NOT EXISTS matches (
+  id TEXT PRIMARY KEY,
+  recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('casual','training','competition')),
+  game_to INTEGER NOT NULL DEFAULT 11,
+  win_by INTEGER NOT NULL DEFAULT 2,
+  best_of INTEGER NOT NULL DEFAULT 1,
+  played_at TEXT NOT NULL,
+  event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+  round_id INTEGER REFERENCES rounds(id) ON DELETE CASCADE,
+  court INTEGER,
+  session_id TEXT,
+  status TEXT NOT NULL DEFAULT 'recorded' CHECK (status IN ('scheduled','recorded','confirmed','verified','disputed')),
+  winner INTEGER,
+  note TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS match_players (
+  match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  team INTEGER NOT NULL CHECK (team IN (1,2)),
+  slot INTEGER NOT NULL CHECK (slot IN (1,2)),
+  athlete_id INTEGER REFERENCES athletes(id) ON DELETE SET NULL,
+  guest_name TEXT NOT NULL DEFAULT '',
+  side TEXT NOT NULL DEFAULT '' CHECK (side IN ('','left','right')),
+  PRIMARY KEY (match_id, team, slot)
+);
+CREATE TABLE IF NOT EXISTS match_games (
+  match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  idx INTEGER NOT NULL,
+  team1 INTEGER NOT NULL,
+  team2 INTEGER NOT NULL,
+  PRIMARY KEY (match_id, idx)
+);
+CREATE TABLE IF NOT EXISTS match_log (
+  id INTEGER PRIMARY KEY,
+  match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  snapshot TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  link TEXT NOT NULL DEFAULT '',
+  read_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE INDEX IF NOT EXISTS mp_athlete ON match_players(athlete_id);
+CREATE INDEX IF NOT EXISTS matches_event ON matches(event_id, round_id);
+CREATE INDEX IF NOT EXISTS notif_user ON notifications(user_id, read_at);
+`;
+
+/* Ordered migrations, tracked with PRAGMA user_version. Never edit a shipped
+   entry; add a new one. */
+const MIGRATIONS = [SCHEMA, PLAY];
+
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 3000;');
-  db.exec(SCHEMA);
+  let v = db.prepare('PRAGMA user_version').get().user_version;
+  // Databases created before migrations existed already have the base schema.
+  if (v === 0 && db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'users'").get()) v = 1;
+  for (; v < MIGRATIONS.length; v++) {
+    db.exec('BEGIN');
+    try { db.exec(MIGRATIONS[v]); db.exec(`PRAGMA user_version = ${v + 1}`); db.exec('COMMIT'); }
+    catch (e) { db.exec('ROLLBACK'); throw e; }
+  }
   return db;
 }
 

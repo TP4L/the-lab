@@ -61,7 +61,7 @@ written for pickleball.
 ```
 cd companion
 ADMIN_EMAIL=you@example.com npm start   # http://localhost:8787
-npm test                                # API journeys, accounts, engine
+npm test                                # API journeys, Play, accounts, engine
 ```
 
 The first account created with `ADMIN_EMAIL` becomes the admin. Everyone else
@@ -72,9 +72,9 @@ It needs Node 22.13 or newer and has no dependencies.
 |---|---|
 | **Home** | Current focus, recent sessions, notes from your coach, new Field Notes, quick actions, staff shortcuts. |
 | **Train** | Scoreboard Studio: 1–10 drills measured by make/miss, score, time or feel. One-player and four-player counters with undo, working offline. Session summaries. |
-| **Play** | Matches and events. This is the next build. |
+| **Play** | Record matches (singles or doubles, sides, formats) with opponent confirmation, disputes, organizer verification and correction history. Events with registration, waitlists, QR check-in, rolling round robins (partners, opponents, left/right), live courts, standings, leaderboard. |
 | **Learn** | Field Notes (Quick Read, The Work, Field Study) and the decision engine. |
-| **Profile** | Player card, claiming a coach-made profile, goals, coach notes, reflections, results, account and privacy settings, account deletion. |
+| **Profile** | Player card with check-in QR, claiming a coach-made profile, goals, coach notes, reflections, results, account and privacy settings, account deletion. |
 | **Coach Workspace** | Roster, new profiles with claim codes, private vs shared notes, media, focus and plan. |
 | **Publishing Studio** | Drafts, uploads, preview, review, schedule, publish, revisions. |
 

@@ -393,3 +393,46 @@ input[type=datetime-local],input[type=email],input[type=search]{width:100%;font:
 .auth-wrap .brandmark{font-family:var(--display);font-weight:800;font-size:40px;letter-spacing:.02em;line-height:1;}
 .auth-wrap .brandmark span{color:var(--accent);}
 .link-btn{background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px;cursor:pointer;font:inherit;font-size:14.5px;}
+
+/* ---------- play ---------- */
+.bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--rule);background:var(--surface);text-decoration:none;color:var(--ink-faint);font-size:10px;}
+.bell::before{content:"";width:14px;height:14px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a6 6 0 0 0-6 6v4l-2 3v1h16v-1l-2-3V8a6 6 0 0 0-6-6zm0 20a3 3 0 0 0 3-3H9a3 3 0 0 0 3 3z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a6 6 0 0 0-6 6v4l-2 3v1h16v-1l-2-3V8a6 6 0 0 0-6-6zm0 20a3 3 0 0 0 3-3H9a3 3 0 0 0 3 3z'/%3E%3C/svg%3E") center/contain no-repeat;color:var(--ink);}
+.bell{font-size:0;}
+.bell[data-n]:not([data-n=""])::after{content:attr(data-n);position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:99px;background:var(--accent);color:var(--accent-ink);font-family:var(--mono);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.result{font-family:var(--display);font-weight:800;font-size:15px;width:32px;height:32px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;flex:none;}
+.result.w{background:var(--ok-soft);color:var(--ok);}
+.result.l{background:var(--surface-2);color:var(--ink-soft);}
+.game-row{display:grid;grid-template-columns:70px minmax(0,110px) 14px minmax(0,110px);gap:8px;align-items:center;padding-block:4px;}
+.game-row input{text-align:center;font-family:var(--display);font-weight:700;font-size:20px;padding:10px 6px;}
+.seg-btns.sm button{padding:7px 4px;font-size:11px;}
+.pfield{gap:6px;}
+.scoreboard{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:center;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px;}
+.scoreboard .team{display:flex;flex-direction:column;gap:4px;}
+.scoreboard .team:last-child{text-align:right;}
+.scoreboard .team .names{font-family:var(--display);font-weight:700;font-size:16px;line-height:1.3;}
+.scoreboard .team.won .eyebrow{color:var(--ok);}
+.scoreboard .games{display:flex;gap:10px;}
+.scoreboard .games span{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.scoreboard .games b{font-family:var(--display);font-weight:800;font-size:24px;color:var(--ink-faint);font-variant-numeric:tabular-nums;line-height:1.1;}
+.scoreboard .games b.w{color:var(--ink);}
+@media (max-width:480px){.scoreboard{grid-template-columns:1fr;text-align:center;}.scoreboard .team:last-child{text-align:center;}.scoreboard .games{justify-content:center;}}
+.courts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:10px;}
+.court-card{display:flex;flex-direction:column;gap:6px;padding:14px;border:1px solid var(--rule);border-radius:6px;background:var(--surface);text-decoration:none;}
+.court-card.mine{border:2px solid var(--accent);}
+.court-card .tm{display:flex;flex-direction:column;gap:2px;font-size:15px;}
+.court-card .tm.w{font-weight:600;}
+.court-card .tm i{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);border:1px solid var(--rule);border-radius:2px;padding:0 4px;margin-left:4px;}
+.court-card .vs{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.1em;text-transform:uppercase;}
+.court-card .sc{margin-top:auto;padding-top:6px;border-top:1px dashed var(--rule-soft);}
+.check{font-family:var(--mono);font-size:12px;color:var(--warn);}
+.check.done{color:var(--ok);}
+.summary-table tr.me td{background:var(--accent-soft);}
+.notif.unread{background:var(--accent-soft);}
+.notif.unread .t{font-weight:700;}
+.qr-wrap{display:flex;flex-direction:column;gap:10px;align-items:flex-start;}
+.qr{width:220px;max-width:100%;background:#fff;padding:6px;border-radius:4px;border:1px solid var(--rule);}
+.qr svg{display:block;width:100%;height:auto;}
+
+/* Consistent rhythm between top-level blocks on every screen. */
+#app{display:flex;flex-direction:column;gap:18px;}
+#app > .back,#app > .offline-note{align-self:flex-start;}
