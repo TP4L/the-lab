@@ -51,10 +51,31 @@ parts, nothing more:
 
 Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 
+## Companion app
+
+`app/index.html` is **LAB Sideline**, a phone-first companion to the coach. It is one
+file with no build step, and it works offline (fonts fall back to system faces).
+Open it in a browser or serve the repo statically.
+
+| Tab | What it does |
+|---|---|
+| **Call** | Tap in the Read (H/T/B, Orientation, Certainty), State + Scramble, Need rung and debt/cover. Returns the four-part output and shows which of the seven calls are legal from there, and why. |
+| **Drill** | Film-room quiz: read a rep, pick the call, see the engine's answer with its read and one-line why. Includes the four worked examples. |
+| **Log** | Record reps that went wrong, classify the error (See → Execution), and see which stage to coach first. Stored in the browser only. |
+| **Calls** | The seven calls as cards, marked reversible or committing, with where each is legal. |
+
+The app's call-picking is a rules engine built from `reference/vocabulary.md`
+legality plus the Certainty and Recovery Debt rules in `SKILL.md`. It reproduces the
+four worked examples. Where it has to choose between two legal calls, the
+preference order is the app's own reading and should be corrected in place,
+the same way as the vocabulary notes.
+
 ## Layout
 
 | Path | What's in it |
 |---|---|
+| `app/index.html` | LAB Sideline, the companion app |
+| `site/index.html` | Readable reference page for the engine |
 | `.claude/skills/lab-coach/SKILL.md` | The coach: equation, pipeline, output contract |
 | `.claude/skills/lab-coach/reference/pipeline.md` | Each stage in depth |
 | `.claude/skills/lab-coach/reference/outer-layers.md` | The nine lenses, incl. Error Classification table |

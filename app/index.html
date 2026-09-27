@@ -1,0 +1,833 @@
+<title>LAB Sideline</title>
+<meta name="theme-color" content="#12161C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+:root{
+  --ground:#EDEEF0;
+  --surface:#FFFFFF;
+  --surface-2:#E2E5E9;
+  --ink:#12161C;
+  --ink-soft:#565E6B;
+  --ink-faint:#8B939F;
+  --rule:#C6CBD2;
+  --rule-soft:#D9DDE2;
+  --accent:#BF2E2A;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#F7E3E1;
+  --ok:#2F7A4F;
+  --ok-soft:#E0F0E6;
+  --shadow:0 1px 2px rgba(18,22,28,.06), 0 8px 24px -16px rgba(18,22,28,.28);
+
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#13171D;
+    --surface:#1A1F27;
+    --surface-2:#232A34;
+    --ink:#E9EBEE;
+    --ink-soft:#9BA4B1;
+    --ink-faint:#6C7684;
+    --rule:#2E353F;
+    --rule-soft:#242B34;
+    --accent:#FF6E60;
+    --accent-ink:#1A0F0D;
+    --accent-soft:#3A2320;
+    --ok:#6FCF97;
+    --ok-soft:#1C3026;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#13171D;
+  --surface:#1A1F27;
+  --surface-2:#232A34;
+  --ink:#E9EBEE;
+  --ink-soft:#9BA4B1;
+  --ink-faint:#6C7684;
+  --rule:#2E353F;
+  --rule-soft:#242B34;
+  --accent:#FF6E60;
+  --accent-ink:#1A0F0D;
+  --accent-soft:#3A2320;
+  --ok:#6FCF97;
+  --ok-soft:#1C3026;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box;}
+[hidden]{display:none !important;}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.12;letter-spacing:-.018em;}
+p{margin:0;}
+button{font:inherit;color:inherit;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+.app{
+  max-width:720px;
+  margin:0 auto;
+  padding-inline:16px;
+  padding-block:20px calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------- top ---------- */
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--rule);}
+.brand{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em;}
+.brand span{color:var(--accent);}
+.eq{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--ink-faint);text-align:right;}
+
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);}
+.view{display:flex;flex-direction:column;gap:22px;padding-top:22px;}
+.view-head{display:flex;flex-direction:column;gap:6px;}
+.view-head h2{font-size:clamp(22px,5.4vw,28px);font-weight:700;}
+.view-head p{color:var(--ink-soft);font-size:15px;max-width:60ch;}
+
+/* ---------- controls ---------- */
+.group{display:flex;flex-direction:column;gap:14px;}
+.group-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;padding-bottom:6px;border-bottom:1px dashed var(--rule);}
+.field{display:flex;flex-direction:column;gap:6px;}
+.flabel{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;}
+.flabel .hint{font-family:var(--body);font-size:13px;letter-spacing:0;text-transform:none;color:var(--ink-faint);text-align:right;}
+
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--surface);}
+.seg input{position:absolute;opacity:0;pointer-events:none;}
+.seg label{
+  font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
+  text-align:center;padding:11px 2px;cursor:pointer;color:var(--ink-soft);
+  border-right:1px solid var(--rule-soft);min-width:0;overflow-wrap:anywhere;
+  transition:background .12s ease,color .12s ease;
+}
+.seg label:last-of-type{border-right:0;}
+.seg label:hover{background:var(--surface-2);}
+.seg input:checked + label{background:var(--ink);color:var(--ground);}
+.seg input:focus-visible + label{outline:2px solid var(--accent);outline-offset:-2px;}
+.seg.is-zeroed input:checked + label{background:var(--accent);color:var(--accent-ink);}
+.seg.ladder{grid-auto-flow:row;grid-template-columns:repeat(3,1fr);}
+.seg.ladder label{border-bottom:1px solid var(--rule-soft);}
+.seg.ladder label:nth-of-type(3n){border-right:0;}
+.seg.ladder label:nth-of-type(n+4){border-bottom:0;}
+
+.toggles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+.tog{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1px solid var(--rule);border-radius:3px;background:var(--surface);cursor:pointer;}
+.tog input{margin:3px 0 0;accent-color:var(--accent);width:16px;height:16px;flex:none;}
+.tog b{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;}
+.tog span{font-size:13.5px;color:var(--ink-soft);line-height:1.4;}
+
+/* ---------- output card ---------- */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:3px;box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px;}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.product{font-family:var(--mono);font-size:12px;color:var(--ink-faint);letter-spacing:.06em;}
+.product b{font-family:var(--display);font-size:22px;color:var(--ink);letter-spacing:-.02em;margin-right:4px;font-variant-numeric:tabular-nums;}
+.product.is-zero b{color:var(--accent);}
+.four{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.four li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 10px;padding:11px 0;border-top:1px solid var(--rule-soft);}
+.four li:first-child{border-top:0;padding-top:0;}
+.four .n{font-family:var(--mono);font-size:12px;color:var(--ink-faint);padding-top:2px;}
+.four .k{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:2px;}
+.four .v{font-size:15px;}
+.act{font-family:var(--mono);font-weight:600;font-size:19px;color:var(--accent);letter-spacing:-.01em;}
+.act .seq{display:block;font-weight:400;font-size:12.5px;color:var(--ink-faint);}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:9px 14px;border:1px solid var(--ink);background:var(--surface);color:var(--ink);border-radius:3px;cursor:pointer;
+}
+.btn:hover{background:var(--surface-2);}
+.btn.primary{background:var(--ink);color:var(--ground);}
+.btn.primary:hover{opacity:.9;}
+.btn.ghost{border-color:var(--rule);color:var(--ink-soft);}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+
+.flag{border-left:3px solid var(--accent);padding:2px 0 2px 12px;font-size:14px;color:var(--ink-soft);}
+.flag b{font-family:var(--display);color:var(--ink);}
+
+.legal{display:flex;flex-direction:column;}
+.lrow{display:grid;grid-template-columns:66px minmax(0,1fr);gap:10px;padding:10px 0;border-top:1px solid var(--rule-soft);align-items:baseline;}
+.lrow:first-child{border-top:0;}
+.pill{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:3px 0;border-radius:2px;text-align:center;}
+.pill.yes{background:var(--ok-soft);color:var(--ok);}
+.pill.no{background:var(--surface-2);color:var(--ink-faint);}
+.pill.pick{background:var(--accent);color:var(--accent-ink);}
+.lrow .cn{font-family:var(--mono);font-size:13.5px;font-weight:600;}
+.lrow .why{display:block;font-size:13.5px;color:var(--ink-soft);line-height:1.4;}
+.lrow.is-no .cn{color:var(--ink-faint);font-weight:500;}
+
+details.more{border-top:1px solid var(--rule);padding-top:14px;}
+details.more summary{cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+details.more[open] summary{margin-bottom:12px;}
+
+/* ---------- drill ---------- */
+.score-strip{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--ink-faint);letter-spacing:.06em;}
+.score-strip b{color:var(--ink);font-size:15px;font-variant-numeric:tabular-nums;}
+.sit{font-size:17px;line-height:1.55;}
+.sit-meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);letter-spacing:.06em;}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;}
+.choice{
+  text-align:left;font-family:var(--mono);font-size:13.5px;font-weight:600;padding:12px 14px;
+  border:1px solid var(--rule);background:var(--surface);border-radius:3px;cursor:pointer;
+}
+.choice:hover:not(:disabled){border-color:var(--ink);}
+.choice:disabled{cursor:default;}
+.choice.is-right{border-color:var(--ok);background:var(--ok-soft);color:var(--ok);}
+.choice.is-wrong{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);}
+.choice.is-dim{opacity:.55;}
+.verdict-line{font-family:var(--display);font-weight:700;font-size:18px;}
+.verdict-line.good{color:var(--ok);}
+.verdict-line.bad{color:var(--accent);}
+
+/* ---------- log ---------- */
+.form{display:flex;flex-direction:column;gap:14px;}
+textarea,select{
+  width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--surface);
+  border:1px solid var(--rule);border-radius:3px;padding:10px 12px;
+}
+textarea{min-height:76px;resize:vertical;}
+.fix{font-size:13.5px;color:var(--ink-soft);}
+.fix b{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-right:6px;}
+.bars{display:flex;flex-direction:column;gap:8px;}
+.bar{display:grid;grid-template-columns:92px minmax(0,1fr) 28px;gap:10px;align-items:center;font-family:var(--mono);font-size:12px;}
+.bar .track{height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden;}
+.bar .track i{display:block;height:100%;background:var(--ink);border-radius:99px;}
+.bar.top .track i{background:var(--accent);}
+.bar .c{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-soft);}
+.entries{display:flex;flex-direction:column;}
+.entry{padding:12px 0;border-top:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:4px;}
+.entry:first-child{border-top:0;}
+.entry .meta{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);}
+.entry .meta .err{color:var(--accent);font-weight:600;}
+.entry .meta .call{color:var(--ink);font-weight:600;}
+.entry p{font-size:14.5px;color:var(--ink-soft);}
+.entry .del{align-self:flex-start;background:none;border:0;padding:0;font-family:var(--mono);font-size:11px;color:var(--ink-faint);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.example-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;background:var(--surface-2);color:var(--ink-soft);padding:2px 6px;border-radius:2px;align-self:flex-start;}
+
+/* ---------- calls ---------- */
+.callcards{display:flex;flex-direction:column;}
+.cc{padding:16px 0;border-top:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:6px;}
+.cc:first-child{border-top:0;padding-top:0;}
+.cc .name{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--accent);}
+.cc .name .seq{color:var(--ink-faint);font-weight:400;font-size:13px;}
+.cc .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);}
+.cc .meta b{color:var(--ink-soft);font-weight:500;}
+.cc p{font-size:14.5px;color:var(--ink-soft);}
+.kind{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;}
+.kind.rev{color:var(--ok);}
+.kind.com{color:var(--accent);}
+
+/* ---------- tab bar ---------- */
+.tabs{
+  position:fixed;left:0;right:0;bottom:0;z-index:10;
+  background:var(--surface);border-top:1px solid var(--rule);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+}
+.tabs-inner{max-width:720px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);}
+.tab{
+  background:none;border:0;cursor:pointer;padding:12px 4px 13px;
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);
+  border-top:3px solid transparent;margin-top:-1px;
+}
+.tab[aria-selected="true"]{color:var(--ink);border-top-color:var(--accent);}
+.tab small{display:block;font-weight:400;letter-spacing:.02em;text-transform:none;font-size:11px;margin-top:1px;}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);
+  background:var(--ink);color:var(--ground);font-family:var(--mono);font-size:12px;padding:8px 14px;border-radius:3px;z-index:11;
+}
+
+@media (prefers-reduced-motion:reduce){*{transition:none !important;}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">LAB <span>Sideline</span></div>
+    <div class="eq">SHOT = H × T × B</div>
+  </header>
+
+  <!-- ================= CALL ================= -->
+  <section class="view" id="view-call" role="tabpanel" aria-labelledby="tab-call">
+    <div class="view-head">
+      <p class="eyebrow">Run the pipeline</p>
+      <h2>Set the read. Get one call.</h2>
+      <p>Tap in what you saw. The engine returns the four-part output and shows which calls were legal from here. Loaded with the step-and-a-half example.</p>
+    </div>
+
+    <div class="card" id="out" aria-live="polite">
+      <div class="card-head">
+        <span class="eyebrow">Output</span>
+        <span class="product" id="product"></span>
+      </div>
+      <ol class="four">
+        <li><span class="n">1</span><div><span class="k">Read</span><span class="v" id="o-read"></span></div></li>
+        <li><span class="n">2</span><div><span class="k">State + Need</span><span class="v" id="o-state"></span></div></li>
+        <li><span class="n">3</span><div><span class="k">Action</span><span class="act" id="o-act"></span></div></li>
+        <li><span class="n">4</span><div><span class="k">Why</span><span class="v" id="o-why"></span></div></li>
+      </ol>
+      <div id="o-flags" class="group"></div>
+      <div class="row">
+        <button class="btn primary" id="copy-out" type="button">Copy output</button>
+        <button class="btn ghost" id="log-out" type="button">Log this rep</button>
+      </div>
+      <details class="more">
+        <summary>Every call from here</summary>
+        <div class="legal" id="legal"></div>
+      </details>
+    </div>
+
+    <div class="group">
+      <p class="group-title">Read · H × T × B</p>
+      <p class="fix" id="persp"></p>
+      <div class="field">
+        <span class="flabel">Height <span class="hint">release point</span></span>
+        <div class="seg" data-seg="h">
+          <input type="radio" name="h" id="h0" value="0"><label for="h0">Zero</label>
+          <input type="radio" name="h" id="h1" value="1"><label for="h1">Low</label>
+          <input type="radio" name="h" id="h2" value="2"><label for="h2">Mod</label>
+          <input type="radio" name="h" id="h3" value="3" checked><label for="h3">High</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="flabel">Time <span class="hint">steps before pressure</span></span>
+        <div class="seg" data-seg="t">
+          <input type="radio" name="t" id="t0" value="0"><label for="t0">Zero</label>
+          <input type="radio" name="t" id="t1" value="1"><label for="t1">Low</label>
+          <input type="radio" name="t" id="t2" value="2" checked><label for="t2">Mod</label>
+          <input type="radio" name="t" id="t3" value="3"><label for="t3">High</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="flabel">Balance <span class="hint">weight over base</span></span>
+        <div class="seg" data-seg="b">
+          <input type="radio" name="b" id="b0" value="0"><label for="b0">Zero</label>
+          <input type="radio" name="b" id="b1" value="1"><label for="b1">Low</label>
+          <input type="radio" name="b" id="b2" value="2"><label for="b2">Mod</label>
+          <input type="radio" name="b" id="b3" value="3" checked><label for="b3">High</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="flabel">Orientation <span class="hint">hips, eyes, stick</span></span>
+        <div class="seg">
+          <input type="radio" name="o" id="o1" value="to" checked><label for="o1">To goal</label>
+          <input type="radio" name="o" id="o2" value="away"><label for="o2">Away</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="flabel">Certainty <span class="hint">how clean is the read</span></span>
+        <div class="seg">
+          <input type="radio" name="c" id="c1" value="low" checked><label for="c1">Low</label>
+          <input type="radio" name="c" id="c2" value="mod"><label for="c2">Moderate</label>
+          <input type="radio" name="c" id="c3" value="high"><label for="c3">High</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="group-title">State</p>
+      <div class="seg">
+        <input type="radio" name="s" id="s1" value="D"><label for="s1">Defensive</label>
+        <input type="radio" name="s" id="s2" value="N" checked><label for="s2">Neutral</label>
+        <input type="radio" name="s" id="s3" value="O"><label for="s3">Offensive</label>
+      </div>
+      <label class="tog" for="scr"><input type="checkbox" id="scr"><div><b>Scramble layer</b><span>Structure broken, assignments stale. Overlays the state.</span></div></label>
+    </div>
+
+    <div class="group">
+      <p class="group-title">Need · one rung at a time</p>
+      <div class="seg ladder">
+        <input type="radio" name="n" id="n0" value="0"><label for="n0">Survive</label>
+        <input type="radio" name="n" id="n1" value="1"><label for="n1">Recover</label>
+        <input type="radio" name="n" id="n2" value="2" checked><label for="n2">Stabilize</label>
+        <input type="radio" name="n" id="n3" value="3"><label for="n3">Build</label>
+        <input type="radio" name="n" id="n4" value="4"><label for="n4">Pressure</label>
+        <input type="radio" name="n" id="n5" value="5"><label for="n5">Finish</label>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="group-title">Solve inputs</p>
+      <div class="toggles">
+        <label class="tog" for="debt"><input type="checkbox" id="debt"><div><b>Debt unpaid</b><span>Already committed this possession and not recovered.</span></div></label>
+        <label class="tog" for="cover"><input type="checkbox" id="cover"><div><b>Cover available</b><span>Someone can take the Cover job if I leave my slot.</span></div></label>
+        <label class="tog" for="drift"><input type="checkbox" id="drift"><div><b>Eyes drifting</b><span>Attention pulled to the ball, off the point that makes the shot.</span></div></label>
+      </div>
+      <div class="row">
+        <span class="eyebrow">Load example</span>
+        <button class="btn ghost" type="button" data-ex="0">1 · Squaring up</button>
+        <button class="btn ghost" type="button" data-ex="1">2 · Broken slide</button>
+        <button class="btn ghost" type="button" data-ex="2">3 · Tight D</button>
+        <button class="btn ghost" type="button" data-ex="3">4 · No 2nd commit</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DRILL ================= -->
+  <section class="view" id="view-drill" role="tabpanel" aria-labelledby="tab-drill" hidden>
+    <div class="view-head">
+      <p class="eyebrow">Film room</p>
+      <h2>Make the call</h2>
+      <p>Read the rep, pick one of the seven calls. The answer comes from the same engine as the Call tab, with its read and one-line why.</p>
+    </div>
+    <div class="score-strip">
+      <span>Right <b id="d-right">0</b></span>
+      <span>Seen <b id="d-seen">0</b></span>
+      <span>Streak <b id="d-streak">0</b></span>
+    </div>
+    <div class="card">
+      <p class="sit-meta" id="d-meta"></p>
+      <p class="sit" id="d-sit"></p>
+      <div class="choices" id="d-choices"></div>
+      <div id="d-result" class="group" hidden></div>
+      <div class="row">
+        <button class="btn primary" type="button" id="d-next">Next rep</button>
+        <button class="btn ghost" type="button" id="d-open" hidden>Open in Call tab</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LOG ================= -->
+  <section class="view" id="view-log" role="tabpanel" aria-labelledby="tab-log" hidden>
+    <div class="view-head">
+      <p class="eyebrow">Error classification</p>
+      <h2>Classify before correcting</h2>
+      <p>Log the reps that went wrong and name which stage broke. The pattern tells you what to coach. Entries stay on this device only.</p>
+    </div>
+
+    <form class="card form" id="log-form">
+      <div class="field">
+        <label class="flabel" for="l-sit">What happened</label>
+        <textarea id="l-sit" placeholder="Slid early off the wing, ball swung behind me, their X popped for a layup."></textarea>
+      </div>
+      <div class="field">
+        <label class="flabel" for="l-call">Call that was made</label>
+        <select id="l-call"></select>
+      </div>
+      <div class="field">
+        <label class="flabel" for="l-err">What broke</label>
+        <select id="l-err"></select>
+        <p class="fix" id="l-fix"></p>
+      </div>
+      <div class="row">
+        <button class="btn primary" type="submit">Save rep</button>
+      </div>
+    </form>
+
+    <div class="group">
+      <p class="group-title">Where the errors are</p>
+      <div class="bars" id="bars"></div>
+      <p class="flag" id="focus"></p>
+    </div>
+
+    <div class="group">
+      <p class="group-title">Reps</p>
+      <div class="entries" id="entries"></div>
+    </div>
+  </section>
+
+  <!-- ================= CALLS ================= -->
+  <section class="view" id="view-calls" role="tabpanel" aria-labelledby="tab-calls" hidden>
+    <div class="view-head">
+      <p class="eyebrow">Vocabulary</p>
+      <h2>Seven calls, used exactly</h2>
+      <p>The phrase is the instruction. Never paraphrased, never blended. Each card shows where the call is legal.</p>
+    </div>
+    <div class="callcards" id="callcards"></div>
+  </section>
+</div>
+
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <div class="tabs-inner">
+    <button class="tab" role="tab" id="tab-call" aria-controls="view-call" aria-selected="true" data-view="call">Call<small>engine</small></button>
+    <button class="tab" role="tab" id="tab-drill" aria-controls="view-drill" aria-selected="false" data-view="drill">Drill<small>quiz</small></button>
+    <button class="tab" role="tab" id="tab-log" aria-controls="view-log" aria-selected="false" data-view="log">Log<small>errors</small></button>
+    <button class="tab" role="tab" id="tab-calls" aria-controls="view-calls" aria-selected="false" data-view="calls">Calls<small>cards</small></button>
+  </div>
+</nav>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ================= model ================= */
+  var RUNGS=['Survive','Recover','Stabilize','Build','Pressure','Finish'];
+  var STATES={D:'Defensive',N:'Neutral',O:'Offensive'};
+  var LEVEL=['zero','low','moderate','high'];
+
+  var CALLS=[
+    {id:'x',name:'Respect the X',kind:'rev',state:'Def / Neutral',rung:'Stabilize +',layer:'Threat, Pattern Memory',
+     text:'The anchor point that generates the danger stays in your accounting even when the ball is elsewhere. Failing to respect it shows up one beat later as a Scramble that came out of nowhere.'},
+    {id:'tri',name:'The Triangle',seq:'speedup → counter → exit',kind:'com',state:'Offensive',rung:'Build / Pressure',layer:'Tempo, Initiative',
+     text:'Three beats run as one unit. Speed up to force a reaction, counter the reaction, exit into the space it vacated. How you buy a missing factor. Illegal on Survive or Recover.'},
+    {id:'own',name:'Own space not lines',kind:'rev',state:'Any',rung:'Any',layer:'Cost, Threat',
+     text:'Occupy and hold area. Do not chase a line or defend where someone just was. Space is cheap to hold and expensive to chase.'},
+    {id:'gsg',name:'Go Stay Go',kind:'rev',state:'Def / Neutral',rung:'Stabilize / Pressure',layer:'Tempo',
+     text:'Approach, hold, re-approach. The Stay beat is information: it makes the opponent declare before you commit. The low-Certainty call.'},
+    {id:'hpo',name:'Hip Pocket Over',kind:'com',state:'Defensive',rung:'Pressure',layer:'Initiative, Pressure',
+     text:'Ride in the hip pocket, then take the over-top position. Takes a factor away by position, not effort. High Certainty only, debt paid first.'},
+    {id:'ccs',name:'Cover Cover Sit',kind:'rev',state:'Defensive',rung:'Survive → Stabilize',layer:'Cost, Recovery Debt',
+     text:'Two cover beats, then settle. Sit is the deliberate refusal to borrow. It stops a Scramble compounding.'},
+    {id:'osg',name:'Oh Slide Go',kind:'com',state:'Def / Def-Scramble',rung:'Survive / Stabilize',layer:'Threat, Initiative',
+     text:'Recognize, slide, commit. Creates Recovery Debt and hands someone else the Cover job, so it is only legal when that job can be filled.'}
+  ];
+  var BY={};CALLS.forEach(function(c){BY[c.id]=c;});
+
+  var ERRORS=[
+    {id:'see',name:'See',what:'Didn’t perceive it',fix:'Eyes, scan pattern, field width'},
+    {id:'read',name:'Read',what:'Perceived, misjudged H/T/B',fix:'Reps against that specific look'},
+    {id:'state',name:'State',what:'Misjudged who holds initiative',fix:'Slow the state call'},
+    {id:'need',name:'Need',what:'Right read, wrong rung (usually rung-skipping)',fix:'Name the rung out loud'},
+    {id:'solve',name:'Solve',what:'Right rung, wrong action',fix:'Vocabulary drilling'},
+    {id:'org',name:'Organize',what:'Right action, jobs collided or Recover unfilled',fix:'Communication'},
+    {id:'exec',name:'Execution',what:'Everything right, body failed',fix:'Physical, not decisional'}
+  ];
+
+  /* Legality of each call against the inputs. Returns {ok, why}. */
+  function legality(id,s){
+    var st=s.state,r=s.need,c=s.cert;
+    var DN=st==='D'||st==='N';
+    switch(id){
+      case 'x':
+        if(!DN) return no('Defensive or Neutral only.');
+        if(r<2) return no('Needs Stabilize or higher; on '+RUNGS[r]+' the job is closer to the ball.');
+        return yes('Threat call. Legal from Stabilize up.');
+      case 'tri':
+        if(st!=='O') return no('Offensive only. You need the initiative to speed up.');
+        if(r!==3&&r!==4) return no('Build or Pressure only.'+(r<2?' The speedup borrows Balance you don’t have.':''));
+        if(s.b<2) return no('The speedup beat spends Balance, and yours is '+LEVEL[s.b]+'.');
+        if(c==='low') return no('Low Certainty caps commitment.');
+        return yes('Buys the missing factor by forcing a reaction.');
+      case 'own':
+        return yes(s.scr?'Lowest-Cost way to stay connected while the map is stale.':'Legal from any state and rung.');
+      case 'gsg':
+        if(!DN) return no('Defensive or Neutral only.');
+        if(r!==2&&r!==4) return no('Stabilize or Pressure only.');
+        return yes('Reversible. The Stay beat buys information.');
+      case 'hpo':
+        if(st!=='D') return no('Defensive only.');
+        if(r!==4) return no('Pressure only.');
+        if(s.debt) return no('Debt has to be paid first.');
+        if(c!=='high') return no('Committing call. Needs high Certainty.');
+        return yes('Takes a factor by position, not effort.');
+      case 'ccs':
+        if(st!=='D') return no('Defensive only.');
+        if(r>2) return no('Survive, Recover or Stabilize only.');
+        return yes('Reversible. Refuses to borrow.');
+      case 'osg':
+        if(st!=='D') return no('Defensive only.');
+        if(r!==0&&r!==2) return no('Survive or Stabilize only.');
+        if(c==='low') return no('Committing call. Low Certainty makes it illegal.');
+        if(s.debt) return no('A second commit on unpaid debt.');
+        if(!s.cover) return no('Nobody can take the Cover job it hands off.');
+        return yes('Real, immediate danger and Cover can be filled.');
+    }
+    function yes(w){return {ok:true,why:w};}
+    function no(w){return {ok:false,why:w};}
+  }
+
+  /* One action. Ordered preference per state and rung, then filtered by legality. */
+  function pick(s){
+    var p=s.h*s.t*s.b, live=p>=8, pref;
+    if(s.state==='O'){
+      pref=['tri','own'];
+    } else if(s.state==='N'){
+      if(s.cert==='low') pref=['gsg','x','own'];
+      else if(s.drift) pref=['x','gsg','own'];
+      else if(s.need===2||s.need===4) pref=['gsg','x','own'];
+      else pref=['x','gsg','own'];
+    } else {
+      switch(s.need){
+        case 0: pref = live ? ['osg','ccs','own'] : ['ccs','own']; break;
+        case 1: pref = s.scr ? ['own','ccs'] : ['ccs','own']; break;
+        case 2:
+          if(s.debt||s.scr) pref=['ccs','own'];
+          else if(s.drift) pref=['x','gsg','ccs'];
+          else if(live && s.cert==='high') pref=['osg','gsg','x','ccs'];
+          else pref=['gsg','x','ccs'];
+          break;
+        case 4: pref=['hpo','gsg','x','own']; break;
+        default: pref=['x','own'];
+      }
+    }
+    for(var i=0;i<pref.length;i++){ if(legality(pref[i],s).ok) return pref[i]; }
+    return 'own';
+  }
+
+  function whyLine(id,s){
+    var mine=s.state==='O';
+    var fac=lowestFactor(s);
+    switch(id){
+      case 'x': return s.drift
+        ? 'My eyes are on the ball, but the shot comes from the X, so keeping it in my accounting costs nothing and ignoring it costs a Scramble.'
+        : 'Nothing needs a commit right now, so the job is keeping the point that creates the shot in my accounting.';
+      case 'tri': return fac+' is my zero and he won’t give it up standing still, so I make him move and take what he vacates.';
+      case 'own': return s.debt||s.need===1
+        ? 'I’m in Recovery Debt, so chasing a line costs legs I don’t have and holding the area costs nothing.'
+        : (mine ? 'No call in the vocabulary buys a factor from here, so I hold my spacing and let the Reassess find the next one.'
+                : 'Space is cheap to hold and expensive to chase, and chasing is what pulls the unit out of shape.');
+      case 'gsg': return s.cert==='low'
+        ? 'Low Certainty makes a commit illegal, so the Stay beat buys the information before I spend the cushion.'
+        : 'Breaking tempo without adding pace makes him declare first, and it stays reversible if I read it wrong.';
+      case 'hpo': return 'Certainty is high and the debt is paid, so I take '+fac+' by position instead of by effort.';
+      case 'ccs': return s.debt
+        ? 'I’ve already got one unpaid debt this possession; the Sit refuses to borrow a second and buys the unit its reset.'
+        : 'The read isn’t clean enough to borrow on, so I cover twice and settle instead of committing.';
+      case 'osg': return 'The danger is real and immediate and Cover can be filled, so someone has to leave their slot and it’s me.';
+    }
+  }
+
+  function lowestFactor(s){
+    var f=[['Height',s.h],['Time',s.t],['Balance',s.b]];
+    f.sort(function(a,b){return a[1]-b[1];});
+    return f[0][0];
+  }
+
+  function readLine(s){
+    var who=s.state==='O'?'mine':'his';
+    var hTxt=['zero, the ball is off-stick or the stick is taken','low, the release has to travel up first','moderate, stick is coming up','high, stick up and loaded'][s.h];
+    var tTxt=['zero, pressure is on him','low, under a step of cushion','moderate, a step or two of cushion','high, no pressure applied'][s.t];
+    var bTxt=['zero, still catching up to himself','low, weight isn’t over the base','moderate, mostly under himself','high, feet under him'][s.b];
+    if(who==='mine'){
+      hTxt=['zero, my hands are taken','low, the release has to travel up first','moderate, hands coming free','high, hands free and loaded'][s.h];
+      tTxt=['zero, he’s on me','low, he’s tight','moderate, a step of separation','high, no pressure on me'][s.t];
+      bTxt=['zero, I’m still catching up','low, weight isn’t over my base','moderate, mostly under myself','high, I’m under myself'][s.b];
+    }
+    var cTxt={low:'Certainty low, act reversibly.',mod:'Certainty moderate, no one has declared.',high:'Certainty high, he’s committed.'}[s.cert];
+    var oTxt=s.o==='away'?' Orientation away, one turn from a shot.':' Orientation square.';
+    return 'Height '+hTxt+'. Time '+tTxt+'. Balance '+bTxt+'.'+oTxt+' '+cTxt;
+  }
+
+  function flags(s){
+    var out=[], p=s.h*s.t*s.b;
+    if(s.debt && s.need>=3) out.push(['Rung check','Debt is unpaid and you’ve set '+RUNGS[s.need]+'. Debt is the usual reason a rung can’t be climbed. Is this really '+RUNGS[s.need]+', or Recover?']);
+    if(s.state!=='O' && p===0) out.push(['Product is zero',lowestFactor(s)+' is already at zero. You don’t need all three; don’t spend on a factor he already lacks.']);
+    if(s.state==='O' && p>0 && s.need<5 && Math.min(s.h,s.t,s.b)===3) out.push(['Rung check','All three factors are high. If the shot is there, you’re on Finish.']);
+    if(s.state==='O' && s.need===5) out.push(['Finish','No call in the vocabulary is a Finish call. Convert.']);
+    if(s.state==='O' && s.need<3) out.push(['Rung check','On '+RUNGS[s.need]+' with the ball, the job is getting legal again, not buying a factor.']);
+    if(s.o==='away' && s.state!=='O') out.push(['Orientation','He’s facing away. The turn he needs is Time you can attack.']);
+    return out;
+  }
+
+  /* ================= call tab ================= */
+  var $=function(id){return document.getElementById(id);};
+  function radio(n){var el=document.querySelector('input[name="'+n+'"]:checked');return el?el.value:null;}
+  function setRadio(n,v){var el=document.querySelector('input[name="'+n+'"][value="'+v+'"]');if(el)el.checked=true;}
+
+  function readInputs(){
+    return {
+      h:+radio('h'),t:+radio('t'),b:+radio('b'),o:radio('o'),cert:radio('c'),
+      state:radio('s'),scr:$('scr').checked,need:+radio('n'),
+      debt:$('debt').checked,cover:$('cover').checked,drift:$('drift').checked
+    };
+  }
+  function applyInputs(s){
+    setRadio('h',s.h);setRadio('t',s.t);setRadio('b',s.b);setRadio('o',s.o||'to');setRadio('c',s.cert);
+    setRadio('s',s.state);$('scr').checked=!!s.scr;setRadio('n',s.need);
+    $('debt').checked=!!s.debt;$('cover').checked=!!s.cover;$('drift').checked=!!s.drift;
+  }
+
+  function stateLine(s){return STATES[s.state]+(s.scr?' / Scramble':'')+'. Need: '+RUNGS[s.need]+'.';}
+
+  function run(s){
+    var id=pick(s);
+    return {id:id,read:readLine(s),state:stateLine(s),why:whyLine(id,s),flags:flags(s)};
+  }
+
+  var last=null;
+  function render(){
+    var s=readInputs(), r=run(s), p=s.h*s.t*s.b;
+    last={s:s,r:r};
+    ['h','t','b'].forEach(function(k){document.querySelector('[data-seg="'+k+'"]').classList.toggle('is-zeroed',s[k]===0);});
+    $('persp').textContent = s.state==='O' ? 'Offensive: these are your own factors. You are buying the one you’re short of.' : 'Defending: these are the ball carrier’s factors. You only need to zero the cheapest one.';
+    var prod=$('product');prod.innerHTML='<b>'+p+'</b>of 27';prod.classList.toggle('is-zero',p===0);
+    $('o-read').textContent=r.read;
+    $('o-state').textContent=r.state;
+    var c=BY[r.id];
+    $('o-act').innerHTML=esc(c.name)+(c.seq?'<span class="seq">'+esc(c.seq)+'</span>':'');
+    $('o-why').textContent=r.why;
+    $('o-flags').innerHTML=r.flags.map(function(f){return '<p class="flag"><b>'+esc(f[0])+'.</b> '+esc(f[1])+'</p>';}).join('');
+    $('legal').innerHTML=CALLS.map(function(k){
+      var L=legality(k.id,s), isPick=k.id===r.id;
+      var pill=isPick?'<span class="pill pick">Call</span>':(L.ok?'<span class="pill yes">Legal</span>':'<span class="pill no">No</span>');
+      return '<div class="lrow'+(L.ok?'':' is-no')+'">'+pill+'<div><span class="cn">'+esc(k.name)+'</span><span class="why">'+esc(L.why)+'</span></div></div>';
+    }).join('');
+  }
+
+  function outputText(){
+    if(!last) return '';
+    var c=BY[last.r.id];
+    return '1. Read — '+last.r.read+'\n2. State + Need — '+last.r.state+'\n3. Action — '+c.name+(c.seq?': '+c.seq:'')+'\n4. Why — '+last.r.why;
+  }
+
+  document.querySelectorAll('#view-call input').forEach(function(i){i.addEventListener('change',render);});
+
+  $('copy-out').addEventListener('click',function(){
+    var txt=outputText();
+    try{
+      navigator.clipboard.writeText(txt).then(function(){toast('Copied');},function(){toast('Copy blocked. Select the output to copy it.');});
+    }catch(e){toast('Copy blocked. Select the output to copy it.');}
+  });
+  $('log-out').addEventListener('click',function(){
+    if(!last) return;
+    $('l-sit').value=last.r.state+' '+last.r.read;
+    $('l-call').value=last.r.id;
+    show('log');
+    $('l-sit').focus();
+  });
+
+  /* Worked examples from reference/examples.md */
+  var EXAMPLES=[
+    {h:3,t:2,b:3,o:'to',cert:'low',state:'N',scr:false,need:2,debt:false,cover:false,drift:false},
+    {h:0,t:3,b:1,o:'to',cert:'mod',state:'D',scr:true,need:1,debt:true,cover:false,drift:false},
+    {h:1,t:1,b:3,o:'to',cert:'high',state:'O',scr:false,need:3,debt:false,cover:false,drift:false},
+    {h:1,t:3,b:3,o:'to',cert:'mod',state:'D',scr:true,need:2,debt:true,cover:true,drift:false}
+  ];
+  document.querySelectorAll('[data-ex]').forEach(function(b){
+    b.addEventListener('click',function(){applyInputs(EXAMPLES[+b.getAttribute('data-ex')]);render();$('out').scrollIntoView({behavior:'smooth',block:'start'});});
+  });
+
+  /* ================= drill ================= */
+  var REPS=[
+    {src:'Worked example 1',sit:'Ball carrier picks his head up at the top: feet under him, stick up. You’re a step and a half off with no help declared. He beat you from this exact look once already tonight.',s:EXAMPLES[0]},
+    {src:'Worked example 2',sit:'You slid, the ball moved past you, and now two attackers are in your area with nobody clearly assigned. Your legs are gone from the slide.',s:EXAMPLES[1]},
+    {src:'Worked example 3',sit:'You have the ball and you’re balanced. Your defender is even with you and tight, stick on your hands. No shooting window.',s:EXAMPLES[2]},
+    {src:'Worked example 4',sit:'Second scramble in the same possession. You already slid once and recovered late. Ball is moving around the perimeter, no immediate shot, and your unit still isn’t reset.',s:EXAMPLES[3]},
+    {src:'Rep',sit:'Dodger beats his man topside and is coming downhill, stick loaded, two steps from a clean look. You’re the adjacent defender, your man is off-ball, and your crease man is set to rotate behind you.',s:{h:3,t:3,b:3,o:'to',cert:'high',state:'D',scr:false,need:0,debt:false,cover:true,drift:false}},
+    {src:'Rep',sit:'Same downhill dodger, same loaded stick, but you slid on the last possession’s dodge and never got back to your spot. Nobody behind you has called the rotation.',s:{h:3,t:3,b:3,o:'to',cert:'high',state:'D',scr:false,need:0,debt:true,cover:false,drift:false}},
+    {src:'Rep',sit:'Settled half-field. Your man is off-ball on the weak side. The ball is swinging up top and you’ve been watching it, and the attacker at X has been feeding all night.',s:{h:1,t:3,b:3,o:'to',cert:'mod',state:'D',scr:false,need:2,debt:false,cover:true,drift:true}},
+    {src:'Rep',sit:'You’re on the ball, he’s dodging to his strong hand for the third time tonight and he’s already telegraphing it. Your help is set, and nobody on your side owes a recovery.',s:{h:2,t:1,b:2,o:'to',cert:'high',state:'D',scr:false,need:4,debt:false,cover:true,drift:false}},
+    {src:'Rep',sit:'Ball carrier is walking it along the wing, stick in one hand, looking for a lane. You want to pressure him, but you haven’t seen this player before and you don’t know his hand.',s:{h:2,t:2,b:3,o:'to',cert:'low',state:'D',scr:false,need:4,debt:false,cover:true,drift:false}},
+    {src:'Rep',sit:'You carry into the attack balanced and square, defender is a step off and playing your hands. Your team is set, spacing is good, but there’s no window yet.',s:{h:1,t:2,b:3,o:'to',cert:'mod',state:'O',scr:false,need:4,debt:false,cover:false,drift:false}},
+    {src:'Rep',sit:'Loose ball on the ground, both teams scrambling, you just got knocked off your feet and are getting up near the crease. Nobody knows who has whom.',s:{h:0,t:2,b:0,o:'away',cert:'low',state:'N',scr:true,need:1,debt:true,cover:false,drift:false}},
+    {src:'Rep',sit:'Ball carrier catches on the wing facing the sideline, stick low. You’re a step off and your unit is set with nobody in debt. You’re not sure yet whether he’ll roll back or feed.',s:{h:1,t:2,b:2,o:'away',cert:'mod',state:'D',scr:false,need:2,debt:false,cover:true,drift:false}}
+  ];
+  var d={i:-1,order:[],right:0,seen:0,streak:0,answered:false};
+  function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  function nextRep(){
+    if(!d.order.length) d.order=shuffle(REPS.map(function(_,i){return i;}));
+    d.i=d.order.shift();d.answered=false;
+    var rep=REPS[d.i];
+    $('d-meta').textContent=rep.src+' · '+(REPS.length-d.order.length)+' of '+REPS.length+' this round';
+    $('d-sit').textContent=rep.sit;
+    $('d-choices').innerHTML=CALLS.map(function(c){return '<button type="button" class="choice" data-id="'+c.id+'">'+esc(c.name)+'</button>';}).join('');
+    $('d-result').hidden=true;$('d-open').hidden=true;
+  }
+  $('d-choices').addEventListener('click',function(e){
+    var b=e.target.closest('.choice'); if(!b||d.answered) return;
+    d.answered=true;
+    var rep=REPS[d.i], r=run(rep.s), guess=b.getAttribute('data-id'), ok=guess===r.id;
+    d.seen++; if(ok){d.right++;d.streak++;} else d.streak=0;
+    $('d-right').textContent=d.right;$('d-seen').textContent=d.seen;$('d-streak').textContent=d.streak;
+    document.querySelectorAll('#d-choices .choice').forEach(function(x){
+      var id=x.getAttribute('data-id');x.disabled=true;
+      if(id===r.id) x.classList.add('is-right'); else if(id===guess) x.classList.add('is-wrong'); else x.classList.add('is-dim');
+    });
+    var L=legality(guess,rep.s);
+    var note = ok ? '' : (L.ok
+      ? '<p class="flag"><b>'+esc(BY[guess].name)+' was legal</b> but not the one call. '+esc(L.why)+'</p>'
+      : '<p class="flag"><b>'+esc(BY[guess].name)+' was illegal here.</b> '+esc(L.why)+'</p>');
+    $('d-result').innerHTML=
+      '<p class="verdict-line '+(ok?'good':'bad')+'">'+(ok?'Right call.':'The call is '+esc(BY[r.id].name)+'.')+'</p>'+note+
+      '<ol class="four">'+
+      '<li><span class="n">1</span><div><span class="k">Read</span><span class="v">'+esc(r.read)+'</span></div></li>'+
+      '<li><span class="n">2</span><div><span class="k">State + Need</span><span class="v">'+esc(r.state)+'</span></div></li>'+
+      '<li><span class="n">4</span><div><span class="k">Why</span><span class="v">'+esc(r.why)+'</span></div></li></ol>';
+    $('d-result').hidden=false;$('d-open').hidden=false;
+  });
+  $('d-next').addEventListener('click',nextRep);
+  $('d-open').addEventListener('click',function(){applyInputs(REPS[d.i].s);render();show('call');});
+
+  /* ================= log ================= */
+  var KEY='lab-sideline-log-v1';
+  function load(){try{var v=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return [];}}
+  function save(list){try{localStorage.setItem(KEY,JSON.stringify(list));return true;}catch(e){return false;}}
+  var SAMPLE=[
+    {t:0,sit:'Slid off the wing before the dodger declared. Ball swung behind me for a layup.',call:'osg',err:'need'},
+    {t:0,sit:'Called Cover Cover Sit, but two of us sat on the same man and the crease was open.',call:'ccs',err:'org'},
+    {t:0,sit:'Watched the ball up top, their X cut backdoor. Never saw him leave.',call:'x',err:'see'}
+  ];
+
+  $('l-call').innerHTML='<option value="">No call made</option>'+CALLS.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
+  $('l-err').innerHTML=ERRORS.map(function(e){return '<option value="'+e.id+'">'+esc(e.name)+' error · '+esc(e.what)+'</option>';}).join('');
+  function fixLine(){var e=ERRORS.filter(function(x){return x.id===$('l-err').value;})[0];$('l-fix').innerHTML='<b>Fix</b>'+esc(e.fix);}
+  $('l-err').addEventListener('change',fixLine);fixLine();
+
+  function renderLog(){
+    var list=load(), usingSample=!list.length, rows=usingSample?SAMPLE:list;
+    var counts={};ERRORS.forEach(function(e){counts[e.id]=0;});
+    rows.forEach(function(r){if(counts[r.err]!==undefined)counts[r.err]++;});
+    var max=Math.max.apply(null,ERRORS.map(function(e){return counts[e.id];}))||1;
+    var topId=ERRORS.reduce(function(a,e){return counts[e.id]>counts[a]?e.id:a;},ERRORS[0].id);
+    $('bars').innerHTML=ERRORS.map(function(e){
+      var n=counts[e.id];
+      return '<div class="bar'+(e.id===topId&&n>0?' top':'')+'"><span>'+esc(e.name)+'</span><span class="track"><i style="width:'+(n/max*100)+'%"></i></span><span class="c">'+n+'</span></div>';
+    }).join('');
+    var te=ERRORS.filter(function(e){return e.id===topId;})[0];
+    $('focus').innerHTML=counts[topId]
+      ? '<b>Coach '+esc(te.name)+' first.</b> '+esc(te.fix)+'.'+(usingSample?' (From the example reps.)':'')
+      : '<b>No reps yet.</b>';
+    $('entries').innerHTML=(usingSample?'<span class="example-tag">Example reps · replaced when you save your first</span>':'')+
+      rows.slice().reverse().map(function(r,idx){
+        var e=ERRORS.filter(function(x){return x.id===r.err;})[0]||ERRORS[0];
+        var when=r.t?new Date(r.t).toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+new Date(r.t).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):'Example';
+        return '<div class="entry"><div class="meta"><span>'+esc(when)+'</span><span class="err">'+esc(e.name)+' error</span>'+(r.call?'<span class="call">'+esc(BY[r.call]?BY[r.call].name:r.call)+'</span>':'')+'</div>'+
+          '<p>'+esc(r.sit||'No note.')+'</p>'+
+          (usingSample?'':'<button type="button" class="del" data-i="'+(rows.length-1-idx)+'">Delete</button>')+'</div>';
+      }).join('');
+  }
+  $('entries').addEventListener('click',function(e){
+    var b=e.target.closest('.del');if(!b)return;
+    var list=load();list.splice(+b.getAttribute('data-i'),1);save(list);renderLog();toast('Rep deleted');
+  });
+  $('log-form').addEventListener('submit',function(e){
+    e.preventDefault();
+    var list=load();
+    list.push({t:Date.now(),sit:$('l-sit').value.trim(),call:$('l-call').value,err:$('l-err').value});
+    if(save(list)){toast('Rep saved');$('l-sit').value='';}else toast('This browser is blocking storage, so the rep wasn’t saved.');
+    renderLog();
+  });
+
+  /* ================= calls ================= */
+  $('callcards').innerHTML=CALLS.map(function(c){
+    return '<div class="cc"><span class="name">'+esc(c.name)+(c.seq?' <span class="seq">'+esc(c.seq)+'</span>':'')+'</span>'+
+      '<span class="meta"><span class="kind '+c.kind+'">'+(c.kind==='rev'?'Reversible':'Committing')+'</span><span>State <b>'+esc(c.state)+'</b></span><span>Rung <b>'+esc(c.rung)+'</b></span><span>Layer <b>'+esc(c.layer)+'</b></span></span>'+
+      '<p>'+esc(c.text)+'</p></div>';
+  }).join('');
+
+  /* ================= shell ================= */
+  var VIEWS=['call','drill','log','calls'];
+  function show(v){
+    VIEWS.forEach(function(k){
+      $('view-'+k).hidden=k!==v;
+      $('tab-'+k).setAttribute('aria-selected',k===v?'true':'false');
+    });
+    if(v==='log') renderLog();
+    try{localStorage.setItem('lab-sideline-tab',v);}catch(e){}
+    window.scrollTo(0,0);
+  }
+  document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){show(t.getAttribute('data-view'));});});
+
+  var tt;
+  function toast(msg){var el=$('toast');el.textContent=msg;el.hidden=false;clearTimeout(tt);tt=setTimeout(function(){el.hidden=true;},1800);}
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+  render();
+  nextRep();
+  var start=(location.hash||'').replace('#','');
+  if(VIEWS.indexOf(start)<0){try{start=localStorage.getItem('lab-sideline-tab');}catch(e){start=null;}}
+  show(VIEWS.indexOf(start)>=0?start:'call');
+})();
+</script>
