@@ -8,7 +8,7 @@ const { createApp } = require('../server/index.js');
 async function start(opts = {}) {
   const mediaDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lab-media-'));
   const resets = [];
-  const app = createApp({ file: ':memory:', mediaDir, adminEmail: 'owner@lab.test', publicUrl: 'http://lab.test', onResetLink: (e, l) => resets.push({ email: e, link: l }), ...opts });
+  const app = createApp({ file: ':memory:', mediaDir, adminEmail: 'owner@lab.test', publicUrl: 'http://lab.test', jobs: false, backupDir: null, onResetLink: (e, l) => resets.push({ email: e, link: l }), ...opts });
   await new Promise(r => app.server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${app.server.address().port}`;
 

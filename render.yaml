@@ -28,3 +28,8 @@ services:
         sync: false
       - key: PUBLIC_URL
         sync: false
+      # Optional. Password-reset emails via resend.com (verify your domain there).
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false

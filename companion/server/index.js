@@ -19,13 +19,23 @@ function createApp(opts = {}) {
     trustProxy: !!opts.trustProxy,
     publicUrl: (opts.publicUrl || '').replace(/\/$/, ''),
     mediaDir,
-    onResetLink: opts.onResetLink || ((email, link) => console.log(`[password reset] ${email}: ${link}`)),
+    backupDir: opts.backupDir === undefined ? (opts.file && opts.file !== ':memory:' ? path.join(path.dirname(opts.file), 'backups') : null) : opts.backupDir,
     removeFiles: files => files.forEach(f => fs.rm(path.join(mediaDir, f), { force: true }, () => {}))
   };
+  const mailer = opts.mailer || require('./mail.js').createMailer({ apiKey: opts.resendKey, from: opts.mailFrom });
+  config.mailEnabled = mailer.enabled;
+  // Reset links go by email when a provider is configured; tests can capture them.
+  config.onResetLink = opts.onResetLink || ((email, link) => mailer.sendSoon({
+    to: email, subject: 'Reset your THE LAB password',
+    text: `Someone asked to reset the password for your THE LAB account.\n\nChoose a new password here (the link works once, for one hour):\n${link}\n\nIf this wasn't you, ignore this email.`,
+    html: `<p>Someone asked to reset the password for your THE LAB account.</p><p><a href="${link}">Choose a new password</a>. The link works once, for one hour.</p><p>If this wasn't you, ignore this email.</p>`
+  }));
   const auth = createAuth(db, { secureCookies: !!opts.secureCookies });
   const r = createRouter();
   const notifier = require('./api/notify.js').createNotifier(db);
-  const ctx = { db, auth, config, notifier };
+  const ctx = { db, auth, config, notifier, mailer };
+  const jobs = require('./jobs.js').createJobs(ctx);
+  if (opts.jobs !== false) jobs.start();
 
   r.get('/api/health', () => ({ ok: true }));
   r.get('/api/meta', () => ({ lanes: LANES, version: 2 }));
@@ -36,6 +46,26 @@ function createApp(opts = {}) {
   require('./api/publishing.js')(r, ctx);
   require('./api/play.js')(r, ctx);
   require('./api/notify.js').routes(r, ctx);
+
+  /* Admin: list and download nightly backups (for an off-site copy). */
+  r.get('/api/admin/backups', ({ user }) => {
+    auth.require(user, 'admin');
+    if (!config.backupDir || !fs.existsSync(config.backupDir)) return [];
+    return fs.readdirSync(config.backupDir).filter(f => /^lab-\d{4}-\d{2}-\d{2}\.db$/.test(f)).sort().reverse()
+      .map(f => ({ date: f.slice(4, 14), size: fs.statSync(path.join(config.backupDir, f)).size }));
+  });
+  r.get('/api/admin/backups/:date', ({ user, params, res }) => {
+    auth.require(user, 'admin');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(params.date) || !config.backupDir) throw new HttpError(404, 'Backup not found.');
+    const file = path.join(config.backupDir, `lab-${params.date}.db`);
+    if (!fs.existsSync(file)) throw new HttpError(404, 'Backup not found.');
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="lab-${params.date}.db"`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+    fs.createReadStream(file).pipe(res);
+  });
+  r.get('/api/admin/status', ({ user }) => {
+    auth.require(user, 'admin');
+    return { email: config.mailEnabled, backups: !!config.backupDir, push: !!config.pushEnabled, google: !!config.googleEnabled };
+  });
 
   /* Home tab: one round trip for the signed-in user's day. */
   r.get('/api/home', ({ user }) => {
@@ -115,7 +145,8 @@ function createApp(opts = {}) {
   }
 
   const server = http.createServer((req, res) => { handle(req, res); });
-  return { server, db, config };
+  server.on('close', () => jobs.stop());
+  return { server, db, config, jobs };
 }
 
 module.exports = { createApp };
@@ -130,6 +161,8 @@ if (require.main === module) {
     adminEmail: process.env.ADMIN_EMAIL || '',
     publicUrl: process.env.PUBLIC_URL || `http://localhost:${port}`,
     secureCookies: process.env.SECURE_COOKIES === '1',
+    resendKey: process.env.RESEND_API_KEY || '',
+    mailFrom: process.env.MAIL_FROM || '',
     trustProxy: process.env.TRUST_PROXY === '1'
   });
   server.listen(port, () => console.log(`THE LAB running at http://localhost:${port}`));

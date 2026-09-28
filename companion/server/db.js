@@ -268,7 +268,15 @@ CREATE INDEX IF NOT EXISTS notif_user ON notifications(user_id, read_at);
 
 /* Ordered migrations, tracked with PRAGMA user_version. Never edit a shipped
    entry; add a new one. */
-const MIGRATIONS = [SCHEMA, PLAY];
+/* Background job bookkeeping: one row per notice already sent. */
+const JOBS = `
+CREATE TABLE IF NOT EXISTS job_log (
+  key TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+`;
+
+const MIGRATIONS = [SCHEMA, PLAY, JOBS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

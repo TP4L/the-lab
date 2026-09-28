@@ -9,6 +9,7 @@ const PREFS = {
   feedback: 'Shared feedback from your coach',
   matches: 'Match confirmations and corrections',
   events: 'Event registration and check-in',
+  reminders: 'Reminders before events',
   content: 'New Field Notes'
 };
 const SETTINGS = { leaderboard: 'Show me on leaderboards' };

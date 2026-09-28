@@ -946,7 +946,17 @@
           return '<div class="li" data-name="' + h((u.name + ' ' + u.email).toLowerCase()) + '"><span class="main-col"><span class="t">' + h(u.name) + '</span><span class="d">' + h(u.email) + (u.athlete_id ? ' · ' + playerId(u.athlete_id) : '') + '</span>' +
             '<span class="checks" data-u="' + u.id + '">' + ROLES.map(function (r) { return '<label><input type="checkbox" value="' + r + '"' + (u.roles.indexOf(r) >= 0 ? ' checked' : '') + (u.id === ME.user.id && r === 'admin' ? ' disabled' : '') + '> ' + r + '</label>'; }).join('') + '</span></span>' +
             '<span class="side"><button class="btn sm ghost" type="button" data-reset="' + u.id + '">Reset link</button></span></div>';
-        }).join('') + '</div><div id="linkbox"></div>';
+        }).join('') + '</div><div id="linkbox"></div>' +
+        '<div class="stack"><p class="section-title">System</p><div class="card stack" id="sys"><p class="small muted">Loading\u2026</p></div></div>';
+      Promise.all([api.get('/api/admin/status'), api.get('/api/admin/backups')]).then(function (r) {
+        var st = r[0], bk = r[1];
+        var line = function (ok, label, off) { return '<p class="small"><span class="tag ' + (ok ? 'ok' : 'demo') + '">' + (ok ? 'On' : 'Off') + '</span> ' + h(label) + (ok ? '' : ' \u00b7 <span class="muted">' + h(off) + '</span>') + '</p>'; };
+        $('#sys').innerHTML = line(st.email, 'Email (password resets)', 'set RESEND_API_KEY and MAIL_FROM in Render') +
+          line(st.push, 'Phone push notifications', 'set VAPID keys in Render') +
+          line(st.google, 'Sign in with Google', 'set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Render') +
+          line(st.backups, 'Nightly backups (last 7 kept on the server disk)', 'no disk configured') +
+          (bk.length ? '<div class="list">' + bk.map(function (b) { return '<div class="li"><span class="t small">' + h(b.date) + '</span><span class="side"><a class="btn sm ghost" href="/api/admin/backups/' + h(b.date) + '" download>Download</a><span>' + Math.round(b.size / 1024) + ' KB</span></span></div>'; }).join('') + '</div><p class="small muted">Download one now and then and keep it somewhere else, so a copy exists off the server.</p>' : '<p class="small muted">The first backup runs within a minute of the server starting, then nightly.</p>');
+      }, function () { $('#sys').innerHTML = '<p class="small muted">System status needs a connection.</p>'; });
       $('#q').addEventListener('input', function () { var q = this.value.toLowerCase(); $$('#ul .li').forEach(function (l) { l.hidden = l.getAttribute('data-name').indexOf(q) < 0; }); });
       $('#ul').addEventListener('change', function (e) {
         var box = e.target.closest('.checks'); if (!box) return;
