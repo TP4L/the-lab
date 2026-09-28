@@ -46,7 +46,10 @@ function createApp(opts = {}) {
   if (opts.jobs !== false) jobs.start();
 
   r.get('/api/health', () => ({ ok: true }));
-  r.get('/api/meta', () => ({ lanes: LANES, version: 3, google: !!config.googleEnabled, push: !!config.pushEnabled }));
+  const { MODES } = require('./formats.js');
+  const { SCORING, ROUND_END } = require('./api/play.js');
+  const { KINDS } = require('./api/planning.js');
+  r.get('/api/meta', () => ({ lanes: LANES, version: 4, google: !!config.googleEnabled, push: !!config.pushEnabled, email: !!config.mailEnabled, modes: MODES, scoring: SCORING, round_end: ROUND_END, interest_kinds: KINDS }));
 
   require('./api/account.js')(r, ctx);
   require('./api/training.js')(r, ctx);
@@ -55,6 +58,7 @@ function createApp(opts = {}) {
   require('./api/play.js')(r, ctx);
   require('./api/learn.js')(r, ctx);
   require('./api/coaching.js')(r, ctx);
+  require('./api/planning.js')(r, ctx);
   require('./api/notify.js').routes(r, ctx);
 
   /* Admin: list and download nightly backups (for an off-site copy). */

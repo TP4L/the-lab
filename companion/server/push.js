@@ -58,16 +58,33 @@ function createPush(db, { publicKey, privateKey, subject, fetchImpl = globalThis
       body
     });
     // Gone or unknown: the browser dropped this subscription.
-    if (res.status === 404 || res.status === 410) db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(sub.endpoint);
+    if (res.status === 404 || res.status === 410) {
+      db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(sub.endpoint);
+      db.prepare('DELETE FROM guest_push WHERE endpoint = ?').run(sub.endpoint);
+    } else record(sub.endpoint, res.status);
     return res.status;
   }
+  /* The push service's answer, so organizers can see whose alerts fail.
+     Accepted only means the push service took it, not that the phone showed it. */
+  function record(endpoint, status) {
+    const t = new Date().toISOString();
+    db.prepare('UPDATE push_subscriptions SET last_status = ?, last_at = ? WHERE endpoint = ?').run(status, t, endpoint);
+    db.prepare('UPDATE guest_push SET last_status = ?, last_at = ? WHERE endpoint = ?').run(status, t, endpoint);
+  }
+  const fail = sub => e => { log(`[push error] ${e.message}`); try { record(sub.endpoint, 599); } catch {} };
   /* Fire-and-forget to every device the user has turned push on for. */
   function toUser(userId, message) {
     if (!enabled) return;
     db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId)
-      .forEach(sub => sendOne(sub, message).catch(e => log(`[push error] ${e.message}`)));
+      .forEach(sub => sendOne(sub, message).catch(fail(sub)));
   }
-  return { enabled, publicKey, sendOne, toUser };
+  /* Players who joined an event with a link and no account. */
+  function toGuest(athleteId, message) {
+    if (!enabled) return;
+    db.prepare('SELECT * FROM guest_push WHERE athlete_id = ?').all(athleteId)
+      .forEach(sub => sendOne(sub, message).catch(fail(sub)));
+  }
+  return { enabled, publicKey, sendOne, toUser, toGuest };
 }
 
 module.exports = { createPush, encrypt, vapidHeaders, generateKeys };

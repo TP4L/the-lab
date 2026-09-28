@@ -414,7 +414,199 @@ ALTER TABLE users ADD COLUMN google_sub TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS users_google ON users(google_sub);
 `;
 
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES];
+/* Event desk: formats, guest players, share links, timed rounds, brackets
+   with a losers side, court acknowledgments and attendance history. */
+const EVENT_DESK = `
+ALTER TABLE events ADD COLUMN mode TEXT NOT NULL DEFAULT 'rotate';
+ALTER TABLE events ADD COLUMN scoring TEXT NOT NULL DEFAULT 'traditional';
+ALTER TABLE events ADD COLUMN round_limit INTEGER;
+ALTER TABLE events ADD COLUMN round_minutes INTEGER;
+ALTER TABLE events ADD COLUMN round_end TEXT NOT NULL DEFAULT 'all';
+ALTER TABLE events ADD COLUMN race_target INTEGER;
+ALTER TABLE events ADD COLUMN elimination TEXT NOT NULL DEFAULT 'single';
+ALTER TABLE events ADD COLUMN registration_open INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE events ADD COLUMN show_roster INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE events ADD COLUMN share_token TEXT;
+ALTER TABLE events ADD COLUMN watch_token TEXT;
+ALTER TABLE events ADD COLUMN schedule TEXT;
+ALTER TABLE events ADD COLUMN plan_id INTEGER;
+CREATE UNIQUE INDEX IF NOT EXISTS events_share ON events(share_token);
+CREATE UNIQUE INDEX IF NOT EXISTS events_watch ON events(watch_token);
+
+ALTER TABLE event_people ADD COLUMN number INTEGER;
+ALTER TABLE event_people ADD COLUMN guest_token TEXT;
+ALTER TABLE event_people ADD COLUMN email TEXT;
+ALTER TABLE event_people ADD COLUMN phone TEXT;
+ALTER TABLE event_people ADD COLUMN on_break INTEGER NOT NULL DEFAULT 0;
+CREATE UNIQUE INDEX IF NOT EXISTS ep_guest ON event_people(guest_token);
+
+ALTER TABLE rounds ADD COLUMN ends_at TEXT;
+ALTER TABLE rounds ADD COLUMN stopped_at TEXT;
+
+ALTER TABLE matches ADD COLUMN start1 INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE matches ADD COLUMN start2 INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE matches ADD COLUMN matchup INTEGER;
+ALTER TABLE matches ADD COLUMN bracket_code TEXT;
+
+ALTER TABLE event_teams ADD COLUMN p3 INTEGER REFERENCES athletes(id) ON DELETE CASCADE;
+
+-- Knockout brackets as a graph: each game takes its two teams from a seed,
+-- or from the winner or loser of an earlier game. That covers single and
+-- double elimination, byes included.
+CREATE TABLE IF NOT EXISTS bracket_games (
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  section TEXT NOT NULL CHECK (section IN ('W','L','F')),
+  round INTEGER NOT NULL,
+  pos INTEGER NOT NULL,
+  src_a TEXT NOT NULL,
+  src_b TEXT NOT NULL,
+  team_a INTEGER,
+  team_b INTEGER,
+  match_id TEXT REFERENCES matches(id) ON DELETE SET NULL,
+  winner_team INTEGER,
+  loser_team INTEGER,
+  settled INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (event_id, code)
+);
+CREATE TABLE IF NOT EXISTS match_acks (
+  match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (match_id, athlete_id)
+);
+-- Every roster change, so the last one can be undone before the next round.
+CREATE TABLE IF NOT EXISTS attendance_log (
+  id INTEGER PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  before TEXT NOT NULL,
+  by_user INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  undone INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- Phone alerts for players who joined with a link instead of an account.
+CREATE TABLE IF NOT EXISTS guest_push (
+  id INTEGER PRIMARY KEY,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  last_status INTEGER,
+  last_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+ALTER TABLE push_subscriptions ADD COLUMN last_status INTEGER;
+ALTER TABLE push_subscriptions ADD COLUMN last_at TEXT;
+CREATE INDEX IF NOT EXISTS attendance_event ON attendance_log(event_id, id);
+`;
+
+/* Pending Interest (find the group before picking a date) and Team Planner
+   (coached sessions with invitations, court blocks and player recaps). */
+const PLANNING = `
+CREATE TABLE IF NOT EXISTS interest_checks (
+  id INTEGER PRIMARY KEY,
+  owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  token TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'training',
+  description TEXT NOT NULL DEFAULT '',
+  skill_level TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
+  timing TEXT NOT NULL DEFAULT '',
+  min_people INTEGER,
+  max_people INTEGER,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed','scheduled')),
+  final_starts_at TEXT,
+  plan_id INTEGER,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS interest_options (
+  id INTEGER PRIMARY KEY,
+  check_id INTEGER NOT NULL REFERENCES interest_checks(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  starts_at TEXT
+);
+CREATE TABLE IF NOT EXISTS interest_responses (
+  id INTEGER PRIMARY KEY,
+  check_id INTEGER NOT NULL REFERENCES interest_checks(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL COLLATE NOCASE,
+  phone TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL CHECK (status IN ('interested','maybe','waitlist')),
+  option_ids TEXT NOT NULL DEFAULT '[]',
+  notes TEXT NOT NULL DEFAULT '',
+  edit_token_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (check_id, email)
+);
+
+CREATE TABLE IF NOT EXISTS plans (
+  id INTEGER PRIMARY KEY,
+  owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  starts_at TEXT,
+  ends_at TEXT,
+  timezone TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
+  sport TEXT NOT NULL DEFAULT 'Pickleball',
+  coaches TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL DEFAULT '',
+  agenda TEXT NOT NULL DEFAULT '',
+  handoff TEXT NOT NULL DEFAULT '',
+  capacity INTEGER,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','done','cancelled')),
+  interest_id INTEGER REFERENCES interest_checks(id) ON DELETE SET NULL,
+  event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS plan_blocks (
+  id INTEGER PRIMARY KEY,
+  plan_id INTEGER NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+  ord INTEGER NOT NULL,
+  start_time TEXT NOT NULL DEFAULT '',
+  end_time TEXT NOT NULL DEFAULT '',
+  court TEXT NOT NULL DEFAULT '',
+  lead TEXT NOT NULL DEFAULT '',
+  drill TEXT NOT NULL DEFAULT '',
+  instructions TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS plan_players (
+  id INTEGER PRIMARY KEY,
+  plan_id INTEGER NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  athlete_id INTEGER REFERENCES athletes(id) ON DELETE SET NULL,
+  court TEXT NOT NULL DEFAULT '',
+  rsvp TEXT NOT NULL DEFAULT 'invited' CHECK (rsvp IN ('invited','in','out','maybe','waitlist')),
+  rsvp_at TEXT,
+  token TEXT NOT NULL UNIQUE,
+  recap_observation TEXT NOT NULL DEFAULT '',
+  recap_cue TEXT NOT NULL DEFAULT '',
+  recap_next TEXT NOT NULL DEFAULT '',
+  recap_published_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- Saved groups of players and saved drills, per coach.
+CREATE TABLE IF NOT EXISTS plan_library (
+  id INTEGER PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('group','drill')),
+  name TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS plan_players_plan ON plan_players(plan_id);
+CREATE INDEX IF NOT EXISTS plan_blocks_plan ON plan_blocks(plan_id, ord);
+`;
+
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

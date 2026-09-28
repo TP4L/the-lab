@@ -9,7 +9,8 @@ const { LANES } = require('./api/publishing.js');
    - a nightly database backup (VACUUM INTO), keeping the last 7
    - cleanup of expired sign-in sessions and reset links
    Each notice is recorded in job_log so it is sent once, even across restarts. */
-function createJobs({ db, notifier, config }) {
+function createJobs(ctx) {
+  const { db, notifier, config } = ctx;
   const once = db.prepare('INSERT OR IGNORE INTO job_log (key) VALUES (?)');
   const first = key => Number(once.run(key).changes) === 1;
 
@@ -24,6 +25,7 @@ function createJobs({ db, notifier, config }) {
       const ids = db.prepare("SELECT athlete_id FROM event_people WHERE event_id = ? AND state IN ('registered','waitlist')").all(e.id).map(r => r.athlete_id);
       const when = which === '1h' ? 'in about an hour' : 'tomorrow';
       sent += notifier.notify(notifier.usersOfAthletes(ids), 'reminders', `${e.title} starts ${when}`, e.location ? `At ${e.location}.` : '', `#/play/events/${e.id}`);
+      if (ctx.play) ctx.play.pushGuests(e, ids, `${e.title} starts ${when}`, e.location ? `At ${e.location}.` : '');
     });
     return sent;
   }
