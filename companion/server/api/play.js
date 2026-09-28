@@ -240,6 +240,7 @@ module.exports = function play(r, { db, auth, notifier }) {
       if (first) db.prepare('UPDATE matches SET recorded_by = ? WHERE id = ?').run(user.id, m.id);
     });
     if (m.round_id) closeRoundIfScored(m.round_id);
+    if (m.bracket) resolveBracket(eventOf(m), user.id);
     const after = players(m.id);
     if (status !== 'verified') notify(participantsUsers(after, user.id), 'matches', first ? `${user.name} entered your score` : `${user.name} corrected a match score`, first ? 'Confirm it, or dispute it.' : (reason ? `Reason: ${reason}. ` : '') + 'Please confirm the new score.', `#/play/match/${m.id}`);
     return full(m.id, user);
@@ -308,6 +309,7 @@ module.exports = function play(r, { db, auth, notifier }) {
       capacity: v('capacity', x => int(x, 'capacity', { min: 2, max: 500 })) || null,
       courts: v('courts', x => int(x, 'courts', { min: 1, max: 40, required: true })) || 2,
       format: v('format', x => oneOf(x, FORMATS, 'format')) || 'round_robin',
+      partner_mode: v('partner_mode', x => oneOf(x, ['rotating', 'fixed'], 'partner_mode')) || 'rotating',
       game_to: v('game_to', x => int(x, 'game_to', { min: 5, max: 30, required: true })) || 11,
       status: v('status', x => oneOf(x, ['draft', 'published', 'live', 'complete', 'cancelled'], 'status')) || 'draft'
     };
@@ -350,9 +352,202 @@ module.exports = function play(r, { db, auth, notifier }) {
       counts: { registered: ps.filter(p => p.state === 'registered').length, waitlist: ps.filter(p => p.state === 'waitlist').length, interested: ps.filter(p => p.state === 'interested').length, checked_in: ps.filter(p => p.checked_in_at).length },
       people: ps.filter(p => p.state !== 'withdrawn' && (org || p.state === 'registered')).map(p => ({ athlete_id: p.athlete_id, name: p.name, state: p.state, checked_in: !!p.checked_in_at, active: !!p.active, player_id: org ? playerId(p.athlete_id) : undefined })),
       rounds: roundsOf(e.id, user),
-      standings: standings(e.id)
+      standings: standings(e.id),
+      teams: teamsOf(e.id),
+      team_standings: e.partner_mode === 'fixed' ? teamStandings(e.id) : [],
+      bracket: bracketOf(e.id, user)
     };
   }
+
+  /* ---------- fixed-partner teams ---------- */
+  function teamsOf(eventId) {
+    return db.prepare(`SELECT t.*, a1.name AS p1_name, a2.name AS p2_name FROM event_teams t JOIN athletes a1 ON a1.id = t.p1 JOIN athletes a2 ON a2.id = t.p2
+      WHERE t.event_id = ? ORDER BY t.id`).all(eventId).map(t => ({ ...t, label: t.name || `${t.p1_name.split(' ')[0]} & ${t.p2_name.split(' ')[0]}` }));
+  }
+  const pairKey = (a, b) => (a < b ? a + ':' + b : b + ':' + a);
+  function teamByPair(eventId) { const m = {}; teamsOf(eventId).forEach(t => { m[pairKey(t.p1, t.p2)] = t; }); return m; }
+  function matchTeams(matchId, byPair) {
+    const ps = players(matchId);
+    return [1, 2].map(n => { const ids = ps.filter(p => p.team === n).map(p => p.athlete_id); return ids.length === 2 ? byPair[pairKey(ids[0], ids[1])] : null; });
+  }
+  function teamStandings(eventId) {
+    const byPair = teamByPair(eventId), rows = {};
+    Object.values(byPair).forEach(t => { rows[t.id] = { team_id: t.id, label: t.label, played: 0, wins: 0, losses: 0, diff: 0 }; });
+    db.prepare("SELECT id, winner FROM matches WHERE event_id = ? AND status NOT IN ('scheduled','disputed')").all(eventId).forEach(m => {
+      const ts = matchTeams(m.id, byPair);
+      const pf = [0, 0]; games(m.id).forEach(([a, b]) => { pf[0] += a; pf[1] += b; });
+      ts.forEach((t, i) => { if (!t) return; const r = rows[t.id]; r.played++; if (m.winner === i + 1) r.wins++; else r.losses++; r.diff += pf[i] - pf[1 - i]; });
+    });
+    return Object.values(rows).sort((a, b) => b.wins - a.wins || b.diff - a.diff || a.label.localeCompare(b.label));
+  }
+  function teamOf(eventId, athleteId) { return db.prepare('SELECT * FROM event_teams WHERE event_id = ? AND (p1 = ? OR p2 = ?)').get(eventId, athleteId, athleteId); }
+  function makeTeam(e, a, b, name) {
+    if (a === b) throw new HttpError(400, 'A team needs two different players.');
+    [a, b].forEach(x => {
+      const p = db.prepare("SELECT state FROM event_people WHERE event_id = ? AND athlete_id = ?").get(e.id, x);
+      if (!p || p.state === 'withdrawn') throw new HttpError(400, 'Both players must be signed up for this event.');
+      if (teamOf(e.id, x)) throw new HttpError(409, 'One of these players is already on a team.');
+    });
+    return Number(db.prepare('INSERT INTO event_teams (event_id, name, p1, p2) VALUES (?, ?, ?, ?)').run(e.id, name || '', a, b).lastInsertRowid);
+  }
+  r.post('/api/events/:id/teams', ({ user, params, body }) => {
+    const e = organizerEvent(user, params.id);
+    makeTeam(e, int(body.p1, 'p1', { min: 1, required: true }), int(body.p2, 'p2', { min: 1, required: true }), str(body.name, 'name', { max: 60 }));
+    return withStatus(201, eventFull(eventRow(e.id), user));
+  });
+  /* Pair everyone registered without a team, checked-in players first. */
+  r.post('/api/events/:id/teams/auto', ({ user, params }) => {
+    const e = organizerEvent(user, params.id);
+    const free = people(e.id).filter(p => p.state === 'registered' && !teamOf(e.id, p.athlete_id))
+      .sort((a, b) => (b.checked_in_at ? 1 : 0) - (a.checked_in_at ? 1 : 0) || (a.created_at < b.created_at ? -1 : 1));
+    tx(db, () => { for (let i = 0; i + 1 < free.length; i += 2) makeTeam(e, free[i].athlete_id, free[i + 1].athlete_id, ''); });
+    return eventFull(eventRow(e.id), user);
+  });
+  r.del('/api/events/:id/teams/:tid', ({ user, params }) => {
+    const e = organizerEvent(user, params.id);
+    const t = db.prepare('SELECT * FROM event_teams WHERE id = ? AND event_id = ?').get(int(params.tid, 'tid', { min: 1, required: true }), e.id);
+    if (!t) throw new HttpError(404, 'Team not found.');
+    const used = db.prepare("SELECT 1 FROM matches m JOIN match_players a ON a.match_id = m.id AND a.athlete_id = ? JOIN match_players b ON b.match_id = m.id AND b.athlete_id = ? AND b.team = a.team WHERE m.event_id = ?").get(t.p1, t.p2, e.id);
+    if (used) throw new HttpError(409, 'This team has already played. It can\u2019t be split now.');
+    db.prepare('DELETE FROM event_teams WHERE id = ?').run(t.id);
+    return eventFull(eventRow(e.id), user);
+  });
+
+  /* Round of fixed teams: fewest games first, fewest repeat opponents. */
+  function buildTeamRound(pool, courts, eventId, rand) {
+    const byPair = teamByPair(eventId), played = {}, faced = {};
+    db.prepare('SELECT id FROM matches WHERE event_id = ?').all(eventId).forEach(m => {
+      const ts = matchTeams(m.id, byPair);
+      ts.forEach(t => { if (t) played[t.id] = (played[t.id] || 0) + 1; });
+      if (ts[0] && ts[1]) { const k = pairKey(ts[0].id, ts[1].id); faced[k] = (faced[k] || 0) + 1; }
+    });
+    const c = Math.min(courts, Math.floor(pool.length / 2));
+    const order = pool.map(t => ({ t, r: rand() })).sort((a, b) => (played[a.t.id] || 0) - (played[b.t.id] || 0) || a.r - b.r).map(x => x.t);
+    const playing = order.slice(0, c * 2), sitting = order.slice(c * 2);
+    let best = null;
+    for (let trial = 0; trial < 300; trial++) {
+      const sh = playing.slice();
+      for (let i = sh.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [sh[i], sh[j]] = [sh[j], sh[i]]; }
+      let cost = 0; const pairs = [];
+      for (let i = 0; i < sh.length; i += 2) { cost += faced[pairKey(sh[i].id, sh[i + 1].id)] || 0; pairs.push([sh[i], sh[i + 1]]); }
+      if (!best || cost < best.cost) best = { cost, pairs };
+      if (cost === 0) break;
+    }
+    return { pairs: best ? best.pairs : [], sitting };
+  }
+  function teamSides(t) {
+    const a = db.prepare('SELECT id, name, side FROM athletes WHERE id = ?').get(t.p1), b = db.prepare('SELECT id, name, side FROM athletes WHERE id = ?').get(t.p2);
+    if (a.side === 'right' || b.side === 'left') return [[a, 'right'], [b, 'left']];
+    return [[a, 'left'], [b, 'right']];
+  }
+  function insertTeamMatch(e, userId, t1, t2, extra) {
+    const id = crypto.randomUUID();
+    db.prepare(`INSERT INTO matches (id, recorded_by, kind, game_to, win_by, best_of, played_at, event_id, round_id, court, status, bracket) VALUES (?, ?, 'competition', ?, 2, 1, ?, ?, ?, ?, 'scheduled', ?)`)
+      .run(id, userId, e.game_to, now(), e.id, extra.round_id || null, extra.court || null, extra.bracket ? 1 : 0);
+    [t1, t2].forEach((t, ti) => teamSides(t).forEach(([p, side], si) => db.prepare('INSERT INTO match_players (match_id, team, slot, athlete_id, side) VALUES (?, ?, ?, ?, ?)').run(id, ti + 1, si + 1, p.id, side)));
+    return id;
+  }
+  function notifyTeams(e, t1, t2, title) {
+    const lab = t => t.name || `${t.p1_name.split(' ')[0]} & ${t.p2_name.split(' ')[0]}`;
+    notify(usersOfAthletes([t1.p1, t1.p2]), 'courts', title, `vs ${lab(t2)}.`, `#/play/events/${e.id}`);
+    notify(usersOfAthletes([t2.p1, t2.p2]), 'courts', title, `vs ${lab(t1)}.`, `#/play/events/${e.id}`);
+  }
+
+  /* ---------- single-elimination bracket ---------- */
+  const ROUND_NAMES = n => (n === 1 ? 'Final' : n === 2 ? 'Semifinals' : n === 3 ? 'Quarterfinals' : `Round of ${2 ** n}`);
+  /* Standard seeding order so 1 and 2 can only meet in the final. */
+  function seedOrder(size) {
+    let order = [1];
+    while (order.length < size) { const n = order.length * 2 + 1; order = order.flatMap(s => [s, n - s]); }
+    return order;
+  }
+  function bracketOf(eventId, user) {
+    const slots = db.prepare('SELECT * FROM bracket_slots WHERE event_id = ? ORDER BY round, pos').all(eventId);
+    if (!slots.length) return null;
+    const teams = {}; teamsOf(eventId).forEach(t => { teams[t.id] = t; });
+    const rounds = Math.max(...slots.map(x => x.round)) + 1;
+    const out = [];
+    for (let rd = 0; rd < rounds; rd++) {
+      out.push({ round: rd, name: ROUND_NAMES(rounds - rd), slots: slots.filter(x => x.round === rd).map(x => ({
+        pos: x.pos, team_a: x.team_a && teams[x.team_a] ? { id: x.team_a, label: teams[x.team_a].label } : null,
+        team_b: x.team_b && teams[x.team_b] ? { id: x.team_b, label: teams[x.team_b].label } : null,
+        winner_team: x.winner_team, match: x.match_id ? (() => { const m = matchRow(x.match_id); return m ? { id: m.id, status: m.status, games: games(m.id), court: m.court } : null; })() : null,
+        bye: rd === 0 && (!x.team_a || !x.team_b)
+      })) });
+    }
+    const final = slots.find(x => x.round === rounds - 1);
+    return { rounds: out, champion: final && final.winner_team && teams[final.winner_team] ? teams[final.winner_team].label : null };
+  }
+  /* Walk the bracket: settle byes, create matches when both teams are known,
+     record winners from scored matches, and move winners forward. */
+  function resolveBracket(e, userId) {
+    const byPair = teamByPair(e.id);
+    const teams = {}; teamsOf(e.id).forEach(t => { teams[t.id] = t; });
+    const slots = db.prepare('SELECT * FROM bracket_slots WHERE event_id = ? ORDER BY round, pos').all(e.id);
+    const rounds = slots.length ? Math.max(...slots.map(x => x.round)) + 1 : 0;
+    const created = [];
+    for (let rd = 0; rd < rounds; rd++) {
+      slots.filter(x => x.round === rd).forEach(x => {
+        let winner = null;
+        if (x.match_id) {
+          const m = matchRow(x.match_id);
+          if (m && m.status !== 'scheduled' && m.status !== 'disputed' && m.winner) {
+            const ts = matchTeams(m.id, byPair);
+            winner = ts[m.winner - 1] ? ts[m.winner - 1].id : null;
+          }
+        } else if (x.team_a && x.team_b) {
+          const id = insertTeamMatch(e, userId, teams[x.team_a], teams[x.team_b], { bracket: true });
+          db.prepare('UPDATE bracket_slots SET match_id = ? WHERE event_id = ? AND round = ? AND pos = ?').run(id, e.id, rd, x.pos);
+          x.match_id = id; created.push([teams[x.team_a], teams[x.team_b], ROUND_NAMES(rounds - rd)]);
+        } else if (rd === 0 && (x.team_a || x.team_b)) {
+          winner = x.team_a || x.team_b; // bye
+        }
+        if (winner !== x.winner_team) db.prepare('UPDATE bracket_slots SET winner_team = ? WHERE event_id = ? AND round = ? AND pos = ?').run(winner, e.id, rd, x.pos);
+        x.winner_team = winner;
+        if (rd + 1 < rounds) {
+          const next = slots.find(y => y.round === rd + 1 && y.pos === Math.floor(x.pos / 2));
+          const col = x.pos % 2 === 0 ? 'team_a' : 'team_b';
+          if (next[col] !== winner) {
+            // Only rewrite a later slot while its match is still unplayed.
+            const nm = next.match_id && matchRow(next.match_id);
+            if (!nm || nm.status === 'scheduled') {
+              if (nm) { db.prepare('DELETE FROM matches WHERE id = ?').run(nm.id); next.match_id = null; db.prepare('UPDATE bracket_slots SET match_id = NULL WHERE event_id = ? AND round = ? AND pos = ?').run(e.id, next.round, next.pos); }
+              db.prepare(`UPDATE bracket_slots SET ${col} = ? WHERE event_id = ? AND round = ? AND pos = ?`).run(winner, e.id, next.round, next.pos);
+              next[col] = winner;
+            }
+          }
+        }
+      });
+    }
+    created.forEach(([a, b, name]) => notifyTeams(e, a, b, `${e.title}: ${name}`));
+  }
+  r.post('/api/events/:id/bracket', ({ user, params, body }) => {
+    const e = organizerEvent(user, params.id);
+    if (e.partner_mode !== 'fixed') throw new HttpError(400, 'Brackets are for fixed-partner events. Switch the event to fixed partners first.');
+    const all = teamsOf(e.id);
+    const seeding = oneOf(body.seeding || 'standings', ['standings', 'order'], 'seeding');
+    let seeded = seeding === 'standings' ? teamStandings(e.id).map(s => all.find(t => t.id === s.team_id)) : all;
+    const limit = body.size ? int(body.size, 'size', { min: 2, max: 64 }) : seeded.length;
+    seeded = seeded.slice(0, limit);
+    if (seeded.length < 2) throw new HttpError(400, 'A bracket needs at least 2 teams.');
+    if (db.prepare("SELECT 1 FROM bracket_slots s JOIN matches m ON m.id = s.match_id WHERE s.event_id = ? AND m.status != 'scheduled'").get(e.id) && !body.force) {
+      throw new HttpError(409, 'The bracket already has results. Send force to rebuild it.');
+    }
+    let size = 2; while (size < seeded.length) size *= 2;
+    const order = seedOrder(size), rounds = Math.log2(size);
+    tx(db, () => {
+      db.prepare("DELETE FROM matches WHERE event_id = ? AND bracket = 1").run(e.id);
+      db.prepare('DELETE FROM bracket_slots WHERE event_id = ?').run(e.id);
+      for (let pos = 0; pos < size / 2; pos++) {
+        const a = seeded[order[pos * 2] - 1], b = seeded[order[pos * 2 + 1] - 1];
+        db.prepare('INSERT INTO bracket_slots (event_id, round, pos, team_a, team_b) VALUES (?, 0, ?, ?, ?)').run(e.id, pos, a ? a.id : null, b ? b.id : null);
+      }
+      for (let rd = 1; rd < rounds; rd++) for (let pos = 0; pos < size / 2 ** (rd + 1); pos++) db.prepare('INSERT INTO bracket_slots (event_id, round, pos) VALUES (?, ?, ?)').run(e.id, rd, pos);
+      if (e.status === 'published' || e.status === 'draft') db.prepare("UPDATE events SET status = 'live', updated_at = ? WHERE id = ?").run(now(), e.id);
+      resolveBracket(e, user.id);
+    });
+    return withStatus(201, eventFull(eventRow(e.id), user));
+  });
 
   r.get('/api/events', ({ user }) => {
     auth.require(user);
@@ -365,8 +560,8 @@ module.exports = function play(r, { db, auth, notifier }) {
   r.post('/api/events', ({ user, body }) => {
     auth.require(user, 'coach');
     const e = eventInput(body);
-    const id = Number(db.prepare(`INSERT INTO events (organizer_id, title, description, location, starts_at, ends_at, capacity, courts, format, game_to, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(user.id, e.title, e.description, e.location, e.starts_at, e.ends_at, e.capacity, e.courts, e.format, e.game_to, e.status).lastInsertRowid);
+    const id = Number(db.prepare(`INSERT INTO events (organizer_id, title, description, location, starts_at, ends_at, capacity, courts, format, partner_mode, game_to, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(user.id, e.title, e.description, e.location, e.starts_at, e.ends_at, e.capacity, e.courts, e.format, e.partner_mode, e.game_to, e.status).lastInsertRowid);
     return withStatus(201, eventFull(eventRow(id), user));
   });
   r.get('/api/events/:id', ({ user, params }) => {
@@ -380,8 +575,9 @@ module.exports = function play(r, { db, auth, notifier }) {
     const e = eventRow(int(params.id, 'id', { min: 1, required: true }));
     if (!isOrganizer(user, e)) throw new HttpError(404, 'Event not found.');
     const f = eventInput(body, e);
-    db.prepare(`UPDATE events SET title = ?, description = ?, location = ?, starts_at = ?, ends_at = ?, capacity = ?, courts = ?, format = ?, game_to = ?, status = ?, updated_at = ? WHERE id = ?`)
-      .run(f.title, f.description, f.location, f.starts_at, f.ends_at, f.capacity, f.courts, f.format, f.game_to, f.status, now(), e.id);
+    if (f.partner_mode !== e.partner_mode && db.prepare('SELECT 1 FROM matches WHERE event_id = ?').get(e.id)) throw new HttpError(409, 'Partner mode can\u2019t change once matches exist.');
+    db.prepare(`UPDATE events SET title = ?, description = ?, location = ?, starts_at = ?, ends_at = ?, capacity = ?, courts = ?, format = ?, partner_mode = ?, game_to = ?, status = ?, updated_at = ? WHERE id = ?`)
+      .run(f.title, f.description, f.location, f.starts_at, f.ends_at, f.capacity, f.courts, f.format, f.partner_mode, f.game_to, f.status, now(), e.id);
     if (f.status === 'cancelled' && e.status !== 'cancelled') {
       notify(usersOfAthletes(people(e.id).filter(p => p.state !== 'withdrawn').map(p => p.athlete_id)), 'events', `${e.title} was cancelled`, '', `#/play/events/${e.id}`);
     }
@@ -416,7 +612,23 @@ module.exports = function play(r, { db, auth, notifier }) {
     notify(usersOfAthletes([next.athlete_id]), 'events', `You’re in: ${e.title}`, 'A spot opened up and you’ve moved off the waitlist.', `#/play/events/${e.id}`);
   }
   r.post('/api/events/:id/interest', ({ user, params }) => setState(user, params.id, 'interested'));
-  r.post('/api/events/:id/register', ({ user, params }) => setState(user, params.id, 'registered'));
+  r.post('/api/events/:id/register', ({ user, params, body }) => {
+    const out = setState(user, params.id, 'registered');
+    if (!body.partner_player_id) return out;
+    // Fixed-partner events: sign up together. The partner is registered and told.
+    const e = eventRow(int(params.id, 'id', { min: 1, required: true }));
+    if (e.partner_mode !== 'fixed') throw new HttpError(400, 'This event rotates partners.');
+    const pid = parsePlayerId(body.partner_player_id);
+    if (!pid || !db.prepare('SELECT 1 FROM athletes WHERE id = ?').get(pid)) throw new HttpError(400, `No player with ID ${body.partner_player_id}.`);
+    const me = auth.ownAthleteId(user);
+    if (db.prepare("SELECT state FROM event_people WHERE event_id = ? AND athlete_id = ?").get(e.id, me).state !== 'registered') return out; // waitlisted: pair later
+    tx(db, () => {
+      db.prepare(`INSERT INTO event_people (event_id, athlete_id, state) VALUES (?, ?, 'registered') ON CONFLICT(event_id, athlete_id) DO UPDATE SET state = 'registered'`).run(e.id, pid);
+      makeTeam(e, me, pid, '');
+    });
+    notify(usersOfAthletes([pid]), 'events', `${user.name} signed you up as a partner`, `${e.title}. Withdraw from the event page if that\u2019s wrong.`, `#/play/events/${e.id}`);
+    return eventFull(eventRow(e.id), user);
+  });
   r.post('/api/events/:id/withdraw', ({ user, params }) => setState(user, params.id, 'withdrawn'));
 
   function organizerEvent(user, id) {
@@ -523,9 +735,25 @@ module.exports = function play(r, { db, auth, notifier }) {
     const open = db.prepare("SELECT number FROM rounds WHERE event_id = ? AND status = 'live'").get(e.id);
     if (open && !body.force) throw new HttpError(409, `Round ${open.number} still has matches without scores. Finish it, or start the next round anyway.`);
     const pool = people(e.id).filter(p => p.state === 'registered' && p.checked_in_at && p.active);
-    if (pool.length < 4) throw new HttpError(400, `Need at least 4 checked-in, active players. ${pool.length} now.`);
     const seed = body.seed === undefined ? crypto.randomInt(1e9) : int(body.seed, 'seed', { min: 0 });
     let st = seed; const rand = () => { st = (st * 1103515245 + 12345) % 2147483648; return st / 2147483648; };
+    if (e.partner_mode === 'fixed') {
+      const ready = new Set(pool.map(p => p.athlete_id));
+      const teamPool = teamsOf(e.id).filter(t => ready.has(t.p1) && ready.has(t.p2));
+      if (teamPool.length < 2) throw new HttpError(400, `Need at least 2 teams with both players checked in. ${teamPool.length} now.`);
+      const plan = buildTeamRound(teamPool, e.courts, e.id, rand);
+      const number = (db.prepare('SELECT MAX(number) AS n FROM rounds WHERE event_id = ?').get(e.id).n || 0) + 1;
+      tx(db, () => {
+        if (open) db.prepare("UPDATE rounds SET status = 'done' WHERE event_id = ? AND status = 'live'").run(e.id);
+        if (e.status === 'published' || e.status === 'draft') db.prepare("UPDATE events SET status = 'live', updated_at = ? WHERE id = ?").run(now(), e.id);
+        const roundId = Number(db.prepare('INSERT INTO rounds (event_id, number, sitting_out) VALUES (?, ?, ?)').run(e.id, number, JSON.stringify(plan.sitting.flatMap(t => [t.p1, t.p2]))).lastInsertRowid);
+        plan.pairs.forEach(([a, b], ci) => insertTeamMatch(e, user.id, a, b, { round_id: roundId, court: ci + 1 }));
+      });
+      plan.pairs.forEach(([a, b], ci) => notifyTeams(e, a, b, `Round ${number}: Court ${ci + 1}`));
+      notify(usersOfAthletes(plan.sitting.flatMap(t => [t.p1, t.p2])), 'up_next', 'You\u2019re up next', `Your team sits out round ${number}.`, `#/play/events/${e.id}`);
+      return withStatus(201, eventFull(eventRow(e.id), user));
+    }
+    if (pool.length < 4) throw new HttpError(400, `Need at least 4 checked-in, active players. ${pool.length} now.`);
     const plan = buildRound(pool, e.courts, history(e.id), rand);
     const number = (db.prepare('SELECT MAX(number) AS n FROM rounds WHERE event_id = ?').get(e.id).n || 0) + 1;
     const ids = [];

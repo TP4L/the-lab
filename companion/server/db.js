@@ -373,7 +373,34 @@ CREATE INDEX IF NOT EXISTS notes_session ON notes(session_id);
 CREATE INDEX IF NOT EXISTS matches_session ON matches(session_id);
 `;
 
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING];
+/* Team events (fixed partners) and single-elimination brackets. */
+const TEAMS = `
+ALTER TABLE events ADD COLUMN partner_mode TEXT NOT NULL DEFAULT 'rotating';
+ALTER TABLE matches ADD COLUMN bracket INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS event_teams (
+  id INTEGER PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  name TEXT NOT NULL DEFAULT '',
+  p1 INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  p2 INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- One row per bracket position. Round 0 holds the seeded teams (null = bye);
+-- later rounds fill in as winners are known.
+CREATE TABLE IF NOT EXISTS bracket_slots (
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  round INTEGER NOT NULL,
+  pos INTEGER NOT NULL,
+  team_a INTEGER REFERENCES event_teams(id) ON DELETE SET NULL,
+  team_b INTEGER REFERENCES event_teams(id) ON DELETE SET NULL,
+  match_id TEXT REFERENCES matches(id) ON DELETE SET NULL,
+  winner_team INTEGER,
+  PRIMARY KEY (event_id, round, pos)
+);
+CREATE INDEX IF NOT EXISTS teams_event ON event_teams(event_id);
+`;
+
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

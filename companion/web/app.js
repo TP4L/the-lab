@@ -1729,6 +1729,7 @@
         '<div class="field"><label class="flabel" for="t">Title</label><input type="text" id="t" maxlength="120" value="' + h(e.title) + '" placeholder="Thursday Round Robin"></div>' +
         '<div class="form-grid"><div class="field"><label class="flabel" for="st">Starts</label><input type="datetime-local" id="st" value="' + local(e.starts_at) + '"></div>' +
         '<div class="field"><label class="flabel" for="loc">Location</label><input type="text" id="loc" maxlength="200" value="' + h(e.location) + '"></div></div>' +
+        '<div class="field"><label class="flabel" for="pm">Partners</label><select id="pm"><option value="rotating"' + (e.partner_mode !== 'fixed' ? ' selected' : '') + '>Rotating partners (mixer)</option><option value="fixed"' + (e.partner_mode === 'fixed' ? ' selected' : '') + '>Fixed partners (teams, brackets)</option></select></div>' +
         '<div class="form-grid"><div class="field"><label class="flabel" for="fmt">Format</label><select id="fmt">' + [['round_robin', 'Round robin'], ['open_play', 'Open play'], ['clinic', 'Clinic']].map(function (o) { return '<option value="' + o[0] + '"' + (e.format === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label class="flabel" for="courts">Courts</label><input type="number" id="courts" min="1" max="40" value="' + e.courts + '"></div>' +
         '<div class="field"><label class="flabel" for="cap">Capacity</label><input type="number" id="cap" min="2" max="500" value="' + (e.capacity || '') + '" placeholder="No limit"></div>' +
@@ -1738,7 +1739,7 @@
         '<div class="row"><button class="btn primary" type="submit">Save event</button></div></form>';
       $('#ef').addEventListener('submit', function (ev) {
         ev.preventDefault();
-        var body = { title: $('#t').value, starts_at: $('#st').value ? new Date($('#st').value).toISOString() : '', location: $('#loc').value, format: $('#fmt').value, courts: $('#courts').value, capacity: $('#cap').value || null, game_to: $('#gto').value, description: $('#desc').value, status: $('#status').value };
+        var body = { title: $('#t').value, starts_at: $('#st').value ? new Date($('#st').value).toISOString() : '', location: $('#loc').value, format: $('#fmt').value, partner_mode: $('#pm').value, courts: $('#courts').value, capacity: $('#cap').value || null, game_to: $('#gto').value, description: $('#desc').value, status: $('#status').value };
         api.request(id ? 'PUT' : 'POST', '/api/events' + (id ? '/' + id : ''), body).then(function (r) { L.toast('Event saved'); location.hash = '#/play/events/' + r.id; }, function (err) { L.formError($('#ef'), err.status === 0 ? 'Saving an event needs a connection.' : err.message); });
       });
     });
@@ -1751,7 +1752,11 @@
       var round = e.rounds[e.rounds.length - 1];
       var mine = ME.athlete_id;
       function tabs() {
-        return '<div class="chips" id="etabs">' + [['info', 'Info'], ['courts', 'Courts'], ['standings', 'Standings'], ['people', e.organizer ? 'Check-in' : 'Players']].map(function (t) { return '<button class="chip" type="button" data-v="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+        var list = [['info', 'Info'], ['courts', 'Courts']];
+        if (e.partner_mode === 'fixed') list.push(['teams', 'Teams']);
+        if (e.bracket || (e.organizer && e.partner_mode === 'fixed')) list.push(['bracket', 'Bracket']);
+        list.push(['standings', 'Standings'], ['people', e.organizer ? 'Check-in' : 'Players']);
+        return '<div class="chips" id="etabs">' + list.map(function (t) { return '<button class="chip" type="button" data-v="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
       }
       function myCourt() {
         if (!round || !mine) return '';
@@ -1779,9 +1784,48 @@
         }).join('');
       }
       function standings() {
+        if (e.partner_mode === 'fixed' && e.team_standings.length) {
+          var mineTeam = e.teams.filter(function (t) { return t.p1 === mine || t.p2 === mine; })[0];
+          return '<div class="table-wrap card" style="padding:0"><table class="summary-table"><thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>+/\u2212</th></tr></thead><tbody>' +
+            e.team_standings.map(function (s, i) { return '<tr' + (mineTeam && s.team_id === mineTeam.id ? ' class="me"' : '') + '><td class="n">' + (i + 1) + '</td><td>' + h(s.label) + '</td><td class="n">' + s.wins + '</td><td class="n">' + s.losses + '</td><td class="n">' + (s.diff > 0 ? '+' : '') + s.diff + '</td></tr>'; }).join('') + '</tbody></table></div>';
+        }
         if (!e.standings.length) return '<div class="list"><p class="empty">Standings appear after the first scores.</p></div>';
         return '<div class="table-wrap card" style="padding:0"><table class="summary-table"><thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>+/−</th></tr></thead><tbody>' +
           e.standings.map(function (s, i) { return '<tr' + (s.athlete_id === mine ? ' class="me"' : '') + '><td class="n">' + (i + 1) + '</td><td>' + h(s.name) + '</td><td class="n">' + s.wins + '</td><td class="n">' + s.losses + '</td><td class="n">' + (s.diff > 0 ? '+' : '') + s.diff + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      }
+      function teamsTab() {
+        var paired = {}; e.teams.forEach(function (t) { paired[t.p1] = paired[t.p2] = 1; });
+        var free = e.people.filter(function (p) { return p.state === 'registered' && !paired[p.athlete_id]; });
+        return (e.teams.length ? '<div class="list">' + e.teams.map(function (t) {
+          return '<div class="li"><span class="main-col"><span class="t small">' + h(t.label) + '</span><span class="d">' + h(t.p1_name) + ' & ' + h(t.p2_name) + '</span></span>' + (e.organizer ? '<button class="btn sm ghost" type="button" data-deltm="' + t.id + '">Split</button>' : '') + '</div>';
+        }).join('') + '</div>' : '<div class="list"><p class="empty">No teams yet.</p></div>') +
+          (e.organizer ? '<div class="card stack"><p class="section-title">Make a team</p>' + (free.length >= 2 ?
+            '<div class="form-grid"><div class="field"><label class="flabel" for="tp1">Player</label><select id="tp1">' + free.map(function (p) { return '<option value="' + p.athlete_id + '">' + h(p.name) + '</option>'; }).join('') + '</select></div>' +
+            '<div class="field"><label class="flabel" for="tp2">Partner</label><select id="tp2">' + free.map(function (p, i) { return '<option value="' + p.athlete_id + '"' + (i === 1 ? ' selected' : '') + '>' + h(p.name) + '</option>'; }).join('') + '</select></div>' +
+            '<div class="field"><label class="flabel" for="tnm">Team name <span class="hint">optional</span></label><input type="text" id="tnm" maxlength="60"></div></div>' +
+            '<div class="row"><button class="btn primary" type="button" id="mktm">Make team</button><button class="btn ghost" type="button" id="autotm">Pair everyone left (' + free.length + ')</button></div>'
+            : '<p class="small muted">' + (free.length ? '1 player has no partner yet.' : 'Everyone registered is on a team.') + '</p>') + '</div>' : '');
+      }
+      function bracketTab() {
+        var b = e.bracket;
+        var build = e.organizer ? '<div class="card stack"><p class="section-title">' + (b ? 'Rebuild bracket' : 'Create a knockout bracket') + '</p><div class="form-grid">' +
+          '<div class="field"><label class="flabel" for="bseed">Seeding</label><select id="bseed"><option value="standings">By standings</option><option value="order">In team order</option></select></div>' +
+          '<div class="field"><label class="flabel" for="bsize">Teams in bracket</label><input type="number" id="bsize" min="2" max="64" value="' + e.teams.length + '"></div></div>' +
+          '<div class="row"><button class="btn ' + (b ? 'danger' : 'primary') + '" type="button" id="mkbr">' + (b ? 'Rebuild bracket' : 'Create bracket') + '</button></div><p class="small muted">Top seeds get byes when the number of teams isn\u2019t a power of two. Winners move on as scores come in.</p></div>' : '';
+        if (!b) return (e.organizer ? '' : '<div class="list"><p class="empty">No bracket yet.</p></div>') + build;
+        return (b.champion ? '<div class="focus-card"><p class="eyebrow">Champions</p><p class="big">' + h(b.champion) + '</p></div>' : '') +
+          '<div class="bracket">' + b.rounds.map(function (rd) {
+            return '<div class="bcol"><p class="section-title">' + h(rd.name) + '</p>' + rd.slots.map(function (x) {
+              var line = function (tm, isA) {
+                if (!tm) return '<p class="bt tbd">' + (rd.round === 0 ? 'Bye' : 'TBD') + '</p>';
+                var won = x.winner_team && x.winner_team === tm.id;
+                var sc = x.match && x.match.games.length ? x.match.games.map(function (g) { return isA ? g[0] : g[1]; }).join(' ') : '';
+                return '<p class="bt' + (won ? ' won' : '') + '"><span>' + h(tm.label) + '</span><b>' + sc + '</b></p>';
+              };
+              var inner = line(x.team_a, true) + line(x.team_b, false);
+              return x.match ? '<a class="bslot" href="#/play/match/' + h(x.match.id) + '">' + inner + '</a>' : '<div class="bslot">' + inner + '</div>';
+            }).join('') + '</div>';
+          }).join('') + '</div>' + build;
       }
       function peopleTab() {
         if (!e.organizer) return '<div class="list">' + (e.people.length ? e.people.map(function (p) { return '<div class="li"><span class="t small">' + h(p.name) + '</span></div>'; }).join('') : '<p class="empty">No one registered yet.</p>') + '</div>';
@@ -1802,6 +1846,7 @@
           (e.description ? '<div class="small">' + L.paras(e.description) + '</div>' : '') +
           '<p class="small muted">' + h({ round_robin: 'Round robin', open_play: 'Open play', clinic: 'Clinic' }[e.format]) + ' · ' + e.courts + ' courts · games to ' + e.game_to + (e.capacity ? ' · ' + e.counts.registered + ' of ' + e.capacity + ' spots' : ' · ' + e.counts.registered + ' registered') + (e.organizer_name ? ' · Organizer ' + h(e.organizer_name) : '') + '</p>' +
           (ME.athlete_id && ['published', 'live'].indexOf(e.status) >= 0 ? '<div class="row">' +
+            (e.partner_mode === 'fixed' && (!e.me || e.me.state === 'withdrawn' || e.me.state === 'interested') ? '<input type="text" id="partner" placeholder="Partner\u2019s player ID (optional)" aria-label="Partner\u2019s player ID" style="flex:1;min-width:160px">' : '') +
             (!e.me || e.me.state === 'withdrawn' || e.me.state === 'interested' ? '<button class="btn primary" type="button" data-reg="register">' + (e.capacity && e.counts.registered >= e.capacity ? 'Join waitlist' : 'Register') + '</button>' : '') +
             (!e.me || e.me.state === 'withdrawn' ? '<button class="btn" type="button" data-reg="interest">Interested</button>' : '') +
             (e.me && e.me.state !== 'withdrawn' ? '<button class="btn ghost" type="button" data-reg="withdraw">Withdraw</button>' : '') + '</div>' : '') +
@@ -1810,12 +1855,27 @@
       }
       app.innerHTML = '<a class="back" href="#/play">← Play</a>' + offlineNote(e) +
         head(e.status === 'live' ? 'Live event' : e.status === 'draft' ? 'Draft event' : 'Event', e.title, '', e.organizer ? '<div class="row"><a class="btn ghost" href="#/play/events/' + e.id + '/edit">Edit</a>' + (e.status !== 'complete' ? '<button class="btn primary" type="button" id="next">Start round ' + (e.rounds.length + 1) + '</button>' : '') + '</div>' : '') +
-        myCourt() + tabs() + '<div id="tab">' + ({ info: info, courts: courts, standings: standings, people: peopleTab })[tab]() + '</div>';
+        myCourt() + tabs() + '<div id="tab">' + ({ info: info, courts: courts, teams: teamsTab, bracket: bracketTab, standings: standings, people: peopleTab }[tab] || info)() + '</div>';
 
       $('#etabs').addEventListener('click', function (ev) { var c = ev.target.closest('.chip'); if (c) { eventTab[id] = c.getAttribute('data-v'); route(); } });
       $$('[data-reg]').forEach(function (b) { b.addEventListener('click', function () {
-        api.request('POST', '/api/events/' + e.id + '/' + b.getAttribute('data-reg'), {}).then(function (r) { L.toast(r.me && r.me.state === 'waitlist' ? 'Event is full. You’re on the waitlist.' : 'Updated'); route(); }, function (err) { L.toast(err.message); });
+        var body = b.getAttribute('data-reg') === 'register' && $('#partner') && $('#partner').value.trim() ? { partner_player_id: $('#partner').value.trim() } : {};
+        api.request('POST', '/api/events/' + e.id + '/' + b.getAttribute('data-reg'), body).then(function (r) { L.toast(r.me && r.me.state === 'waitlist' ? 'Event is full. You’re on the waitlist.' : 'Updated'); route(); }, function (err) { L.toast(err.message); });
       }); });
+      if ($('#mktm')) $('#mktm').addEventListener('click', function () {
+        api.request('POST', '/api/events/' + e.id + '/teams', { p1: Number($('#tp1').value), p2: Number($('#tp2').value), name: $('#tnm').value }).then(function () { L.toast('Team made'); route(); }, function (err) { L.toast(err.message); });
+      });
+      if ($('#autotm')) $('#autotm').addEventListener('click', function () { api.request('POST', '/api/events/' + e.id + '/teams/auto', {}).then(function () { L.toast('Teams paired'); route(); }, function (err) { L.toast(err.message); }); });
+      $$('[data-deltm]').forEach(function (b) { L.armed(b, 'Split?', function () { api.request('DELETE', '/api/events/' + e.id + '/teams/' + b.getAttribute('data-deltm')).then(route, function (err) { L.toast(err.message); }); }); });
+      if ($('#mkbr')) {
+        var mk = function (force) {
+          api.request('POST', '/api/events/' + e.id + '/bracket', { seeding: $('#bseed').value, size: Number($('#bsize').value) || undefined, force: force || undefined })
+            .then(function () { eventTab[id] = 'bracket'; L.toast('Bracket ready. Teams were notified.'); route(); }, function (err) {
+              if (err.status === 409) L.toast(err.message, { label: 'Rebuild', run: function () { mk(true); } }); else L.toast(err.message);
+            });
+        };
+        if (e.bracket) L.armed($('#mkbr'), 'Tap again to rebuild', function () { mk(false); }); else $('#mkbr').addEventListener('click', function () { mk(false); });
+      }
       if ($('#next')) $('#next').addEventListener('click', function () {
         var go = function (force) { api.request('POST', '/api/events/' + e.id + '/rounds', force ? { force: true } : {}).then(function () { eventTab[id] = 'courts'; L.toast('Courts posted. Players were notified.'); route(); }, function (err) {
           if (err.status === 409) L.toast(err.message, { label: 'Start anyway', run: function () { go(true); } }); else L.toast(err.message);

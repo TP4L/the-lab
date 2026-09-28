@@ -477,3 +477,14 @@ input[type=datetime-local],input[type=email],input[type=search]{width:100%;font:
 .board button:disabled{opacity:.5;cursor:default;}
 .clock{font-family:var(--display);font-weight:800;font-size:22px;font-variant-numeric:tabular-nums;padding:2px 10px;border:2px solid var(--ink);border-radius:4px;}
 .voice{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px dashed var(--rule);border-radius:4px;}
+
+/* ---------- bracket ---------- */
+.bracket{display:flex;gap:14px;overflow-x:auto;padding-bottom:8px;}
+.bcol{display:flex;flex-direction:column;gap:10px;min-width:190px;justify-content:space-around;}
+.bslot{display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:4px;background:var(--surface);text-decoration:none;overflow:hidden;}
+a.bslot:hover{border-color:var(--ink);}
+.bt{display:flex;justify-content:space-between;gap:8px;padding:7px 10px;font-size:14px;border-top:1px solid var(--rule-soft);}
+.bt:first-child{border-top:0;}
+.bt b{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;}
+.bt.won{font-weight:700;background:var(--ok-soft);}
+.bt.tbd{color:var(--ink-faint);font-style:italic;}
