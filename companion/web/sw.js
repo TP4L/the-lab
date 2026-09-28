@@ -1,6 +1,6 @@
 /* Service worker: keeps the app shell on the device so THE LAB opens with no
    connection. API calls always go to the network; the app handles offline. */
-const VERSION = 'lab-shell-v8';
+const VERSION = 'lab-shell-v9';
 const SHELL = ['/', '/index.html', '/styles.css', '/lib.js', '/engine.js', '/qr.js', '/markdown.js', '/voice.js', '/app.js', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', e => {
@@ -19,4 +19,19 @@ self.addEventListener('fetch', e => {
       return res;
     }).catch(() => caches.match(e.request).then(r => r || caches.match('/index.html')))
   );
+});
+
+/* Phone notifications. The payload is {title, body, link}; tapping opens the link. */
+self.addEventListener('push', e => {
+  let m = { title: 'THE LAB', body: '', link: '#/notifications' };
+  try { m = Object.assign(m, e.data.json()); } catch (x) {}
+  e.waitUntil(self.registration.showNotification(m.title, { body: m.body, icon: '/icon.svg', badge: '/icon.svg', data: { link: m.link }, tag: m.link }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = '/' + (e.notification.data && e.notification.data.link || '#/');
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) { if ('focus' in c) { c.navigate ? c.navigate(url) : null; return c.focus(); } }
+    return self.clients.openWindow(url);
+  }));
 });

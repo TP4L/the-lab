@@ -33,3 +33,15 @@ services:
         sync: false
       - key: MAIL_FROM
         sync: false
+      # Optional. Phone notifications: generate with `node server/push.js --keys`.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      # Optional. Sign in with Google (OAuth client, redirect URI PUBLIC_URL/api/auth/google/callback).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

@@ -26,7 +26,8 @@ module.exports = function account(r, { db, auth, config }) {
   }
   function me(user) {
     const athleteId = auth.ownAthleteId(user);
-    return { user, athlete_id: athleteId };
+    const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(user.id);
+    return { user, athlete_id: athleteId, has_password: !!row && !String(row.password_hash).startsWith('oauth$') };
   }
 
   r.post('/api/auth/signup', ({ body, res }) => {
@@ -54,6 +55,53 @@ module.exports = function account(r, { db, auth, config }) {
     return me(auth.userRow(u));
   });
 
+  /* ---------- Sign in with Google (OpenID Connect, authorization code flow) ----------
+     The ID token comes straight from Google's token endpoint over TLS, so its
+     claims are trusted after checking audience, issuer, expiry and email_verified.
+     An existing account with the same verified email is signed in, never duplicated. */
+  const GOOGLE_STATE = 'lab_oauth_state';
+  const googleRedirect = () => `${config.publicUrl}/api/auth/google/callback`;
+  r.get('/api/auth/google/start', ({ res }) => {
+    if (!config.googleEnabled) throw new HttpError(404, 'Sign in with Google isn\u2019t set up on this server.');
+    const state = token(16);
+    const q = new URLSearchParams({ client_id: config.googleClientId, redirect_uri: googleRedirect(), response_type: 'code', scope: 'openid email profile', state, prompt: 'select_account' });
+    res.writeHead(302, { Location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, 'Set-Cookie': `${GOOGLE_STATE}=${state}; Path=/api/auth/google; HttpOnly; SameSite=Lax; Max-Age=600${config.secureCookies ? '; Secure' : ''}`, 'Cache-Control': 'no-store' });
+    res.end();
+  });
+  r.get('/api/auth/google/callback', async ({ req, res, query }) => {
+    const fail = msg => { res.writeHead(302, { Location: `/#/signin?error=${encodeURIComponent(msg)}`, 'Cache-Control': 'no-store' }); res.end(); };
+    if (!config.googleEnabled) return fail('Sign in with Google isn\u2019t set up.');
+    const m = /(?:^|;\s*)lab_oauth_state=([^;]+)/.exec(req.headers.cookie || '');
+    if (!m || !query.get('state') || m[1] !== query.get('state')) return fail('Sign-in expired. Try again.');
+    if (!query.get('code')) return fail('Google sign-in was cancelled.');
+    let claims;
+    try {
+      const tr = await config.fetchImpl('https://oauth2.googleapis.com/token', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ code: query.get('code'), client_id: config.googleClientId, client_secret: config.googleClientSecret, redirect_uri: googleRedirect(), grant_type: 'authorization_code' }).toString()
+      });
+      const tok = await tr.json();
+      if (!tr.ok || !tok.id_token) return fail('Google didn\u2019t accept the sign-in. Try again.');
+      claims = JSON.parse(Buffer.from(tok.id_token.split('.')[1], 'base64url').toString('utf8'));
+    } catch { return fail('Couldn\u2019t reach Google. Try again.'); }
+    const nowS = Math.floor(Date.now() / 1000);
+    if (claims.aud !== config.googleClientId || !['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss) || !(claims.exp > nowS) || claims.email_verified !== true || !claims.email) {
+      return fail('That Google account couldn\u2019t be verified.');
+    }
+    const e = String(claims.email).toLowerCase();
+    let u = db.prepare('SELECT * FROM users WHERE google_sub = ?').get(claims.sub) || db.prepare('SELECT * FROM users WHERE email = ?').get(e);
+    if (u && !u.google_sub) db.prepare('UPDATE users SET google_sub = ? WHERE id = ?').run(claims.sub, u.id);
+    if (!u) {
+      const roles = config.adminEmail && e === config.adminEmail.toLowerCase() ? ['athlete', 'coach', 'contributor', 'editor', 'admin'] : ['athlete'];
+      const id = Number(db.prepare('INSERT INTO users (email, name, password_hash, roles, google_sub) VALUES (?, ?, ?, ?, ?)')
+        .run(e, String(claims.name || e.split('@')[0]).slice(0, 80), 'oauth$' + token(8), JSON.stringify(roles), claims.sub).lastInsertRowid);
+      u = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    }
+    const s = auth.startSession(u.id);
+    res.writeHead(302, { Location: '/#/', 'Set-Cookie': [s.cookie, `${GOOGLE_STATE}=; Path=/api/auth/google; Max-Age=0`], 'Cache-Control': 'no-store' });
+    res.end();
+  });
+
   r.post('/api/auth/logout', ({ req, res }) => {
     res.setHeader('Set-Cookie', auth.endSession(req));
     return withStatus(204, null);
@@ -71,7 +119,8 @@ module.exports = function account(r, { db, auth, config }) {
   r.post('/api/me/password', ({ user, body, req }) => {
     auth.require(user);
     const u = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-    if (typeof body.current !== 'string' || !verifyPassword(body.current, u.password_hash)) throw new HttpError(400, 'Current password is incorrect.');
+    const googleOnly = String(u.password_hash).startsWith('oauth$');
+    if (!googleOnly && (typeof body.current !== 'string' || !verifyPassword(body.current, u.password_hash))) throw new HttpError(400, 'Current password is incorrect.');
     const pw = password(body.password);
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(pw), user.id);
     // Sign out other devices.
@@ -93,7 +142,9 @@ module.exports = function account(r, { db, auth, config }) {
   r.post('/api/me/delete', ({ user, body, res, req }) => {
     auth.require(user);
     const u = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-    if (typeof body.password !== 'string' || !verifyPassword(body.password, u.password_hash)) throw new HttpError(400, 'Password is incorrect.');
+    if (String(u.password_hash).startsWith('oauth$')) {
+      if (body.confirm !== 'DELETE') throw new HttpError(400, 'Type DELETE to confirm.');
+    } else if (typeof body.password !== 'string' || !verifyPassword(body.password, u.password_hash)) throw new HttpError(400, 'Password is incorrect.');
     const files = [];
     tx(db, () => {
       const a = db.prepare('SELECT * FROM athletes WHERE user_id = ?').get(user.id);

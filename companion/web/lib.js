@@ -77,6 +77,35 @@
     });
   }
 
+  /* ---------- blobs for offline uploads (IndexedDB) ---------- */
+  var Blobs = (function () {
+    var dbp = null;
+    function db() {
+      if (!dbp) dbp = new Promise(function (res, rej) {
+        if (!window.indexedDB) return rej(new Error('No IndexedDB'));
+        var r = indexedDB.open('lab-blobs', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('b'); };
+        r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); };
+      });
+      return dbp;
+    }
+    function op(mode, fn) { return db().then(function (d) { return new Promise(function (res, rej) { var t = d.transaction('b', mode); var q = fn(t.objectStore('b')); t.oncomplete = function () { res(q && q.result); }; t.onerror = function () { rej(t.error); }; }); }); }
+    return {
+      put: function (k, v) { return op('readwrite', function (s) { return s.put(v, k); }); },
+      get: function (k) { return op('readonly', function (s) { return s.get(k); }); },
+      del: function (k) { return op('readwrite', function (s) { return s.delete(k); }); }
+    };
+  })();
+  /* Queue a photo/video for upload. The upload ID becomes the media ID, so a
+     note queued after it can already reference media_id = uploadId. */
+  function queueUpload(file, query, label) {
+    var uploadId = uuid();
+    return Blobs.put(uploadId, file).then(function () {
+      queue({ type: 'upload', uploadId: uploadId, query: query, mime: file.type, label: label || ('Upload ' + (file.name || '')) });
+      return uploadId;
+    });
+  }
+
   /* ---------- outbox: writes made offline, replayed in order ---------- */
   /* Every queued write is idempotent on the server (device-made IDs), so a
      retry after a dropped reply never creates a duplicate. */
@@ -96,7 +125,16 @@
     if (!q.length) { status(); return Promise.resolve(); }
     flushing = true; status();
     var head = q[0], batch = [head], req;
-    if (head.type === 'events') {
+    if (head.type === 'upload') {
+      req = Blobs.get(head.uploadId).then(function (blob) {
+        if (!blob) throw new ApiError('The file is no longer on this device.', 410);
+        return fetch('/api/media?' + head.query, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': head.mime || blob.type, 'X-Upload-Id': head.uploadId }, body: blob })
+          .then(function (res) {
+            if (res.ok) { Blobs.del(head.uploadId); return res.json(); }
+            return res.json().catch(function () { return {}; }).then(function (d) { throw new ApiError(d.error || 'Upload failed.', res.status); });
+          }, function () { setOnline(false); throw new ApiError('You\u2019re offline.', 0); });
+      });
+    } else if (head.type === 'events') {
       for (var i = 1; i < q.length && batch.length < 400; i++) {
         if (q[i].type === 'events' && q[i].session === head.session) batch.push(q[i]); else break;
       }
@@ -193,7 +231,7 @@
   }
 
   window.Lab = {
-    Store: Store, uuid: uuid, api: { get: get, request: request, upload: upload }, queue: queue, flush: flush, outbox: outbox, status: status,
+    Store: Store, uuid: uuid, api: { get: get, request: request, upload: upload }, queue: queue, queueUpload: queueUpload, flush: flush, outbox: outbox, status: status,
     isOnline: function () { return online; }, on: on, emit: emit,
     h: h, $: $, $$: $$, toast: toast, when: when, armed: armed, formError: formError, copy: copy, paras: paras, ApiError: ApiError
   };

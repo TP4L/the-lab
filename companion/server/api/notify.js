@@ -25,7 +25,7 @@ function prefsOf(row) {
 
 /* notify(userIds, kind, title, body, link): respects each person's prefs.
    `link` is an in-app route like "#/play/events/3", used as a deep link. */
-function createNotifier(db) {
+function createNotifier(db, push) {
   const ins = db.prepare('INSERT INTO notifications (user_id, kind, title, body, link) VALUES (?, ?, ?, ?, ?)');
   function notify(userIds, kind, title, body = '', link = '') {
     const ids = [...new Set(userIds.filter(Boolean))];
@@ -35,6 +35,7 @@ function createNotifier(db) {
       const u = db.prepare('SELECT prefs FROM users WHERE id = ?').get(uid);
       if (!u || prefsOf(u)[kind] === false) return;
       ins.run(uid, kind, title, body, link); n++;
+      if (push) push.toUser(uid, { title, body, link });
     });
     return n;
   }
@@ -46,7 +47,8 @@ function createNotifier(db) {
   return { notify, usersOfAthletes };
 }
 
-function routes(r, { db, auth }) {
+function routes(r, ctx) {
+  const { db, auth } = ctx;
   r.get('/api/notifications', ({ user }) => {
     auth.require(user);
     const items = db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 100').all(user.id);
@@ -58,6 +60,34 @@ function routes(r, { db, auth }) {
     if (body.id) db.prepare('UPDATE notifications SET read_at = ? WHERE id = ? AND user_id = ?').run(now(), int(body.id, 'id', { min: 1 }), user.id);
     else db.prepare('UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL').run(now(), user.id);
     return withStatus(204, null);
+  });
+  /* Phone push: the app subscribes with the browser's push service. */
+  r.get('/api/push/key', () => {
+    if (!ctx.push || !ctx.push.enabled) throw new HttpError(404, 'Phone notifications aren\u2019t set up on this server yet.');
+    return { publicKey: ctx.push.publicKey };
+  });
+  r.post('/api/push/subscribe', ({ user, body }) => {
+    auth.require(user);
+    if (!ctx.push || !ctx.push.enabled) throw new HttpError(404, 'Phone notifications aren\u2019t set up on this server yet.');
+    const endpoint = String(body.endpoint || '');
+    let u; try { u = new URL(endpoint); } catch { throw new HttpError(400, 'endpoint must be a URL.'); }
+    if (u.protocol !== 'https:') throw new HttpError(400, 'endpoint must be https.');
+    const keys = body.keys || {};
+    if (typeof keys.p256dh !== 'string' || typeof keys.auth !== 'string' || keys.p256dh.length > 200 || keys.auth.length > 100) throw new HttpError(400, 'keys.p256dh and keys.auth are required.');
+    db.prepare(`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)
+      ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth`).run(user.id, endpoint, keys.p256dh, keys.auth);
+    return withStatus(204, null);
+  });
+  r.post('/api/push/unsubscribe', ({ user, body }) => {
+    auth.require(user);
+    db.prepare('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?').run(user.id, String(body.endpoint || ''));
+    return withStatus(204, null);
+  });
+  r.post('/api/push/test', ({ user }) => {
+    auth.require(user);
+    if (!ctx.push || !ctx.push.enabled) throw new HttpError(404, 'Phone notifications aren\u2019t set up on this server yet.');
+    ctx.push.toUser(user.id, { title: 'THE LAB', body: 'Phone notifications are working.', link: '#/notifications' });
+    return withStatus(202, { sent: db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = ?').get(user.id).n });
   });
   r.get('/api/me/prefs', ({ user }) => {
     auth.require(user);

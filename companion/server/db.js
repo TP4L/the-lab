@@ -400,7 +400,21 @@ CREATE TABLE IF NOT EXISTS bracket_slots (
 CREATE INDEX IF NOT EXISTS teams_event ON event_teams(event_id);
 `;
 
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS];
+/* Phone push subscriptions and sign-in with Google. */
+const DEVICES = `
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+ALTER TABLE users ADD COLUMN google_sub TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS users_google ON users(google_sub);
+`;
+
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

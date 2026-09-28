@@ -12,6 +12,7 @@ function hashPassword(pw) {
   return `scrypt$${salt.toString('base64')}$${hash.toString('base64')}`;
 }
 function verifyPassword(pw, stored) {
+  if (String(stored).startsWith('oauth$')) return false; // Google-only account: no password yet
   const [alg, s, h] = String(stored).split('$');
   if (alg !== 'scrypt' || !s || !h) return false;
   const want = Buffer.from(h, 'base64');

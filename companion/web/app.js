@@ -53,8 +53,10 @@
   /* ================= auth views ================= */
   var views = {};
 
-  views.signin = function () {
+  views.signin = function (_, query) {
     app.innerHTML = '<div class="auth-wrap"><p class="brandmark">THE <span>LAB</span></p><p class="muted">Know what to work on, do the work, record what happened, know what comes next.</p>' +
+      (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
+      '<a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="field"><label class="flabel" for="pw">Password</label><input type="password" id="pw" autocomplete="current-password" required></div>' +
@@ -66,6 +68,7 @@
       api.request('POST', '/api/auth/login', { email: $('#em').value, password: $('#pw').value })
         .then(function (m) { setMe(m); location.hash = '#/'; }, function (err) { L.formError($('#f'), err.status === 0 ? 'You’re offline. Sign in needs a connection.' : err.message); });
     });
+    if (META.google) $('#gbtn').hidden = false;
     $('#em').focus();
   };
 
@@ -930,16 +933,47 @@
       '<p><b>' + h(ME.user.name) + '</b> · <span class="muted">' + h(ME.user.email) + '</span></p>' +
       '<p class="small muted">Roles: ' + h(ME.user.roles.join(', ')) + '</p>' +
       '<p class="small" id="memline"></p>' +
-      '<details class="more"><summary>Change password</summary><form class="form" id="pwf" novalidate>' +
-      '<div class="field"><label class="flabel" for="cur">Current password</label><input type="password" id="cur" autocomplete="current-password"></div>' +
+      '<details class="more"><summary>' + (ME.has_password === false ? 'Set a password' : 'Change password') + '</summary><form class="form" id="pwf" novalidate>' +
+      (ME.has_password === false ? '<p class="small muted">You sign in with Google. A password lets you sign in with your email too.</p>' : '<div class="field"><label class="flabel" for="cur">Current password</label><input type="password" id="cur" autocomplete="current-password"></div>') +
       '<div class="field"><label class="flabel" for="npw">New password</label><input type="password" id="npw" autocomplete="new-password"></div>' +
       '<div class="row"><button class="btn" type="submit">Change password</button></div></form></details>' +
       '<details class="more" id="prefs"><summary>Notifications and privacy</summary><div id="prefbox" class="stack-sm"><p class="small muted">Loading\u2026</p></div></details>' +
       '<details class="more"><summary>Privacy</summary><div class="small stack-sm"><p>Your coach sees your profile, results, reflections and shared media. Other athletes never see your profile or results.</p><p>Coaches can keep private notes about you. Those are for coaching staff only. Notes marked “Shared” are the ones written for you.</p><p>Published Field Notes are public. Nothing else in THE LAB is.</p></div></details>' +
       '<details class="more"><summary>Delete account</summary><form class="form" id="delf" novalidate><p class="small">This deletes your login, your reflections and the photos and video you uploaded. If a coach created your profile, they keep the session results they recorded, no longer linked to you. This can’t be undone.</p>' +
-      '<div class="field"><label class="flabel" for="dpw">Password</label><input type="password" id="dpw" autocomplete="current-password"></div>' +
+      (ME.has_password === false ? '<div class="field"><label class="flabel" for="dpw">Type DELETE to confirm</label><input type="text" id="dpw" autocomplete="off"></div>' : '<div class="field"><label class="flabel" for="dpw">Password</label><input type="password" id="dpw" autocomplete="current-password"></div>') +
       '<div class="row"><button class="btn danger" type="button" id="delbtn">Delete my account</button></div></form></details>' +
       '<div class="row"><button class="btn" type="button" id="signout">Sign out</button></div></div></div>';
+  }
+  /* Phone notifications (Web Push). iPhone needs the app added to the Home Screen first. */
+  function pushControls() {
+    var box = $('#pushbox'); if (!box) return;
+    if (!META.push) { box.innerHTML = '<p class="small muted">Phone notifications aren\u2019t switched on for THE LAB yet. Everything still shows in the bell.</p>'; return; }
+    var ios = /iPhone|iPad/.test(navigator.userAgent), standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      box.innerHTML = '<p class="small muted">' + (ios && !standalone ? 'On iPhone, add THE LAB to your Home Screen (Share \u2192 Add to Home Screen), open it from there, then turn on phone notifications here.' : 'This browser can\u2019t show phone notifications.') + '</p>'; return;
+    }
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription().then(function (sub) { return { reg: reg, sub: sub }; }); }).then(function (x) {
+      var on = !!x.sub && Notification.permission === 'granted';
+      box.innerHTML = '<label class="tog" for="pushon"><input type="checkbox" id="pushon"' + (on ? ' checked' : '') + '><div><b>Phone notifications on this device</b><span>' + (Notification.permission === 'denied' ? 'Blocked in your browser settings. Allow notifications for this site to turn them on.' : 'Courts, reminders, coach feedback and the rest, even when THE LAB is closed.') + '</span></div></label>' + (on ? '<button class="btn sm ghost" type="button" id="pushtest">Send a test</button>' : '');
+      $('#pushon').addEventListener('change', function () {
+        var cb = this;
+        if (cb.checked) {
+          Notification.requestPermission().then(function (perm) {
+            if (perm !== 'granted') throw new Error('Notifications weren\u2019t allowed.');
+            return api.get('/api/push/key');
+          }).then(function (k) {
+            var raw = atob(k.publicKey.replace(/-/g, '+').replace(/_/g, '/')), key = new Uint8Array(raw.length);
+            for (var i = 0; i < raw.length; i++) key[i] = raw.charCodeAt(i);
+            return x.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+          }).then(function (sub) { return api.request('POST', '/api/push/subscribe', sub.toJSON()); })
+            .then(function () { L.toast('Phone notifications on'); pushControls(); }, function (err) { cb.checked = false; L.toast(err.message || 'Couldn\u2019t turn on notifications.'); });
+        } else if (x.sub) {
+          var ep = x.sub.endpoint;
+          x.sub.unsubscribe().then(function () { return api.request('POST', '/api/push/unsubscribe', { endpoint: ep }); }).then(function () { L.toast('Phone notifications off'); pushControls(); }, function () { pushControls(); });
+        }
+      });
+      if ($('#pushtest')) $('#pushtest').addEventListener('click', function () { api.request('POST', '/api/push/test', {}).then(function () { L.toast('Test sent'); }, function (err) { L.toast(err.message); }); });
+    }, function () { box.innerHTML = '<p class="small muted">Phone notifications need the app to finish installing. Reopen THE LAB and try again.</p>'; });
   }
   function bindSettings() {
     api.get('/api/me/learning').then(function (d) {
@@ -951,7 +985,7 @@
     $('#prefs').addEventListener('toggle', function once() {
       $('#prefs').removeEventListener('toggle', once);
       api.get('/api/me/prefs').then(function (d) {
-        $('#prefbox').innerHTML = '<p class="small muted">Notifications show in THE LAB (the bell at the top). Phone push notifications come with the store apps.</p>' + Object.keys(d.labels).map(function (k) {
+        $('#prefbox').innerHTML = '<div id="pushbox"></div><p class="small muted">Choose what you\u2019re told about. These apply to the bell and to phone notifications.</p>' + Object.keys(d.labels).map(function (k) {
           return '<label class="tog" for="pf-' + k + '"><input type="checkbox" id="pf-' + k + '" data-pref="' + k + '"' + (d.prefs[k] ? ' checked' : '') + '><div><b>' + h(d.labels[k]) + '</b></div></label>';
         }).join('');
         $('#prefbox').addEventListener('change', function (e) {
@@ -961,6 +995,7 @@
         });
       }, function (err) { $('#prefbox').innerHTML = '<p class="small muted">' + h(err.status === 0 ? 'Settings need a connection.' : err.message) + '</p>'; });
     });
+    $('#prefs').addEventListener('toggle', function oncePush() { $('#prefs').removeEventListener('toggle', oncePush); setTimeout(pushControls, 50); });
     if (location.hash.indexOf('#prefs') > 0) { $('#prefs').open = true; setTimeout(function () { $('#prefs').scrollIntoView(); }, 50); }
     $('#signout').addEventListener('click', function () {
       var pending = L.outbox().length;
@@ -969,10 +1004,10 @@
     });
     $('#pwf').addEventListener('submit', function (e) {
       e.preventDefault();
-      api.request('POST', '/api/me/password', { current: $('#cur').value, password: $('#npw').value }).then(function () { L.toast('Password changed. Other devices were signed out.'); $('#pwf').reset(); }, function (err) { L.formError($('#pwf'), err.message); });
+      api.request('POST', '/api/me/password', { current: $('#cur') ? $('#cur').value : undefined, password: $('#npw').value }).then(function () { L.toast('Password saved. Other devices were signed out.'); if (ME.has_password === false) { ME.has_password = true; setMe(ME); } $('#pwf').reset(); }, function (err) { L.formError($('#pwf'), err.message); });
     });
     L.armed($('#delbtn'), 'Tap again to delete forever', function () {
-      api.request('POST', '/api/me/delete', { password: $('#dpw').value }).then(function () {
+      api.request('POST', '/api/me/delete', ME.has_password === false ? { confirm: $('#dpw').value.trim() } : { password: $('#dpw').value }).then(function () {
         Store.keys('').forEach(Store.del); setMe(null); location.hash = '#/signin'; L.toast('Your account was deleted.');
       }, function (err) { L.formError($('#delf'), err.message); });
     });
@@ -1086,7 +1121,9 @@
           setTimeout(route, 300);
         }
         if (!file) return saveNote();
-        if (!L.isOnline()) return L.formError($('#nf'), 'Uploading media needs a connection. Remove the file to save the note offline.');
+        if (!L.isOnline()) {
+          return L.queueUpload(file, 'athlete_id=' + a.id + '&visibility=' + vis, file.name + ' for ' + a.name).then(saveNote, function () { L.formError($('#nf'), 'This browser can\u2019t store the file offline. Remove it to save the note, or try again with a connection.'); });
+        }
         pendingUpload = pendingUpload || L.uuid();
         var prog = $('#nprog'); prog.hidden = false;
         $('#nprog-t').textContent = 'Uploading ' + file.name;
@@ -1271,6 +1308,12 @@
         row.innerHTML = '<span class="small">' + h(file.name) + ' · <span class="pc">0%</span></span><div class="progress"><i></i></div>';
         $('#uploads').appendChild(row);
         function go() {
+          if (!L.isOnline()) {
+            L.queueUpload(file, 'post_id=' + p.id, file.name + ' for \u201c' + (f.title || 'post') + '\u201d').then(function () {
+              $('.pc', row).textContent = 'Saved on this device. It uploads when you\u2019re back online.';
+            }, function () { $('.pc', row).textContent = 'Offline, and this browser can\u2019t hold the file. Try again with a connection.'; });
+            return;
+          }
           api.upload(file, 'post_id=' + p.id, function (x) { $('i', row).style.width = Math.round(x * 100) + '%'; $('.pc', row).textContent = Math.round(x * 100) + '%'; }, uid)
             .then(function (m) {
               p.media.push(m);
@@ -2040,6 +2083,8 @@
   if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
 
   // Confirm the session is still valid, then render.
+  var META = Store.get('meta', {});
+  api.request('GET', '/api/meta').then(function (m) { META = m; Store.set('meta', m); if ($('#gbtn') && m.google) $('#gbtn').hidden = false; }, function () {});
   if (ME) api.request('GET', '/api/me').then(function (m) { setMe(m); }, function (err) { if (err.status === 401) setMe(null); }).then(function () { route(); pollBell(); });
   else route();
   L.status(); L.flush();
