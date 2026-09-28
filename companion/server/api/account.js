@@ -9,6 +9,11 @@ module.exports = function account(r, { db, auth, config }) {
   const loginLimit = limiter(10, 15 * 60 * 1000);
   const resetLimit = limiter(5, 60 * 60 * 1000);
 
+  /* Behind a hosting proxy (TRUST_PROXY=1) the client is the first X-Forwarded-For hop. */
+  function clientIp(req) {
+    if (config.trustProxy) { const f = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim(); if (f) return f; }
+    return req.socket.remoteAddress || '';
+  }
   function email(v) {
     const e = str(v, 'email', { required: true, max: 200 }).toLowerCase();
     if (!EMAIL.test(e)) throw new HttpError(400, 'Enter a valid email address.');
@@ -40,7 +45,7 @@ module.exports = function account(r, { db, auth, config }) {
 
   r.post('/api/auth/login', ({ body, res, req }) => {
     const e = email(body.email);
-    const key = (req.socket.remoteAddress || '') + '|' + e;
+    const key = clientIp(req) + '|' + e;
     if (!loginLimit(key)) throw new HttpError(429, 'Too many sign-in attempts. Wait 15 minutes and try again.');
     const u = db.prepare('SELECT * FROM users WHERE email = ?').get(e);
     if (!u || typeof body.password !== 'string' || !verifyPassword(body.password, u.password_hash)) throw new HttpError(401, 'Email or password is incorrect.');
@@ -118,7 +123,7 @@ module.exports = function account(r, { db, auth, config }) {
   }
   r.post('/api/auth/reset/request', ({ body, req }) => {
     const e = email(body.email);
-    if (!resetLimit((req.socket.remoteAddress || '') + '|' + e)) throw new HttpError(429, 'Too many reset requests. Try again in an hour.');
+    if (!resetLimit(clientIp(req) + '|' + e)) throw new HttpError(429, 'Too many reset requests. Try again in an hour.');
     const u = db.prepare('SELECT id, email FROM users WHERE email = ?').get(e);
     if (u) config.onResetLink(u.email, issueReset(u.id));
     return withStatus(202, { ok: true });

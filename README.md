@@ -81,6 +81,14 @@ It needs Node 22.13 or newer and has no dependencies.
 It installs to the home screen and works offline. Scores, notes, reflections
 and drafts save on the device and sync without duplicates.
 
+**Deploying (Render).** `render.yaml` at the repo root is a Render Blueprint.
+In the Render dashboard choose **New → Blueprint**, connect this repo and pick
+the branch. When asked, set `ADMIN_EMAIL` (the account that becomes admin) and
+`PUBLIC_URL` (for example `https://the-lab.onrender.com`). It runs on the
+Starter plan with a 1 GB disk at `/data` for the database and uploads, about
+$7–8 a month. Render's free plan has no disk, so data would be lost on every
+restart.
+
 - `companion/docs/API.md` is the contract the website should build against.
 - `companion/docs/PARITY.md` lists what's done, what needs infrastructure, and
   what remains before the iOS and Android releases.

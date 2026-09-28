@@ -1,0 +1,30 @@
+# Render Blueprint for THE LAB app (companion/).
+# Render dashboard -> New -> Blueprint -> pick this repo. You'll be asked for
+# ADMIN_EMAIL and PUBLIC_URL. The disk keeps the database and uploads.
+services:
+  - type: web
+    name: the-lab
+    runtime: docker
+    rootDir: companion
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: lab-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: LAB_DB
+        value: /data/lab.db
+      - key: LAB_MEDIA_DIR
+        value: /data/media
+      - key: SECURE_COOKIES
+        value: "1"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: PUBLIC_URL
+        sync: false

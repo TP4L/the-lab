@@ -16,6 +16,7 @@ function createApp(opts = {}) {
 
   const config = {
     adminEmail: opts.adminEmail || '',
+    trustProxy: !!opts.trustProxy,
     publicUrl: (opts.publicUrl || '').replace(/\/$/, ''),
     mediaDir,
     onResetLink: opts.onResetLink || ((email, link) => console.log(`[password reset] ${email}: ${link}`)),
@@ -128,7 +129,8 @@ if (require.main === module) {
     mediaDir: process.env.LAB_MEDIA_DIR,
     adminEmail: process.env.ADMIN_EMAIL || '',
     publicUrl: process.env.PUBLIC_URL || `http://localhost:${port}`,
-    secureCookies: process.env.SECURE_COOKIES === '1'
+    secureCookies: process.env.SECURE_COOKIES === '1',
+    trustProxy: process.env.TRUST_PROXY === '1'
   });
   server.listen(port, () => console.log(`THE LAB running at http://localhost:${port}`));
 }
