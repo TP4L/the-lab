@@ -113,11 +113,14 @@ module.exports = function training(r, { db, auth }) {
     const items = list(body.items, 'items', { max: MAX_ITEMS, item: itemFields });
     if (!items.length) throw new HttpError(400, 'Add at least one drill.');
     const startedAt = isoTime(body.started_at, 'started_at') || now();
+    const assignment = body.assignment_id ? db.prepare('SELECT * FROM assignments WHERE id = ?').get(int(body.assignment_id, 'assignment_id', { min: 1 })) : null;
+    if (body.assignment_id && (!assignment || !athleteIds.includes(assignment.athlete_id))) throw new HttpError(400, 'That assignment isn\u2019t for an athlete in this session.');
     tx(db, () => {
       db.prepare('INSERT INTO training_sessions (id, coach_id, title, started_at) VALUES (?, ?, ?, ?)').run(id, user.id, title, startedAt);
       athleteIds.forEach((aid, i) => db.prepare('INSERT INTO training_athletes (session_id, athlete_id, slot) VALUES (?, ?, ?)').run(id, aid, i + 1));
       items.forEach((it, i) => db.prepare('INSERT INTO training_items (session_id, idx, name, measure, target, instructions) VALUES (?, ?, ?, ?, ?, ?)')
         .run(id, i, it.name, it.measure, it.target, it.instructions));
+      if (assignment) db.prepare("UPDATE assignments SET status = 'done', session_id = ?, completed_at = ? WHERE id = ?").run(id, now(), assignment.id);
     });
     return withStatus(201, loadSession(db, id));
   });
@@ -125,9 +128,20 @@ module.exports = function training(r, { db, auth }) {
   r.get('/api/training/sessions/:id', ({ user, params }) => {
     const s = sessionAccess(user, uuid(params.id, 'id'));
     const full = loadSession(db, s.id);
+    const coachView = s.coach_id === user.id || user.roles.includes('admin');
+    const mine = auth.ownAthleteId(user);
+    // Notes written during this session; athletes see only what's shared with them.
+    full.notes = db.prepare(`SELECT n.id, n.athlete_id, n.kind, n.visibility, n.body, n.created_at, u.name AS author, a.name AS athlete_name
+      FROM notes n LEFT JOIN users u ON u.id = n.author_id JOIN athletes a ON a.id = n.athlete_id WHERE n.session_id = ? ORDER BY n.created_at`).all(s.id)
+      .filter(n => coachView || (n.athlete_id === mine && n.visibility === 'shared'));
+    // Games recorded from this session.
+    full.matches = db.prepare('SELECT id, status, winner FROM matches WHERE session_id = ? ORDER BY played_at').all(s.id).map(m => {
+      const ps = db.prepare('SELECT mp.team, mp.athlete_id, COALESCE(a.name, mp.guest_name) AS name FROM match_players mp LEFT JOIN athletes a ON a.id = mp.athlete_id WHERE mp.match_id = ? ORDER BY mp.team, mp.slot').all(m.id);
+      const gs = db.prepare('SELECT team1, team2 FROM match_games WHERE match_id = ? ORDER BY idx').all(m.id).map(g => [g.team1, g.team2]);
+      return { ...m, players: ps, games: gs };
+    }).filter(m => coachView || m.players.some(p => p.athlete_id === mine));
     // An athlete viewing a group session sees only their own row.
-    if (s.coach_id !== user.id && !user.roles.includes('admin')) {
-      const mine = auth.ownAthleteId(user);
+    if (!coachView) {
       full.summary = full.summary.filter(c => c.athlete_id === mine);
       full.events = full.events.filter(e => e.athlete_id === mine);
       full.athletes = full.athletes.filter(a => a.id === mine);

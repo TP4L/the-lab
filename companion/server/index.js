@@ -47,6 +47,7 @@ function createApp(opts = {}) {
   require('./api/publishing.js')(r, ctx);
   require('./api/play.js')(r, ctx);
   require('./api/learn.js')(r, ctx);
+  require('./api/coaching.js')(r, ctx);
   require('./api/notify.js').routes(r, ctx);
 
   /* Admin: list and download nightly backups (for an off-site copy). */

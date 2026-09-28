@@ -7,6 +7,7 @@ const PREFS = {
   courts: 'Court assignments and rotations',
   up_next: 'You’re up next',
   feedback: 'Shared feedback from your coach',
+  training: 'Training assigned by your coach',
   matches: 'Match confirmations and corrections',
   events: 'Event registration and check-in',
   reminders: 'Reminders before events',

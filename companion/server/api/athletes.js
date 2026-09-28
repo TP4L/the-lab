@@ -178,6 +178,7 @@ module.exports = function athletes(r, ctx) {
       if (!m) throw new HttpError(400, 'Attached media must belong to this athlete.');
     }
     const sessionId = body.session_id ? uuid(body.session_id, 'session_id') : null;
+    if (sessionId && !db.prepare('SELECT 1 FROM training_athletes WHERE session_id = ? AND athlete_id = ?').get(sessionId, a.id)) throw new HttpError(400, 'That session didn\u2019t include this athlete.');
     // client_id makes offline retries idempotent: the same note is never saved twice.
     if (clientId) {
       const prior = db.prepare('SELECT * FROM notes WHERE author_id = ? AND client_id = ?').get(user.id, clientId);

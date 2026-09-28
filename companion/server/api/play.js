@@ -166,11 +166,20 @@ module.exports = function play(r, { db, auth, notifier }) {
       const dup = findDuplicate(inp);
       if (dup) throw new HttpError(409, 'This looks like a match that’s already recorded: same players and scores on the same day.', { duplicate_of: dup });
     }
+    let sessionId = null;
+    if (body.session_id) {
+      sessionId = uuid(body.session_id, 'session_id');
+      const sess = db.prepare('SELECT coach_id FROM training_sessions WHERE id = ?').get(sessionId);
+      const mine = auth.ownAthleteId(user);
+      if (!sess || !(sess.coach_id === user.id || (mine && db.prepare('SELECT 1 FROM training_athletes WHERE session_id = ? AND athlete_id = ?').get(sessionId, mine)))) throw new HttpError(400, 'You can only link matches to sessions you ran or played in.');
+    }
     const probe = { event_id: null };
-    const status = canVerify(user, probe, inp.teams.flat().map(p => ({ athlete_id: p.athlete_id }))) && !inp.teams.flat().some(p => p.athlete_id === auth.ownAthleteId(user)) ? 'verified' : 'recorded';
+    const ownId = auth.ownAthleteId(user);
+    const playing = !!ownId && inp.teams.flat().some(p => p.athlete_id === ownId);
+    const status = canVerify(user, probe, inp.teams.flat().map(p => ({ athlete_id: p.athlete_id }))) && !playing ? 'verified' : 'recorded';
     tx(db, () => {
       db.prepare(`INSERT INTO matches (id, recorded_by, kind, game_to, win_by, best_of, played_at, status, winner, note, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(id, user.id, inp.kind, inp.game_to, inp.win_by, inp.best_of, inp.played_at, status, decide(inp.games), inp.note, body.session_id ? uuid(body.session_id, 'session_id') : null);
+        .run(id, user.id, inp.kind, inp.game_to, inp.win_by, inp.best_of, inp.played_at, status, decide(inp.games), inp.note, sessionId);
       writePlayersGames(id, inp);
       log(id, user.id, 'recorded');
     });

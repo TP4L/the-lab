@@ -142,8 +142,12 @@
           d.events.map(function (e) { return eventRow({ id: e.id, title: e.title, starts_at: e.starts_at, location: e.location, status: e.status, my_state: e.state }); }).join('') +
           d.open_events.filter(function (o) { return !d.events.some(function (e) { return e.id === o.id; }); }).map(function (e) { return eventRow(Object.assign({ status: 'published' }, e)); }).join('') + '</div>'
           : '<div class="list"><p class="empty">No upcoming events. <a href="#/play/events">Browse events</a>.</p></div>') + '</div>' +
-        '<div class="stack" id="learning"></div>' +
+        '<div class="stack" id="assignedHome"></div><div class="stack" id="learning"></div>' +
         '<div class="stack"><p class="section-title">New in Field Notes</p>' + postList(d.posts) + '</div>';
+      if (ME.athlete_id) api.get('/api/me/assignments').then(function (as) {
+        var open = as.filter(function (a) { return a.status === 'open'; });
+        if (open.length && $('#assignedHome')) { $('#assignedHome').innerHTML = '<p class="section-title">Assigned to you</p>' + assignmentList(open, false); bindAssignments($('#assignedHome')); }
+      }, function () {});
       api.get('/api/me/learning').then(function (lr) {
         var going = lr.courses.filter(function (c) { return c.completed < c.lessons; });
         if (going.length && $('#learning')) $('#learning').innerHTML = '<p class="section-title">Continue learning</p><div class="course-grid">' + going.slice(0, 2).map(courseCard).join('') + '</div>';
@@ -205,11 +209,71 @@
       }
       app.innerHTML = offlineNote(rows) +
         head('Train', coach ? 'Sessions' : 'Your training', coach ? 'Run a session courtside. Scores save on this device first and sync when there’s signal.' : 'Every session your coach records against you.',
-          coach ? '<div class="row"><a class="btn" href="#/train/new?quick=1">Counter</a><a class="btn primary" href="#/train/new">New session</a></div>' : '') +
+          coach ? '<div class="row"><a class="btn ghost" href="#/coach/templates">Templates</a><a class="btn" href="#/train/new?quick=1">Counter</a><a class="btn primary" href="#/train/new">New session</a></div>' : '') +
+        '<div class="stack" id="assigned"></div>' +
         (live.length ? '<div class="stack"><p class="section-title">Live</p><div class="list">' + live.map(row).join('') + '</div></div>' : '') +
         '<div class="stack"><p class="section-title">History</p>' + (done.length ? '<div class="list">' + done.map(row).join('') + '</div>' : '<div class="list"><p class="empty">No completed sessions yet.</p></div>') + '</div>';
+      if (ME.athlete_id) api.get('/api/me/assignments').then(function (as) {
+        if (!as.length || !$('#assigned')) return;
+        $('#assigned').innerHTML = '<p class="section-title">Assigned to you</p>' + assignmentList(as, false);
+        bindAssignments($('#assigned'));
+      }, function () {});
     });
   };
+  function assignmentList(as, coachView, athleteId) {
+    return '<div class="list">' + as.map(function (a) {
+      return '<div class="li"><span class="who"><span class="lesson-dot' + (a.status === 'done' ? ' done' : '') + '" aria-hidden="true">' + (a.status === 'done' ? '✓' : '') + '</span><span class="main-col"><span class="t small">' + h(a.title) + '</span><span class="d">' +
+        (a.due_on ? 'Due ' + h(new Date(a.due_on + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })) + ' · ' : '') + (a.template_items ? a.template_items.length + ' drills' : '') + (a.coach ? ' · ' + h(a.coach) : '') + (a.note ? ' · ' + h(a.note) : '') + '</span></span></span>' +
+        '<span class="side row">' + (a.session_id ? '<a class="btn sm ghost" href="#/train/' + h(a.session_id) + '">Session</a>' : '') +
+        (coachView && a.status === 'open' ? '<a class="btn sm primary" href="#/train/new?athlete=' + athleteId + '&assignment=' + a.id + '">Run now</a>' : '') +
+        '<button class="btn sm ghost" type="button" data-asg="' + a.id + '" data-to="' + (a.status === 'done' ? 'open' : 'done') + '">' + (a.status === 'done' ? 'Reopen' : 'Mark done') + '</button>' +
+        (coachView ? '<button class="btn sm ghost" type="button" data-asgdel="' + a.id + '" aria-label="Remove assignment">✕</button>' : '') + '</span></div>';
+    }).join('') + '</div>';
+  }
+  function bindAssignments(root) {
+    $$('[data-asg]', root).forEach(function (b) { b.addEventListener('click', function () {
+      api.request('PUT', '/api/assignments/' + b.getAttribute('data-asg'), { status: b.getAttribute('data-to') }).then(route, function (err) { L.toast(err.message); });
+    }); });
+    $$('[data-asgdel]', root).forEach(function (b) { L.armed(b, 'Remove?', function () { api.request('DELETE', '/api/assignments/' + b.getAttribute('data-asgdel')).then(route); }); });
+  }
+
+  /* ---------- templates (coaches) ---------- */
+  views.templates = function () {
+    if (!has('coach')) return forbidden('Templates are for coaches.');
+    return api.get('/api/templates').then(function (ts) {
+      app.innerHTML = '<a class="back" href="#/coach">← Coach Workspace</a>' + head('Coach Workspace', 'Session templates', 'Reusable sets of drills. Start a session from one, or assign one to an athlete.', '<a class="btn primary" href="#/coach/templates/new">New template</a>') +
+        (ts.length ? '<div class="list">' + ts.map(function (t) { return '<a class="li" href="#/coach/templates/' + t.id + '"><span class="main-col"><span class="t">' + h(t.name) + '</span><span class="d">' + t.items.map(function (i) { return h(i.name); }).join(' · ') + '</span></span><span class="side">' + h(t.author || '') + '</span></a>'; }).join('') + '</div>' : '<div class="list"><p class="empty">No templates yet.</p></div>');
+    });
+  };
+  views.templateEdit = function (id) {
+    if (!has('coach')) return forbidden('Templates are for coaches.');
+    return (id === 'new' ? Promise.resolve({ name: '', items: TEMPLATE_4.map(function (x) { return Object.assign({}, x); }) }) : api.get('/api/templates/' + id)).then(function (t) {
+      var items = t.items.map(function (x) { return Object.assign({}, x); });
+      app.innerHTML = '<a class="back" href="#/coach/templates">← Templates</a>' + head('Template', id === 'new' ? 'New template' : t.name, '', id !== 'new' ? '<button class="btn danger" type="button" id="del">Delete</button>' : '') +
+        '<form class="form" id="tf" novalidate><div class="field"><label class="flabel" for="n">Name</label><input type="text" id="n" maxlength="120" value="' + h(t.name) + '" placeholder="Kitchen day"></div>' +
+        '<div class="field"><span class="flabel">Drills <span class="hint">1–10</span></span><div class="list" id="items"></div><div class="row"><button class="btn ghost" type="button" id="add-item">Add drill</button></div></div>' +
+        '<div class="row"><button class="btn primary" type="submit">Save template</button></div></form>';
+      function paint() {
+        $('#items').innerHTML = items.map(function (it, i) {
+          return '<div class="item-edit"><input type="text" aria-label="Drill ' + (i + 1) + ' name" data-k="name" data-i="' + i + '" value="' + h(it.name) + '" placeholder="Drill or situation">' +
+            '<select aria-label="Measured by" data-k="measure" data-i="' + i + '">' + Object.keys(MEASURES).map(function (m) { return '<option value="' + m + '"' + (m === it.measure ? ' selected' : '') + '>' + MEASURES[m] + '</option>'; }).join('') + '</select>' +
+            '<span class="ctl row"><button class="btn sm ghost" type="button" data-rm="' + i + '" aria-label="Remove drill"' + (items.length < 2 ? ' disabled' : '') + '>✕</button></span>' +
+            '<div class="more-f"><input type="text" aria-label="Target" data-k="target" data-i="' + i + '" value="' + h(it.target || '') + '" placeholder="Target"><input type="text" aria-label="Instructions" data-k="instructions" data-i="' + i + '" value="' + h(it.instructions || '') + '" placeholder="Instructions (optional)"></div></div>';
+        }).join('');
+        $('#add-item').disabled = items.length >= 10;
+      }
+      ['input', 'change'].forEach(function (ev) { $('#items').addEventListener(ev, function (e) { var i = e.target.getAttribute('data-i'); if (i !== null) items[+i][e.target.getAttribute('data-k')] = e.target.value; }); });
+      $('#items').addEventListener('click', function (e) { var b = e.target.closest('[data-rm]'); if (b) { items.splice(+b.getAttribute('data-rm'), 1); paint(); } });
+      $('#add-item').addEventListener('click', function () { if (items.length < 10) { items.push({ name: '', measure: 'reps', target: '' }); paint(); } });
+      paint();
+      $('#tf').addEventListener('submit', function (e) {
+        e.preventDefault();
+        api.request(id === 'new' ? 'POST' : 'PUT', '/api/templates' + (id === 'new' ? '' : '/' + id), { name: $('#n').value, items: items }).then(function () { L.toast('Template saved'); location.hash = '#/coach/templates'; }, function (err) { L.formError($('#tf'), err.message); });
+      });
+      if ($('#del')) L.armed($('#del'), 'Tap again to delete', function () { api.request('DELETE', '/api/templates/' + id).then(function () { location.hash = '#/coach/templates'; }, function (err) { L.toast(err.message); }); });
+    });
+  };
+
 
   var TEMPLATE_4 = [
     { name: 'Third-shot drops to the kitchen', measure: 'reps', target: '7 of 10' },
@@ -221,14 +285,21 @@
   views.trainNew = function (_, query) {
     if (!has('coach')) return forbidden('Only coaches can run sessions.');
     var quick = query.quick === '1';
-    return api.get('/api/athletes').then(function (roster) {
+    var tplReq = api.get('/api/templates').then(null, function () { return []; });
+    var asgReq = query.assignment && query.athlete ? api.get('/api/athletes/' + query.athlete + '/assignments').then(null, function () { return []; }) : Promise.resolve([]);
+    return Promise.all([api.get('/api/athletes'), tplReq, asgReq]).then(function (res) {
+      var roster = res[0], templates = res[1];
+      var assignment = res[2].filter(function (a) { return String(a.id) === String(query.assignment); })[0] || null;
       var items = quick ? [{ name: 'Make / miss', measure: 'reps', target: '' }] : TEMPLATE_4.map(function (x) { return Object.assign({}, x); });
+      if (assignment && assignment.template_items) items = assignment.template_items.map(function (x) { return Object.assign({}, x); });
       var preset = query.athlete ? [Number(query.athlete)] : [];
       app.innerHTML = '<a class="back" href="#/train">← Train</a>' +
         head('Scoreboard Studio', quick ? 'Make / miss counter' : 'New session', quick ? 'Pick who’s hitting. One big counter each.' : 'Pick up to 8 athletes and 1–10 drills or situations. Four athletes get one large square each.') +
         offlineNote(roster) +
+        (assignment ? '<div class="banner"><span>Running assigned training: <b>' + h(assignment.title) + '</b>' + (assignment.note ? '. ' + h(assignment.note) : '') + '</span></div>' : '') +
         '<form class="form" id="f" novalidate>' +
-        '<div class="field"><label class="flabel" for="t">Title</label><input type="text" id="t" maxlength="120" value="' + h(quick ? 'Counter · ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Session · ' + new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })) + '"></div>' +
+        (!quick && templates.length ? '<div class="field"><label class="flabel" for="tpl">Start from a template</label><select id="tpl"><option value="">Default drills</option>' + templates.map(function (t) { return '<option value="' + t.id + '">' + h(t.name) + ' (' + t.items.length + ')</option>'; }).join('') + '</select></div>' : '') +
+        '<div class="field"><label class="flabel" for="t">Title</label><input type="text" id="t" maxlength="120" value="' + h(assignment ? assignment.title : quick ? 'Counter · ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Session · ' + new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })) + '"></div>' +
         '<div class="field"><span class="flabel">Athletes <span class="hint" id="cnt"></span></span>' +
         (roster.length ? '<input type="search" id="q" placeholder="Search athletes" aria-label="Search athletes"><div class="pick" id="pick">' + roster.map(function (a) {
           return '<label data-name="' + h(a.name.toLowerCase()) + '"><input type="checkbox" value="' + a.id + '"' + (preset.indexOf(a.id) >= 0 ? ' checked' : '') + '> ' + h(a.name) + '</label>';
@@ -257,6 +328,13 @@
       if ($('#pick')) $('#pick').addEventListener('change', count);
       if ($('#q')) $('#q').addEventListener('input', function () { var q = this.value.toLowerCase(); $$('#pick label').forEach(function (l) { l.hidden = l.getAttribute('data-name').indexOf(q) < 0; }); });
       paintItems(); count();
+      if ($('#tpl')) $('#tpl').addEventListener('change', function () {
+        var v = this.value;
+        var t = templates.filter(function (x) { return String(x.id) === v; })[0];
+        items = (t ? t.items : TEMPLATE_4).map(function (x) { return Object.assign({}, x); });
+        if (t) $('#t').value = t.name;
+        paintItems();
+      });
 
       $('#f').addEventListener('submit', function (e) {
         e.preventDefault();
@@ -274,7 +352,7 @@
           events: []
         };
         Store.set('session:' + id, local);
-        L.queue({ method: 'POST', path: '/api/training/sessions', body: { id: id, title: local.title, athletes: ids, items: clean, started_at: started }, label: 'Start “' + local.title + '”' });
+        L.queue({ method: 'POST', path: '/api/training/sessions', body: { id: id, title: local.title, athletes: ids, items: clean, started_at: started, assignment_id: assignment && ids.indexOf(assignment.athlete_id) >= 0 ? assignment.id : undefined }, label: 'Start “' + local.title + '”' });
         location.hash = '#/train/' + id + '/live';
       });
     });
@@ -286,7 +364,7 @@
     return api.get('/api/training/sessions/' + id).then(function (srv) {
       var seen = {}, events = [];
       srv.events.concat(local ? local.events : []).forEach(function (e) { if (!seen[e.id]) { seen[e.id] = 1; events.push(e); } });
-      var merged = { id: srv.id, title: srv.title, status: srv.status, version: srv.version, started_at: srv.started_at, items: srv.items, athletes: srv.athletes, events: events, coach_id: srv.coach_id };
+      var merged = { id: srv.id, title: srv.title, status: srv.status, version: srv.version, started_at: srv.started_at, items: srv.items, athletes: srv.athletes, events: events, coach_id: srv.coach_id, notes: srv.notes || [], matches: srv.matches || [] };
       if (local && local.status === 'complete' && srv.status === 'live') merged.status = 'complete';
       Store.set('session:' + id, merged);
       return merged;
@@ -419,9 +497,28 @@
           var m = 0, t = 0; s.items.forEach(function (it) { if (it.measure === 'reps') { var c = cells[it.idx + ':' + a.id]; m += c.makes; t += c.attempts; } });
           return '<div class="tile"><span class="l">' + h(a.name) + '</span><span class="n">' + (t ? Math.round(m / t * 100) + '%' : '—') + '</span><span class="s">' + m + ' of ' + t + ' makes</span></div>';
         }).join('') + '</div>' : '') +
-        (coach ? '<div class="row"><a class="btn ghost" href="#/coach/' + s.athletes[0].id + '">Add feedback in Coach Workspace</a></div>' : '');
+        '<div class="stack"><p class="section-title">Games from this session</p>' + ((s.matches || []).length ? '<div class="list">' + s.matches.map(function (m) {
+          var names = function (t) { return m.players.filter(function (p) { return p.team === t; }).map(function (p) { return h(p.name); }).join(' & '); };
+          return '<a class="li" href="#/play/match/' + h(m.id) + '"><span class="main-col"><span class="t small">' + names(1) + ' <span class="muted">vs</span> ' + names(2) + '</span><span class="d mono">' + h(m.games.map(function (g) { return g.join('–'); }).join(', ')) + '</span></span></a>';
+        }).join('') + '</div>' : '<div class="list"><p class="empty">No games recorded from this session.</p></div>') +
+        '<div class="row"><a class="btn ghost" href="#/play/match/new?session=' + h(id) + '">Record a game</a></div></div>' +
+        '<div class="stack"><p class="section-title">Session notes</p>' + ((s.notes || []).length ? '<div class="list">' + s.notes.map(function (n) {
+          return '<div class="note ' + (n.visibility === 'private' ? 'private' : '') + '"><p class="body">' + h(n.body) + '</p><p class="meta">' + (n.kind === 'reflection' ? '<span class="vis reflection">Reflection</span>' : n.visibility === 'private' ? '<span class="vis private">Private · coaches only</span>' : '<span class="vis shared">Shared</span>') + '<span>' + h(n.athlete_name) + '</span><span>' + h(n.author || '') + '</span></p></div>';
+        }).join('') + '</div>' : '<div class="list"><p class="empty">No notes on this session yet.</p></div>') +
+        (coach ? '<form class="card form" id="snf" novalidate><div class="form-grid"><div class="field"><label class="flabel" for="sna">Athlete</label><select id="sna">' + s.athletes.map(function (a) { return '<option value="' + a.id + '">' + h(a.name) + '</option>'; }).join('') + '</select></div>' +
+          '<div class="field"><label class="flabel" for="snv">Who can see it</label><select id="snv"><option value="private">Private · coaches only</option><option value="shared">Shared with athlete</option></select></div></div>' +
+          '<div class="field"><label class="flabel" for="snb">Note</label><textarea id="snb" maxlength="5000"></textarea></div><div class="row"><button class="btn primary" type="submit">Add note</button></div></form>' : '') + '</div>';
+      if ($('#snf')) $('#snf').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var text = $('#snb').value.trim(); if (!text) return L.formError($('#snf'), 'Write the note first.');
+        var aid = $('#sna').value;
+        L.queue({ method: 'POST', path: '/api/athletes/' + aid + '/notes', body: { body: text, visibility: $('#snv').value, session_id: id, client_id: L.uuid() }, kind: 'coach', label: 'Session note' });
+        L.toast(L.isOnline() ? 'Note saved' : 'Saved on this device. It’ll sync when you’re online.');
+        setTimeout(route, 400);
+      });
     });
   };
+
 
   /* ================= LEARN ================= */
   var learnLane = '', learnTab = 'notes';
@@ -875,7 +972,7 @@
   views.coach = function () {
     if (!has('coach')) return forbidden('Coach Workspace is for coaches.');
     return api.get('/api/athletes').then(function (list) {
-      app.innerHTML = offlineNote(list) + head('Coach Workspace', 'Athletes', list.length + ' on your roster', '<a class="btn primary" href="#/coach/new">New athlete</a>') +
+      app.innerHTML = offlineNote(list) + head('Coach Workspace', 'Athletes', list.length + ' on your roster', '<div class="row"><a class="btn ghost" href="#/coach/templates">Templates</a><a class="btn ghost" href="#/cohorts">Cohorts</a><a class="btn primary" href="#/coach/new">New athlete</a></div>') +
         '<input type="search" id="q" placeholder="Search athletes" aria-label="Search athletes">' +
         '<div class="list" id="roster">' + (list.length ? list.map(function (a) {
           return '<a class="li" href="#/coach/' + a.id + '" data-name="' + h(a.name.toLowerCase()) + '"><span class="who">' + avatar(a, 'sm') + '<span class="main-col"><span class="t">' + h(a.name) + '</span><span class="d">' + h(a.focus || 'No focus set') + '</span></span></span>' +
@@ -933,6 +1030,13 @@
         '<div class="field"><span class="flabel">Who can see it</span><div class="seg-btns" id="vis"><button type="button" data-v="private" aria-pressed="true">Private · coaches only</button><button type="button" data-v="shared" aria-pressed="false">Shared with athlete</button></div></div>' +
         '<div class="field"><label class="flabel" for="nfile">Photo or video <span class="hint">optional</span></label><input type="file" id="nfile" accept="image/*,video/*"><div class="upload-row" id="nprog" hidden><div class="progress"><i></i></div><span class="small muted" id="nprog-t"></span></div></div>' +
         '<div class="row"><button class="btn primary" type="submit">Save note</button></div></form>' +
+        '<form class="card form" id="af" novalidate><p class="section-title">Assign training</p><div class="form-grid">' +
+        '<div class="field"><label class="flabel" for="atpl">Template</label><select id="atpl"><option value="">No template</option></select></div>' +
+        '<div class="field"><label class="flabel" for="atitle">Title</label><input type="text" id="atitle" maxlength="120" placeholder="Defaults to the template name"></div>' +
+        '<div class="field"><label class="flabel" for="adue">Due</label><input type="date" id="adue"></div></div>' +
+        '<div class="field"><label class="flabel" for="anote">Note</label><input type="text" id="anote" maxlength="2000" placeholder="What to focus on"></div>' +
+        '<div class="row"><button class="btn" type="submit">Assign</button></div></form>' +
+        '<div class="stack" id="asglist"></div>' +
         '<p class="section-title">Notes and reflections</p>' + notesHTML(notes, true) +
         '</div><div class="stack">' +
         '<form class="card form" id="pf" novalidate><p class="section-title">Development</p>' +
@@ -948,6 +1052,17 @@
         '<p class="small muted">Coaches: ' + h(p.coaches.map(function (c) { return c.name; }).join(', ')) + '</p>' +
         '</div></div>';
 
+      api.get('/api/templates').then(function (ts) { $('#atpl').innerHTML += ts.map(function (t) { return '<option value="' + t.id + '">' + h(t.name) + '</option>'; }).join(''); }, function () {});
+      api.get('/api/athletes/' + a.id + '/assignments').then(function (as) {
+        if (!as.length) return;
+        $('#asglist').innerHTML = '<p class="section-title">Assigned training</p>' + assignmentList(as, true, a.id);
+        bindAssignments($('#asglist'));
+      }, function () {});
+      $('#af').addEventListener('submit', function (e) {
+        e.preventDefault();
+        api.request('POST', '/api/athletes/' + a.id + '/assignments', { template_id: $('#atpl').value || undefined, title: $('#atitle').value, due_on: $('#adue').value || undefined, note: $('#anote').value })
+          .then(function () { L.toast('Assigned. ' + a.name.split(' ')[0] + ' was notified.'); route(); }, function (err) { L.formError($('#af'), err.status === 0 ? 'Assigning needs a connection.' : err.message); });
+      });
       var vis = 'private';
       $('#vis').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; vis = b.getAttribute('data-v'); $$('#vis button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); });
       var pendingUpload = null;
@@ -1256,7 +1371,7 @@
   }
 
   /* Record a match. Offline-safe: the device picks the ID. */
-  views.matchNew = function () {
+  views.matchNew = function (_, query) {
     return api.get('/api/me').then(function (m) {
       setMe(m);
       if (!m.athlete_id && !has('coach')) { app.innerHTML = head('Record match', 'Set up your profile first', 'Matches attach to your athlete profile.') + '<div class="row"><a class="btn primary" href="#/profile">Go to Profile</a></div>'; return; }
@@ -1272,7 +1387,7 @@
               '<input type="text" id="' + id + '" list="roster" placeholder="Player ID (LAB-00012) or guest name" autocomplete="off">') +
             '<div class="seg-btns sm" data-side="' + id + '"><button type="button" data-v="" aria-pressed="true">Side?</button><button type="button" data-v="left" aria-pressed="false">Left</button><button type="button" data-v="right" aria-pressed="false">Right</button></div></div>';
         }
-        app.innerHTML = '<a class="back" href="#/play">← Play</a>' + head('Play', 'Record a match', 'Your opponents get a request to confirm the score.') +
+        app.innerHTML = '<a class="back" href="' + (query.session ? '#/train/' + h(query.session) : '#/play') + '">\u2190 ' + (query.session ? 'Session' : 'Play') + '</a>' + head('Play', 'Record a match', query.session ? 'This game will be linked to the training session.' : 'Your opponents get a request to confirm the score.') +
           (roster.length ? '<datalist id="roster">' + roster.map(function (a) { return '<option value="LAB-' + ('00000' + a.id).slice(-5) + '">' + h(a.name) + '</option>'; }).join('') + '</datalist>' : '<datalist id="roster"></datalist>') +
           '<form class="form" id="mf" novalidate>' +
           '<div class="form-grid"><div class="field"><span class="flabel">Type</span><div class="seg-btns" data-k="kind">' + Object.keys(MATCH_KIND).map(function (k) { return '<button type="button" data-v="' + k + '" aria-pressed="' + (st.kind === k) + '">' + MATCH_KIND[k] + '</button>'; }).join('') + '</div></div>' +
@@ -1327,7 +1442,7 @@
             games.push([Number(a), Number(b)]);
           }
           if (!games.length) return L.formError($('#mf'), 'Enter the score.');
-          var body = { id: L.uuid(), kind: st.kind, game_to: st.game_to, win_by: st.win_by, best_of: st.best_of, teams: teams, games: games, note: $('#note').value, played_at: new Date($('#when').value).toISOString() };
+          var body = { id: L.uuid(), session_id: query.session || undefined, kind: query.session ? 'training' : st.kind, game_to: st.game_to, win_by: st.win_by, best_of: st.best_of, teams: teams, games: games, note: $('#note').value, played_at: new Date($('#when').value).toISOString() };
           if (confirmDup) body.confirm_duplicate = true;
           var label = teams.map(function (t) { return t.map(function (p) { return p.player_id || p.guest_name || myName.split(' ')[0]; }).join(' & '); }).join(' vs ');
           if (!L.isOnline()) {
@@ -1645,7 +1760,7 @@
     [/^\/play\/leaderboard$/, 'leaderboard', 'play'], [/^\/notifications$/, 'notifications', ''],
     [/^\/learn$/, 'learn', 'learn', true], [/^\/learn\/courses$/, 'learnCourses', 'learn', true], [/^\/learn\/course\/([\w-]+)$/, 'course', 'learn', true], [/^\/learn\/course\/([\w-]+)\/(\d+)$/, 'lesson', 'learn', true], [/^\/learn\/engine$/, 'engine', 'learn', true], [/^\/learn\/([\w-]+)$/, 'post', 'learn', true],
     [/^\/profile$/, 'profile', 'profile'],
-    [/^\/coach$/, 'coach', 'home'], [/^\/coach\/new$/, 'coachNew', 'home'], [/^\/coach\/(\d+)$/, 'coachAthlete', 'home'], [/^\/coach\/(\d+)\/code$/, 'coachCode', 'home'],
+    [/^\/coach$/, 'coach', 'home'], [/^\/coach\/new$/, 'coachNew', 'home'], [/^\/coach\/templates$/, 'templates', 'home'], [/^\/coach\/templates\/(new|\d+)$/, 'templateEdit', 'home'], [/^\/coach\/(\d+)$/, 'coachAthlete', 'home'], [/^\/coach\/(\d+)\/code$/, 'coachCode', 'home'],
     [/^\/studio\/courses$/, 'studioCourses', 'home'], [/^\/studio\/course\/(\d+)$/, 'courseEdit', 'home'], [/^\/studio\/lesson\/(\d+)$/, 'lessonEdit', 'home'],
     [/^\/cohorts$/, 'cohorts', 'learn'], [/^\/cohorts\/(\d+)$/, 'cohort', 'learn'],
     [/^\/studio$/, 'studio', 'home'], [/^\/studio\/([\w-]+)$/, 'studioEdit', 'home'],

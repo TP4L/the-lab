@@ -345,7 +345,35 @@ ALTER TABLE media ADD COLUMN course_id INTEGER REFERENCES courses(id) ON DELETE 
 CREATE INDEX IF NOT EXISTS lessons_course ON lessons(course_id, position);
 `;
 
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN];
+/* Coaching: reusable session templates and training assigned to athletes. */
+const COACHING = `
+CREATE TABLE IF NOT EXISTS training_templates (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  items TEXT NOT NULL,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS assignments (
+  id INTEGER PRIMARY KEY,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  template_id INTEGER REFERENCES training_templates(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  due_on TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','done')),
+  session_id TEXT REFERENCES training_sessions(id) ON DELETE SET NULL,
+  assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS assignments_athlete ON assignments(athlete_id, status);
+CREATE INDEX IF NOT EXISTS notes_session ON notes(session_id);
+CREATE INDEX IF NOT EXISTS matches_session ON matches(session_id);
+`;
+
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');
