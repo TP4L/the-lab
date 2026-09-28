@@ -70,16 +70,23 @@ It needs Node 22.13 or newer and has no dependencies.
 
 | Tab | What's in it |
 |---|---|
-| **Home** | Current focus, recent sessions, notes from your coach, new Field Notes, quick actions, staff shortcuts. |
-| **Train** | Scoreboard Studio: 1–10 drills measured by make/miss, score, time or feel. One-player and four-player counters with undo, working offline. Session summaries. |
-| **Play** | Record matches (singles or doubles, sides, formats) with opponent confirmation, disputes, organizer verification and correction history. Events with registration, waitlists, QR check-in, rolling round robins (partners, opponents, left/right), live courts, standings, leaderboard. |
-| **Learn** | Field Notes (Quick Read, The Work, Field Study) and the decision engine. |
-| **Profile** | Player card with check-in QR, claiming a coach-made profile, goals, coach notes, reflections, results, account and privacy settings, account deletion. |
-| **Coach Workspace** | Roster, new profiles with claim codes, private vs shared notes, media, focus and plan. |
-| **Publishing Studio** | Drafts, uploads, preview, review, schedule, publish, revisions. |
+| **Home** | Current focus, assigned training, recent sessions, notes from your coach, upcoming events, continue learning, new Field Notes, staff shortcuts. |
+| **Train** | Scoreboard Studio: 1–10 drills measured by make/miss, score, time or feel. One-player and four-player counters, custom scoreboards (timed, best-of), templates, assigned training, session notes, voice scoring (experimental). |
+| **Play** | Matches with confirmation, disputes, verification and corrections. Events with registration, waitlists, QR check-in, rotating round robins or fixed-partner teams, knockout brackets, live courts, standings, leaderboard. |
+| **Learn** | Field Notes with rich text, courses and lessons (everyone, members or cohort), progress, saved posts, the decision engine. |
+| **Profile** | Player card with check-in QR, claiming, goals, coach notes, reflections, results, notification settings (including phone push), account and privacy, account deletion. |
+| **Coach Workspace** | Roster, claim codes, private vs shared notes, media, templates, assigning training, cohorts. |
+| **Publishing Studio** | Posts and courses: drafts, uploads, preview, review, schedule, publish, revisions. |
+| **Admin** | Roles, membership, reset links, system status, backups. |
 
 It installs to the home screen and works offline. Scores, notes, reflections
 and drafts save on the device and sync without duplicates.
+
+**Optional services** (set in Render, all off by default): `RESEND_API_KEY` and
+`MAIL_FROM` for password-reset emails; `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`
+and `VAPID_SUBJECT` for phone notifications (generate them with `node
+server/push.js --keys`); `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for
+Sign in with Google. Admin → System shows which are on.
 
 **Deploying (Render).** `render.yaml` at the repo root is a Render Blueprint.
 In the Render dashboard choose **New → Blueprint**, connect this repo and pick

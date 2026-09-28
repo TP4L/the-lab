@@ -234,7 +234,123 @@ Notifications are sent for:
 
 Phone push is not wired yet. See `PARITY.md`.
 
+## Rich text
+
+Post bodies and lesson bodies use a small Markdown subset:
+- `## heading` and `### subheading`
+- `**bold**`, `_italic_`
+- `- list` and `1. list`
+- `> quote` and `---`
+- `[text](https://…)` links. Only http(s), mailto and in-app `#/` links are
+  allowed.
+- `![caption](media:ID)` places an uploaded photo or video belonging to the
+  same post or lesson.
+
+The renderer is `web/markdown.js`. The server and the app share it, and it
+escapes everything first. `GET /posts/:slug` and lesson responses include
+`body_html`, ready to display on the website.
+
+## Learn
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/courses` | anyone | Published courses with `unlocked`, `completed` and `lessons`. Editors also see drafts. |
+| GET | `/courses/:slug` | anyone | Modules and lessons with `open` and `done`, plus `locked_reason`. |
+| GET | `/courses/:slug/lessons/:id` | see below | `body_html`, `video_media_id`, `prev`, `next`. Locked lessons return **403** `{locked:true}`. |
+| POST / DELETE | `/lessons/:id/complete` | viewer | Marks progress or clears it. |
+| GET | `/me/learning` | signed in | Membership, cohorts and started courses. |
+| GET | `/me/saved` | signed in | Saved posts. |
+| PUT / DELETE | `/me/saved/:postId` | signed in | Save or unsave a post. |
+| POST | `/studio/courses` | editor | Create a course. |
+| GET / PUT / DELETE | `/studio/courses/:id` | editor | `{title, summary, access, status, cover_media_id}` |
+| POST | `/studio/courses/:id/lessons` | editor | `{title, module, body, minutes, preview, position}` |
+| GET / PUT / DELETE | `/studio/lessons/:id` | editor | Also sets `video_media_id`. |
+| PUT | `/admin/users/:id/membership` | admin | `{status: active\|cancelled\|none, plan, expires_at, note}` |
+| GET / POST | `/cohorts` | coach, editor | `{title, course_id, starts_at, ends_at}` |
+| GET / PUT / DELETE | `/cohorts/:id` | coach, editor | |
+| POST | `/cohorts/:id/members` | coach, editor | `{emails: [...]}` returns `added` and `missing`. |
+| DELETE | `/cohorts/:id/members/:userId` | coach, editor | |
+
+**Course access** (`access`):
+- `public`: anyone signed in can open every lesson.
+- `members`: an active membership, or a cohort for the course.
+- `cohort`: a cohort for the course only.
+
+Lessons marked `preview` are open to everyone, including visitors who aren't
+signed in. Lesson video and images follow the same rules. Course covers are
+public once the course is published.
+
+## Coaching
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET / POST | `/templates` | coach | A shared library: `{name, items:[{name, measure, target, instructions}]}` |
+| GET / PUT / DELETE | `/templates/:id` | coach | Only the author (or an admin) can delete. |
+| GET / POST | `/athletes/:id/assignments` | coach (post), coach or self (get) | `{template_id?, title?, due_on?, note?}`. The athlete is notified. |
+| GET | `/me/assignments` | athlete | |
+| PUT | `/assignments/:id` | coach, athlete | `{status: open\|done}` |
+| DELETE | `/assignments/:id` | coach | |
+
+- Creating a session with `assignment_id` marks that assignment done and links
+  the session.
+- A note can carry `session_id`, which is checked against the session's
+  athletes. A match can carry `session_id` if you ran or played in the session.
+- `GET /training/sessions/:id` includes `notes` and `matches`. Athletes see
+  only what's shared with them.
+
+## Team events and brackets
+
+Events have `partner_mode`: `rotating` (a mixer) or `fixed` (teams).
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| POST | `/events/:id/register` | athlete | `{partner_player_id?}`. On fixed-partner events this signs up the partner and forms the team. |
+| POST | `/events/:id/teams` | organizer | `{p1, p2, name?}` |
+| POST | `/events/:id/teams/auto` | organizer | Pairs everyone registered who has no team. |
+| DELETE | `/events/:id/teams/:teamId` | organizer | Refused once the team has played. |
+| POST | `/events/:id/rounds` | organizer | On fixed-partner events, schedules whole teams. |
+| POST | `/events/:id/bracket` | organizer | `{seeding: standings\|order, size?, force?}`. Single elimination. |
+
+**Brackets:**
+- Top seeds get byes.
+- Winners advance as bracket matches are scored.
+- Correcting a score re-routes the next match while it's still unplayed.
+- `GET /events/:id` includes `teams`, `team_standings` and
+  `bracket {rounds, champion}`.
+
+## Phone notifications (Web Push)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/push/key` | The VAPID public key, or 404 if push isn't configured. |
+| POST | `/push/subscribe` | The browser's `PushSubscription.toJSON()`. |
+| POST | `/push/unsubscribe` | `{endpoint}` |
+| POST | `/push/test` | Sends a test notification to your devices. |
+
+Every in-app notification is also pushed to the person's devices, following
+their preferences. The payload is `{title, body, link}`. Generate keys with
+`node server/push.js --keys`.
+
+## Sign in with Google
+
+- `GET /auth/google/start` redirects to Google.
+- `GET /auth/google/callback` signs in and redirects to `/#/`.
+- Configure it with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The redirect
+  URI is `PUBLIC_URL/api/auth/google/callback`.
+- A verified Google email that matches an existing account signs in to that
+  account.
+- Google-only accounts (`has_password: false` on `/me`) can set a password.
+  They delete their account with `{confirm: "DELETE"}`.
+
+## Admin
+
+- `GET /admin/status`: which of email, push, Google and backups are on.
+- `GET /admin/backups`: lists nightly backups.
+- `GET /admin/backups/:date`: downloads a backup (a SQLite file).
+
 ## Other
 
-- `GET /home`: the signed-in user's Home tab in one call.
-- `GET /health`, `GET /meta`.
+- `GET /home`: the signed-in user's Home tab in one call, including open
+  events, items to confirm and unread notifications.
+- `GET /health`
+- `GET /meta`: `{lanes, google, push}`

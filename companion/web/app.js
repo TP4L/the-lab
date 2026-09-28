@@ -54,7 +54,7 @@
   var views = {};
 
   views.signin = function (_, query) {
-    app.innerHTML = '<div class="auth-wrap"><p class="brandmark">THE <span>LAB</span></p><p class="muted">Know what to work on, do the work, record what happened, know what comes next.</p>' +
+    app.innerHTML = '<div class="auth-wrap"><h1 class="brandmark">THE <span>LAB</span></h1><p class="muted">Know what to work on, do the work, record what happened, know what comes next.</p>' +
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
       '<a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
@@ -73,7 +73,7 @@
   };
 
   views.signup = function () {
-    app.innerHTML = '<div class="auth-wrap"><p class="brandmark">THE <span>LAB</span></p>' +
+    app.innerHTML = '<div class="auth-wrap"><h1 class="brandmark">THE <span>LAB</span></h1>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Create your account</p>' +
       '<div class="field"><label class="flabel" for="nm">Full name</label><input type="text" id="nm" autocomplete="name" maxlength="80" required></div>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required><p class="small muted">Use the email your coach has, so your profile and history connect.</p></div>' +
@@ -393,7 +393,7 @@
       app.innerHTML = '<div class="live">' +
         '<div class="live-head"><a class="back" href="#/train">← Train</a><span class="small muted mono" id="saved"></span></div>' +
         '<h1 style="font-size:22px">' + h(s.title) + '</h1>' +
-        '<div class="drill-tabs" role="tablist" id="tabs"></div>' +
+        '<div class="drill-tabs" role="group" aria-label="Drills" id="tabs"></div>' +
         '<p class="drill-info" id="info"></p>' +
         '<div id="board"></div>' +
         voiceBar() +
@@ -401,7 +401,7 @@
 
       function save() { Store.set('session:' + id, s); $('#saved').textContent = 'Saved on device · ' + s.events.length + ' taps'; }
       function tabs() {
-        $('#tabs').innerHTML = s.items.map(function (it, i) { return '<button type="button" role="tab" aria-pressed="' + (i === cur) + '" data-i="' + i + '">' + (i + 1) + '. ' + h(it.name) + '</button>'; }).join('');
+        $('#tabs').innerHTML = s.items.map(function (it, i) { return '<button type="button" aria-pressed="' + (i === cur) + '" data-i="' + i + '">' + (i + 1) + '. ' + h(it.name) + '</button>'; }).join('');
         var it = s.items[cur];
         $('#info').innerHTML = '<b>' + h(MEASURES[it.measure]) + '</b>' + (it.target ? ' · Target ' + h(it.target) : '') + (it.instructions ? ' · ' + h(it.instructions) : '');
       }
@@ -884,7 +884,7 @@
       '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
       '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20" value="' + h(a.rating) + '" placeholder="e.g. 4.0"></div></div>' +
       '<div class="row"><button class="btn" type="submit">Save</button></div></form>' +
-      '<div class="field"><span class="flabel">Profile photo</span><input type="file" id="photo" accept="image/*"><div class="upload-row" id="photo-prog" hidden><div class="progress"><i></i></div></div></div>' +
+      '<div class="field"><label class="flabel" for="photo">Profile photo</label><input type="file" id="photo" accept="image/*"><div class="upload-row" id="photo-prog" hidden><div class="progress"><i></i></div></div></div>' +
       '</div>' +
       '<div class="stack"><p class="section-title">Notes from your coach</p>' + notesHTML(coachNotes, false) +
       '<p class="section-title" id="reflect">My reflections</p>' +
@@ -1196,7 +1196,7 @@
       }
 
       function render() {
-        app.innerHTML = '<a class="back" href="#/studio">← Studio</a>' + banner +
+        app.innerHTML = '<a class="back" href="#/studio">← Studio</a>' + '<h1 class="sr-only">' + (isLocal ? 'New post' : 'Edit post') + '</h1>' + banner +
           '<div class="head-row"><div class="row"><span class="status ' + p.status + '">' + STATUS_LABEL[p.status] + '</span>' + (p.status === 'scheduled' ? '<span class="small mono">for ' + h(L.when(p.publish_at)) + '</span>' : '') + (p.status === 'published' ? '<a class="small" href="#/learn/' + h(p.slug) + '">View live →</a>' : '') + '</div><span class="small muted mono" id="savestate"></span></div>' +
           (p.review_note && p.status === 'draft' ? '<p class="flag"><b>Editor note.</b> ' + h(p.review_note) + '</p>' : '') +
           (liveNoEdit ? '<p class="flag"><b>This post is live.</b> Ask an editor to change it.</p>' : '') +

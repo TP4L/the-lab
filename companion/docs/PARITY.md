@@ -1,153 +1,135 @@
 # Feature parity checklist
 
-Status of THE LAB app against the build brief. Last updated: this build (core
-loop, Publishing Studio and Play, as an installable web app).
+THE LAB app against the build brief. The app is an installable web app,
+deployed on Render.
 
-- **Done:** works end to end and is covered by the automated tests or the
-  browser run.
-- **Infra:** the code is ready, but it needs a service or account to be set up.
-- **Next:** not built yet.
+- **Done:** works end to end, covered by the automated tests (`npm test`)
+  and the browser journey scripts in `test/e2e/`.
+- **Configure:** built and tested, but switched off until a key or account is
+  added in Render.
+- **Blocked:** needs access to something outside this repo.
+- **Next:** not built.
 
 ## 1. Connecting the ecosystem
 
 | Item | Status | Notes |
 |---|---|---|
-| Inspect the existing website, auth and database | **Blocked** | trainwiththelab.com is blocked by this environment's network policy. The "Sites" project ID isn't reachable with any tool here. `TP4L/the-lab-2` is a Supabase prototype with placeholder keys. |
-| One shared backend for website and app | Done | `companion/server` is that backend. The website should read and write through `docs/API.md` rather than keep its own copy. |
-| Migrate existing website accounts and data | Next | Needs an export from wherever the site stores data today. |
-| Security holes in `the-lab-2` schema | Flagged | Sign-up can choose `coach`, and users can update their own role. This backend grants roles only through an admin. |
+| One shared backend for website and app | Done | `docs/API.md` is the contract. The public feed returns `body_html`, so the website can show the same articles. |
+| Inspect the existing website, auth and database | Blocked | trainwiththelab.com is blocked by this environment's network policy, and the "Sites" project isn't reachable here. |
+| Migrate existing website accounts and content | Blocked | Needs an export from wherever the site stores data today. |
+| Point the website at this backend | Blocked | Whoever builds the site uses `docs/API.md`. |
+| Security holes in `TP4L/the-lab-2` | Flagged | Sign-up can pick `coach`, and users can raise their own role. This backend only grants roles through an admin. |
 
 ## 2. Design and navigation
 
 | Item | Status |
 |---|---|
-| Five tabs: Home, Train, Play, Learn, Profile | Done |
-| Home: focus, recent sessions, coach notes, new posts, quick actions | Done |
-| Upcoming events on Home | Done |
-| Staff entry to Coach Workspace, Publishing Studio, Admin | Done, role-aware |
+| Five tabs (Home, Train, Play, Learn, Profile), role-aware staff shortcuts | Done |
 | Loading, empty, error, permission-denied and offline states | Done |
-| Light and dark themes, keyboard focus, skip link, labelled controls | Done |
-| Full screen-reader audit on real devices | Next |
+| Light and dark themes | Done |
+| Accessibility: axe-core WCAG 2 A/AA plus best practice on 22 screens in both themes, zero violations | Done |
+| Screen-reader walkthrough on a real iPhone and Android device | Next (needs devices) |
 
 ## 3. Accounts and player profiles
 
 | Item | Status | Notes |
 |---|---|---|
-| Email and password sign-in | Done | |
-| Other sign-in methods (Google, Apple) | Next | Depends on what the website uses today. |
-| Secure profile claiming, no duplicates | Done | One-time code, optionally locked to an email, rate limited. |
-| Photo, name, hand, side, rating | Done | |
-| Goals (athlete), focus and plan (coach-owned) | Done | |
-| Session history and training results | Done | |
-| Game results | Done | Match history, W/L, status. |
-| Coach-shared notes, reflections, photos and videos | Done | |
-| Private coach notes kept separate, enforced on the server, media included | Done | Tested in journey 6. |
-| Player card with ID | Done | |
-| QR code for check-in | Done | Built-in encoder, checked against an independent decoder. |
-| Membership, cohort and course access | Next | |
-| Account recovery | Infra | Reset links work. Emailing them needs an email provider; until then admins issue links. |
-| Account deletion and privacy explanation | Done | |
+| Email and password, account recovery, account deletion, privacy explanation | Done | |
+| Password-reset emails | Configure | `RESEND_API_KEY` and `MAIL_FROM`. Until then, admins give out reset links. |
+| Sign in with Google | Configure | `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Links to an existing account by verified email. |
+| Sign in with Apple | Next | Needs an Apple Developer account and a signing key. Required by the App Store only if the iOS build offers Google sign-in. |
+| Claiming a coach-made profile with no duplicates | Done | |
+| Photo, hand, side, rating, goals, focus, plan, player card with QR | Done | |
+| Session history, training and game results | Done | |
+| Private coach notes kept separate, enforced on the server, media included | Done | |
+| Membership, cohort and course access | Done | Admins grant membership. See section 8 for payments. |
 
 ## 4. Coach Workspace
 
 | Item | Status |
 |---|---|
-| Search athletes, create profiles, claim codes | Done |
-| Ongoing notes with clear Private / Shared labels | Done |
-| Upload media with progress and retry | Done |
-| Edit focus and plan (assigning training) | Done |
-| Run individual or group sessions and record per athlete | Done |
+| Search athletes, create profiles, claim codes, notes (private or shared), media | Done |
+| Session templates, assigning training with a due date, "Run now" | Done |
+| Individual and group sessions, notes on a session, games from a session | Done |
 | Review previous sessions | Done |
-| Assign a training plan template to an athlete | Next |
 
 ## 5. Training and Scoreboard Studio
 
 | Item | Status | Notes |
 |---|---|---|
-| Session builder, 1–10 drills measured by reps, score, time or feel | Done | The brief says 4–10; the builder starts with 4 and allows fewer for quick counters. |
-| Targets, instructions, timestamps | Done | Every tap is timestamped. |
-| Notes and reflections per session | Partial | Notes can carry a `session_id` in the API; the UI adds notes on the athlete. |
-| Single-player make/miss counter | Done | |
-| Four-player counter, one large square each, separate make/miss areas | Done | |
-| Undo, accidental-tap recovery, autosave, resume after closing | Done | Tested in the browser, including offline. |
-| Session summary, individual and group | Done | |
-| Custom scoreboards with editable names and scoring rules | Next | |
-| Timed games, best-of formats | Next | Time measure with a stopwatch is done. |
-| Round-robin schedules | Done | Partners, opponents, left/right sides, per-court completion checks. |
-| Voice score entry (experimental) | Next | Must be tested on real devices with earbuds and music before being called reliable. |
+| Session builder: 1–10 drills measured by reps, score, time or feel; targets and instructions | Done | |
+| One-player and four-player make/miss counters, undo, autosave, resume, offline | Done | |
+| Custom scoreboards: 2–4 named sides, game to N, win by 1 or 2 | Done | |
+| Timed games and best-of 1/3/5/7 | Done | When time runs out with scores level, the next point wins. |
+| Round robins with partners, opponents and left/right sides | Done | In Events. |
+| Session summaries | Done | |
+| Voice score entry (experimental) | Done, not device-tested | Off by default. Every spoken score shows with Undo. **Not yet tested on real phones with earbuds or music.** Don't call it reliable until it is. |
 
 ## 6. Games and events
 
 | Item | Status | Notes |
 |---|---|---|
-| Record casual, training and competition matches: players, teams, sides, format, scores, date | Done | Singles and doubles; to 11/15/21, win by 1 or 2, best of 1/3/5. |
-| Link a match to an event | Done | |
-| Link a match to a training session | Partial | The API accepts `session_id`; the UI doesn't set it yet. |
-| Self-recorded, opponent-confirmed, organizer-verified, disputed | Done | Tested (journey 3 and match rules). |
-| Duplicate prevention | Done | Device IDs for retries; same players and scores within 12 hours prompts first. |
-| Correction history | Done | Every correction keeps the previous version and a reason. |
-| Event discovery, interest, registration, waitlist, participant lists | Done | |
-| QR check-in | Done | Camera scanning where the browser supports it (Chrome on Android). On iPhone Safari the organizer types the code under the QR. A native build adds scanning everywhere. |
-| Court assignments, rotations, live scores, standings | Done | Live scores refresh every 20 seconds on the event screen. |
-| Late arrivals and early departures under organizer control | Done | Check in or switch a player to "Left"; the next round adjusts. |
-| Leaderboards | Done | Confirmed and verified results only; opt-out setting. |
-| In-app notifications with deep links and per-type opt-in | Done | |
-| Phone push notifications | Infra | Web push needs VAPID keys and a push sender. On iOS it works only for home-screen installs (16.4+). Native builds use APNs/FCM. |
-| Reminders before sessions and events | Next | Needs a scheduler (cron) to send them at the right time. |
-| Team events (fixed partners), brackets | Next | |
+| Casual, training and competition matches, with sides, format and scores | Done | |
+| Self-recorded, opponent-confirmed, organizer-verified, disputed; correction history; duplicate checks | Done | |
+| Event discovery, interest, registration, waitlist, participants | Done | |
+| QR check-in | Done | Camera scanning where the browser supports it (Chrome on Android). Otherwise the organizer types the code shown under the QR. |
+| Rotating round robins, courts, live scores, standings, late arrivals and early departures | Done | |
+| Fixed-partner team events, partner sign-up, team standings | Done | |
+| Knockout brackets with byes and auto-advance | Done | |
+| Leaderboard with opt-out | Done | |
+| In-app notifications with deep links and preferences | Done | |
+| Reminders 24 hours and 1 hour before events | Done | |
+| Phone push notifications | Configure | `VAPID_*` keys. On iPhone, only when THE LAB is added to the Home Screen (iOS 16.4+). |
 
 ## 7. Publishing Studio
 
 | Item | Status |
 |---|---|
-| Create and edit posts in Quick Read, The Work, Field Study | Done |
-| Upload photos and short video, choose thumbnail | Done |
-| Titles, captions, tags, author credit | Done |
-| Preview, drafts, submit, return with note, schedule, publish | Done |
-| Edit published posts (editors), revision history, status shown | Done |
-| Contributor, editor and admin permissions, admin manages access | Done |
-| Same content on website and app | Done in the API. The website needs to render `/api/posts`. |
-| Upload progress, retry, draft recovery (including conflicts) | Done |
-| Recording video in-app | Partial: the file picker opens the camera on phones. |
-| Rich text (headings, links, inline images) | Next: bodies are plain paragraphs today. |
+| Quick Read, The Work, Field Study; drafts, review, schedule, publish, revisions | Done |
+| Rich text: headings, emphasis, lists, quotes, links, inline photos and video | Done |
+| Photo and video uploads with progress, retry and offline queue; draft recovery | Done |
+| Contributor, editor and admin permissions | Done |
+| Scheduled posts notify members when they go live | Done |
 
 ## 8. Learning and membership
 
-| Item | Status |
-|---|---|
-| Field Notes feed and reader, public preview | Done |
-| Courses, modules, cohorts, progress, saved posts | Next |
-| Booking and payments | Blocked: the existing flows need inspecting first. App-store rules also apply to in-app purchases in native builds. |
+| Item | Status | Notes |
+|---|---|---|
+| Courses, modules, lessons, video, free previews | Done | |
+| Access by everyone, members or cohort, enforced on media too | Done | |
+| Cohorts, progress tracking, continue learning, saved posts | Done | |
+| Paid membership, booking and payments | Blocked | The current booking and payment flows need to be seen first. In a native iOS build, digital memberships must use Apple in-app purchase. |
 
 ## 9. Offline and sync
 
 | Item | Status |
 |---|---|
-| App opens with no connection (service worker) | Done |
-| Scorekeeping, counters, notes, reflections and post drafts work offline | Done |
-| Saved on device / syncing / synced indicator, and a sync screen | Done |
-| Queued writes retried safely, with no duplicates | Done (device-generated IDs everywhere) |
-| Conflicts: scores merge; session and post edits return 409 with the latest copy | Done |
-| Offline media uploads queued in the background | Next: today uploads need a connection and say so. |
-| Features that need a connection are labelled | Done |
+| App opens with no connection | Done |
+| Scores, counters, scoreboards, notes, reflections, matches and post drafts work offline | Done |
+| Photos and video queue offline and upload on reconnect | Done |
+| Saved on device / syncing / synced indicator and sync screen | Done |
+| Safe retries with no duplicates; conflicts return the latest copy | Done |
+
+## Operations
+
+| Item | Status | Notes |
+|---|---|---|
+| Nightly database backup, last 7 kept, downloadable from Admin | Done | They sit on the same disk: download one now and then for an off-site copy. Uploaded media isn't in the nightly backup; Render's disk snapshots cover it. |
+| Database migrations | Done | Versioned; they only add, never destroy. |
 
 ## Before iOS and Android store release
 
-1. **Hosting.** Deploy the server over HTTPS with a persistent disk
-   (Render, Fly.io or Railway). Set `ADMIN_EMAIL`, `PUBLIC_URL` and
-   `SECURE_COOKIES=1`.
-2. **Email.** Connect an email provider (for example Resend or Postmark) to
-   `onResetLink`.
-3. **Backups.** Nightly copies of the SQLite file and the media folder. Move
-   media to object storage once it grows.
-4. **Website.** Point trainwiththelab.com at `/api`, and migrate its existing
-   accounts and content.
-5. **Native wrapper.** Use Capacitor for store builds, or rebuild in React
-   Native if the native features in the brief (voice, background upload,
-   push) outgrow the web.
-6. **Accounts.** Apple Developer ($99/yr) and Google Play ($25). Apple requires
-   in-app account deletion (done) and Sign in with Apple if other social
-   logins are offered.
-7. **Real-device testing.** Courtside tap targets in sunlight, wake lock,
-   video upload on cellular, iOS storage eviction for installed web apps.
-8. **Push.** Connect web push or native push to the notifications that already exist.
+1. **Keys in Render:** email, VAPID and Google.
+2. **Website:** point it at `/api` and migrate the existing accounts and
+   content.
+3. **Payments:** decide on Stripe for web and in-app purchase for iOS once
+   the current flows are known.
+4. **Native wrapper:** use Capacitor around this app. It adds native push,
+   QR scanning on iPhone and background uploads.
+5. **Developer accounts:** Apple ($99/yr) and Google Play ($25). Add Sign in
+   with Apple if Google sign-in stays in the iOS build.
+6. **Real-device testing:**
+   - courtside tap targets in sunlight
+   - voice scoring with earbuds and music
+   - screen readers
+   - video upload on cellular
