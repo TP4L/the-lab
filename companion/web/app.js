@@ -142,7 +142,12 @@
           d.events.map(function (e) { return eventRow({ id: e.id, title: e.title, starts_at: e.starts_at, location: e.location, status: e.status, my_state: e.state }); }).join('') +
           d.open_events.filter(function (o) { return !d.events.some(function (e) { return e.id === o.id; }); }).map(function (e) { return eventRow(Object.assign({ status: 'published' }, e)); }).join('') + '</div>'
           : '<div class="list"><p class="empty">No upcoming events. <a href="#/play/events">Browse events</a>.</p></div>') + '</div>' +
+        '<div class="stack" id="learning"></div>' +
         '<div class="stack"><p class="section-title">New in Field Notes</p>' + postList(d.posts) + '</div>';
+      api.get('/api/me/learning').then(function (lr) {
+        var going = lr.courses.filter(function (c) { return c.completed < c.lessons; });
+        if (going.length && $('#learning')) $('#learning').innerHTML = '<p class="section-title">Continue learning</p><div class="course-grid">' + going.slice(0, 2).map(courseCard).join('') + '</div>';
+      }, function () {});
     });
   };
 
@@ -419,37 +424,252 @@
   };
 
   /* ================= LEARN ================= */
-  var learnLane = '';
+  var learnLane = '', learnTab = 'notes';
+  function progressBar(done, total) { var pc = total ? Math.round(done / total * 100) : 0; return '<div class="progress" role="progressbar" aria-valuenow="' + pc + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + done + ' of ' + total + ' lessons done"><i style="width:' + pc + '%"></i></div>'; }
+  function courseCard(c) {
+    return '<a class="course-card" href="#/learn/course/' + h(c.slug) + '"><div class="cover">' + (c.cover_media_id ? '<img alt="" loading="lazy" src="/api/media/' + h(c.cover_media_id) + '">' : '<span>' + h(initials(c.title)) + '</span>') + '</div>' +
+      '<div class="body"><p class="lane">' + (c.status === 'draft' ? 'Draft · ' : '') + h(c.access_label) + (c.unlocked ? '' : ' · Locked') + '</p><p class="t">' + h(c.title) + '</p>' +
+      '<p class="d">' + c.lessons + ' lesson' + (c.lessons === 1 ? '' : 's') + (c.minutes ? ' · ' + c.minutes + ' min' : '') + (c.completed ? ' · ' + c.completed + ' done' : '') + '</p>' +
+      (c.completed ? progressBar(c.completed, c.lessons) : '') + '</div></a>';
+  }
   views.learn = function () {
-    return api.get('/api/posts' + (learnLane ? '?lane=' + learnLane : '')).then(function (posts) {
-      app.innerHTML = offlineNote(posts) + head('Learn', 'Field Notes', 'Quick Reads, The Work and Field Studies from THE LAB.', ME ? '' : '<a class="btn primary" href="#/signin">Sign in</a>') +
-        '<div class="chips" id="lanes"><button class="chip" type="button" data-v="" aria-pressed="' + (!learnLane) + '">All</button>' + Object.keys(LANES).map(function (k) { return '<button class="chip" type="button" data-v="' + k + '" aria-pressed="' + (learnLane === k) + '">' + LANES[k] + '</button>'; }).join('') + '</div>' +
-        postList(posts) +
-        '<div class="stack"><p class="section-title">Tools</p><div class="quick"><a href="#/learn/engine">Decision engine</a></div></div>' +
-        '<div class="coming"><p class="eyebrow">Next build</p><p>Courses, modules, cohorts, saved posts and membership access.</p></div>';
-      $('#lanes').addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) { learnLane = c.getAttribute('data-v'); route(); } });
+    var tabs = '<div class="chips" id="ltabs">' + [['notes', 'Field Notes'], ['courses', 'Courses'], ['saved', 'Saved']].filter(function (t) { return ME || t[0] !== 'saved'; }).map(function (t) { return '<button class="chip" type="button" data-v="' + t[0] + '" aria-pressed="' + (learnTab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+    var body;
+    if (learnTab === 'courses') {
+      body = api.get('/api/courses').then(function (cs) {
+        return offlineNote(cs) + (cs.length ? '<div class="course-grid">' + cs.map(courseCard).join('') + '</div>' : '<div class="list"><p class="empty">No courses published yet.</p></div>');
+      });
+    } else if (learnTab === 'saved') {
+      body = api.get('/api/me/saved').then(function (ps) { return offlineNote(ps) + (ps.length ? postList(ps.map(function (p) { return Object.assign({ lane_name: LANES[p.lane] }, p); })) : '<div class="list"><p class="empty">Nothing saved yet. Tap Save on any Field Note to keep it here.</p></div>'); });
+    } else {
+      body = api.get('/api/posts' + (learnLane ? '?lane=' + learnLane : '')).then(function (posts) {
+        return offlineNote(posts) + '<div class="chips" id="lanes"><button class="chip" type="button" data-v="" aria-pressed="' + (!learnLane) + '">All</button>' + Object.keys(LANES).map(function (k) { return '<button class="chip" type="button" data-v="' + k + '" aria-pressed="' + (learnLane === k) + '">' + LANES[k] + '</button>'; }).join('') + '</div>' + postList(posts);
+      });
+    }
+    return body.then(function (html) {
+      app.innerHTML = head('Learn', learnTab === 'courses' ? 'Courses' : learnTab === 'saved' ? 'Saved' : 'Field Notes', learnTab === 'notes' ? 'Quick Reads, The Work and Field Studies from THE LAB.' : '', ME ? '' : '<a class="btn primary" href="#/signin">Sign in</a>') +
+        tabs + html + '<div class="stack"><p class="section-title">Tools</p><div class="quick"><a href="#/learn/engine">Decision engine</a></div></div>';
+      $('#ltabs').addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) { learnTab = c.getAttribute('data-v'); route(); } });
+      if ($('#lanes')) $('#lanes').addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) { learnLane = c.getAttribute('data-v'); route(); } });
     });
   };
 
   views.post = function (slug) {
     return api.get('/api/posts/' + slug).then(function (p) {
-      var media = p.media.filter(function (m) { return m.id !== p.thumbnail_media_id; });
-      app.innerHTML = '<a class="back" href="#/learn">← Field Notes</a>' + offlineNote(p) + '<article class="article">' + articleHTML(p, media) + '</article>';
+      app.innerHTML = '<a class="back" href="#/learn">← Field Notes</a>' + offlineNote(p) + '<article class="article">' + articleHTML(p) + '</article>' +
+        (ME ? '<div class="row"><button class="btn" type="button" id="save" aria-pressed="false">Save</button></div>' : '');
+      if (!ME) return;
+      var saved = false;
+      function paint() { $('#save').textContent = saved ? 'Saved ✓' : 'Save'; $('#save').setAttribute('aria-pressed', String(saved)); }
+      api.get('/api/me/saved').then(function (list) { saved = list.some(function (x) { return x.id === p.id; }); paint(); }, function () {});
+      $('#save').addEventListener('click', function () {
+        api.request(saved ? 'DELETE' : 'PUT', '/api/me/saved/' + p.id).then(function () { saved = !saved; paint(); L.toast(saved ? 'Saved to Learn → Saved' : 'Removed from Saved'); }, function (err) { L.toast(err.status === 0 ? 'Saving needs a connection.' : err.message); });
+      });
     });
   };
-  function articleHTML(p, media) {
+  /* Renders rich text; media placed in the body aren't repeated in the gallery. */
+  function articleHTML(p) {
+    var map = {}; (p.media || []).forEach(function (m) { map[m.id] = m.mime; });
+    var r = window.LabMarkdown.render(p.body, { media: map, withUsed: true });
+    var rest = (p.media || []).filter(function (m) { return m.id !== p.thumbnail_media_id && r.used.indexOf(m.id) < 0; });
     return '<p class="lane">' + h(p.lane_name || LANES[p.lane]) + '</p><h1>' + h(p.title) + '</h1>' +
       (p.summary ? '<p class="dek">' + h(p.summary) + '</p>' : '') +
       '<p class="small muted mono">' + h(p.author_credit || '') + (p.published_at ? ' · ' + h(new Date(p.published_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })) : '') + '</p>' +
       (p.thumbnail_media_id ? '<img class="hero" alt="" src="/api/media/' + h(p.thumbnail_media_id) + '">' : '') +
-      '<div class="prose">' + L.paras(p.body) + '</div>' +
-      (media && media.length ? '<div class="media-grid">' + media.map(mediaFigure).join('') + '</div>' : '') +
+      '<div class="prose">' + r.html + '</div>' +
+      (rest.length ? '<div class="media-grid">' + rest.map(mediaFigure).join('') + '</div>' : '') +
       (p.tags && p.tags.length ? '<div class="chips">' + p.tags.map(function (t) { return '<span class="tag">' + h(t) + '</span>'; }).join('') + '</div>' : '');
   }
   function mediaFigure(m) {
     return '<figure>' + (m.mime.indexOf('video/') === 0 ? '<video controls playsinline preload="metadata" src="/api/media/' + h(m.id) + '"></video>' : '<img alt="" loading="lazy" src="/api/media/' + h(m.id) + '">') +
       (m.visibility && m.visibility !== 'public' ? '<span class="vis ' + h(m.visibility) + '">' + (m.visibility === 'private' ? 'Coach only' : 'Shared') + '</span>' : '') + '</figure>';
   }
+
+  views.learnCourses = function () { learnTab = 'courses'; return views.learn(); };
+  views.course = function (slug) {
+    return api.get('/api/courses/' + slug).then(function (c) {
+      var next = null;
+      c.modules.forEach(function (m) { m.lessons.forEach(function (l) { if (!next && l.open && !l.done) next = l; }); });
+      app.innerHTML = '<a class="back" href="#/learn">← Learn</a>' + offlineNote(c) +
+        (c.cover_media_id ? '<img class="hero" alt="" src="/api/media/' + h(c.cover_media_id) + '">' : '') +
+        head(c.access_label + (c.status === 'draft' ? ' · Draft' : ''), c.title, c.summary, has('editor') ? '<a class="btn ghost" href="#/studio/course/' + c.id + '">Edit course</a>' : '') +
+        '<div class="stack-sm"><p class="small mono">' + c.completed + ' of ' + c.lessons + ' lessons done' + (c.minutes ? ' · ' + c.minutes + ' min total' : '') + '</p>' + progressBar(c.completed, c.lessons) + '</div>' +
+        (c.locked_reason ? '<div class="banner"><span>' + h(c.locked_reason) + ' Lessons marked Preview are open to everyone. To get access, speak to your coach or THE LAB team.</span>' + (ME ? '' : '<a class="btn sm primary" href="#/signin">Sign in</a>') + '</div>' : '') +
+        (next ? '<div class="row"><a class="btn primary" href="#/learn/course/' + h(c.slug) + '/' + next.id + '">' + (c.completed ? 'Continue: ' : 'Start: ') + h(next.title) + '</a></div>' : '') +
+        c.modules.map(function (m) {
+          return '<div class="stack"><p class="section-title">' + h(m.title || 'Lessons') + '</p><div class="list">' + m.lessons.map(function (l) {
+            var icon = l.done ? '<span class="lesson-dot done" aria-label="Done">✓</span>' : l.open ? '<span class="lesson-dot" aria-hidden="true"></span>' : '<span class="lesson-dot locked" aria-label="Locked">•</span>';
+            var inner = '<span class="who">' + icon + '<span class="main-col"><span class="t small">' + h(l.title) + '</span><span class="d mono">' + (l.minutes ? l.minutes + ' min' : '') + (l.preview && !c.unlocked ? (l.minutes ? ' · ' : '') + 'Preview' : '') + (!l.open ? 'Locked' : '') + '</span></span></span>';
+            return l.open ? '<a class="li" href="#/learn/course/' + h(c.slug) + '/' + l.id + '">' + inner + '</a>' : '<div class="li is-locked">' + inner + '</div>';
+          }).join('') + '</div></div>';
+        }).join('');
+    });
+  };
+
+  views.lesson = function (slug, query, id) {
+    return api.get('/api/courses/' + slug + '/lessons/' + id).then(function (l) {
+      var video = l.video_media_id ? '<video class="lesson-video" controls playsinline preload="metadata" src="/api/media/' + h(l.video_media_id) + '"></video>' : '';
+      app.innerHTML = '<a class="back" href="#/learn/course/' + h(slug) + '">← ' + h(l.course.title) + '</a>' + offlineNote(l) +
+        '<article class="article"><p class="lane">' + h(l.module || l.course.title) + (l.minutes ? ' · ' + l.minutes + ' min' : '') + '</p><h1>' + h(l.title) + '</h1>' + video +
+        '<div class="prose">' + l.body_html + '</div></article>' +
+        '<div class="live-bar">' + (l.prev ? '<a class="btn ghost" href="#/learn/course/' + h(slug) + '/' + l.prev.id + '">← Previous</a>' : '') +
+        (ME ? '<button class="btn ' + (l.done ? '' : 'primary') + '" type="button" id="done">' + (l.done ? 'Completed ✓' : 'Mark complete') + '</button>' : '') +
+        (l.next ? '<a class="btn" href="#/learn/course/' + h(slug) + '/' + l.next.id + '">Next →</a>' : '') + '</div>';
+      if ($('#done')) $('#done').addEventListener('click', function () {
+        api.request(l.done ? 'DELETE' : 'POST', '/api/lessons/' + l.id + '/complete', l.done ? undefined : {}).then(function () {
+          if (!l.done && l.next) { L.toast('Lesson complete'); location.hash = '#/learn/course/' + slug + '/' + l.next.id; } else route();
+        }, function (err) { L.toast(err.status === 0 ? 'Progress needs a connection.' : err.message); });
+      });
+    }, function (err) {
+      if (err.status === 403 && err.data.locked) {
+        app.innerHTML = '<a class="back" href="#/learn/course/' + h(slug) + '">← Course</a>' + head('Locked', 'This lesson is locked', err.message + ' Speak to your coach or THE LAB team about access.') + (ME ? '' : '<div class="row"><a class="btn primary" href="#/signin">Sign in</a></div>');
+        return;
+      }
+      throw err;
+    });
+  };
+
+  /* ---------- studio: courses ---------- */
+  views.studioCourses = function () {
+    if (!has('editor')) return forbidden('Courses are managed by editors.');
+    return api.get('/api/courses').then(function (cs) {
+      app.innerHTML = '<a class="back" href="#/studio">← Studio</a>' + head('Publishing Studio', 'Courses', 'Build courses from lessons. Choose who can open them: everyone, members, or a cohort.', '<button class="btn primary" type="button" id="newc">New course</button>') +
+        (cs.length ? '<div class="list">' + cs.map(function (c) {
+          return '<a class="li" href="#/studio/course/' + c.id + '"><span class="main-col"><span class="t">' + h(c.title) + '</span><span class="d">' + c.lessons + ' lessons · ' + h(c.access_label) + '</span></span><span class="side"><span class="status ' + (c.status === 'published' ? 'published' : 'draft') + '">' + (c.status === 'published' ? 'Published' : 'Draft') + '</span></span></a>';
+        }).join('') + '</div>' : '<div class="list"><p class="empty">No courses yet.</p></div>') +
+        '<div class="row"><a class="btn ghost" href="#/cohorts">Manage cohorts</a></div>';
+      $('#newc').addEventListener('click', function () {
+        api.request('POST', '/api/studio/courses', { title: 'Untitled course' }).then(function (c) { location.hash = '#/studio/course/' + c.id; }, function (err) { L.toast(err.message); });
+      });
+    });
+  };
+
+  views.courseEdit = function (id) {
+    if (!has('editor')) return forbidden('Courses are managed by editors.');
+    return api.get('/api/studio/courses/' + id).then(function (c) {
+      app.innerHTML = '<a class="back" href="#/studio/courses">← Courses</a>' +
+        head('Course', c.title, '', '<div class="row">' + (c.status === 'published' ? '<a class="btn ghost" href="#/learn/course/' + h(c.slug) + '">View</a>' : '') + '<button class="btn danger" type="button" id="delc">Delete</button></div>') +
+        '<div class="grid-2"><form class="card form" id="cf" novalidate>' +
+        '<div class="field"><label class="flabel" for="ct">Title</label><input type="text" id="ct" maxlength="160" value="' + h(c.title) + '"></div>' +
+        '<div class="field"><label class="flabel" for="cs">Summary</label><textarea id="cs" maxlength="1000">' + h(c.summary) + '</textarea></div>' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="ca">Who can open it</label><select id="ca">' + [['public', 'Everyone signed in'], ['members', 'Members (and cohorts)'], ['cohort', 'Cohort only']].map(function (o) { return '<option value="' + o[0] + '"' + (c.access === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label class="flabel" for="cst">Status</label><select id="cst"><option value="draft"' + (c.status === 'draft' ? ' selected' : '') + '>Draft</option><option value="published"' + (c.status === 'published' ? ' selected' : '') + '>Published</option></select></div></div>' +
+        '<div class="field"><label class="flabel" for="ccov">Cover image</label>' + (c.cover_media_id ? '<img class="hero" alt="" src="/api/media/' + h(c.cover_media_id) + '" style="max-height:160px">' : '') + '<input type="file" id="ccov" accept="image/*"><div class="progress" id="covp" hidden><i></i></div></div>' +
+        '<div class="row"><button class="btn primary" type="submit">Save course</button></div></form>' +
+        '<div class="stack"><p class="section-title">Lessons · ' + c.lessons.length + '</p>' +
+        (c.lessons.length ? '<div class="list">' + c.lessons.map(function (l, i) {
+          return '<div class="li"><a class="main-col" href="#/studio/lesson/' + l.id + '" style="text-decoration:none"><span class="d mono">' + h(l.module || 'No module') + '</span><span class="t small">' + (i + 1) + '. ' + h(l.title) + '</span><span class="d">' + (l.preview ? 'Preview · ' : '') + (l.video_media_id ? 'Video · ' : '') + (l.minutes ? l.minutes + ' min' : '') + '</span></a>' +
+            '<span class="side row"><button class="btn sm ghost" type="button" data-mv="' + i + '" data-d="-1"' + (i ? '' : ' disabled') + ' aria-label="Move up">↑</button><button class="btn sm ghost" type="button" data-mv="' + i + '" data-d="1"' + (i < c.lessons.length - 1 ? '' : ' disabled') + ' aria-label="Move down">↓</button></span></div>';
+        }).join('') + '</div>' : '<div class="list"><p class="empty">No lessons yet.</p></div>') +
+        '<form class="card form" id="lf" novalidate><div class="form-grid"><div class="field"><label class="flabel" for="lt">New lesson</label><input type="text" id="lt" maxlength="160" placeholder="Lesson title"></div>' +
+        '<div class="field"><label class="flabel" for="lm">Module</label><input type="text" id="lm" maxlength="120" value="' + h(c.lessons.length ? c.lessons[c.lessons.length - 1].module : '') + '" placeholder="e.g. Foundations"></div></div>' +
+        '<div class="row"><button class="btn" type="submit">Add lesson</button></div></form></div></div>';
+      $('#cf').addEventListener('submit', function (e) {
+        e.preventDefault();
+        api.request('PUT', '/api/studio/courses/' + c.id, { title: $('#ct').value, summary: $('#cs').value, access: $('#ca').value, status: $('#cst').value })
+          .then(function () { L.toast('Course saved'); route(); }, function (err) { L.formError($('#cf'), err.message); });
+      });
+      $('#ccov').addEventListener('change', function () {
+        var f = this.files[0]; if (!f) return; var pb = $('#covp'); pb.hidden = false;
+        api.upload(f, 'course_id=' + c.id, function (x) { $('i', pb).style.width = Math.round(x * 100) + '%'; })
+          .then(function (m) { return api.request('PUT', '/api/studio/courses/' + c.id, { cover_media_id: m.id }); })
+          .then(function () { L.toast('Cover updated'); route(); }, function (err) { pb.hidden = true; L.toast(err.message); });
+      });
+      $('#lf').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!$('#lt').value.trim()) return L.formError($('#lf'), 'Give the lesson a title.');
+        api.request('POST', '/api/studio/courses/' + c.id + '/lessons', { title: $('#lt').value, module: $('#lm').value }).then(function (l) { location.hash = '#/studio/lesson/' + l.id; }, function (err) { L.formError($('#lf'), err.message); });
+      });
+      $$('[data-mv]').forEach(function (b) { b.addEventListener('click', function () {
+        var i = +b.getAttribute('data-mv'), j = i + Number(b.getAttribute('data-d'));
+        var ls = c.lessons.slice(); var t = ls[i]; ls[i] = ls[j]; ls[j] = t;
+        Promise.all(ls.map(function (l, k) { return l.position === k ? null : api.request('PUT', '/api/studio/lessons/' + l.id, { position: k }); })).then(route, function (err) { L.toast(err.message); });
+      }); });
+      L.armed($('#delc'), 'Tap again to delete the course', function () { api.request('DELETE', '/api/studio/courses/' + c.id).then(function () { location.hash = '#/studio/courses'; }); });
+    });
+  };
+
+  views.lessonEdit = function (id) {
+    if (!has('editor')) return forbidden('Courses are managed by editors.');
+    return api.get('/api/studio/lessons/' + id).then(function (l) {
+      var key = 'lesson:' + l.id, saved = Store.get(key);
+      var f = saved && saved.base === l.updated_at ? saved.fields : { title: l.title, module: l.module, minutes: l.minutes || '', preview: l.preview, body: l.body };
+      app.innerHTML = '<a class="back" href="#/studio/course/' + l.course.id + '">← ' + h(l.course.title) + '</a>' +
+        (saved && saved.base === l.updated_at && JSON.stringify(saved.fields) !== JSON.stringify({ title: l.title, module: l.module, minutes: l.minutes || '', preview: l.preview, body: l.body }) ? '<div class="banner"><span>Restored unsaved changes from this device.</span></div>' : '') +
+        '<form class="form" id="lef" novalidate><input class="editor-title" type="text" id="t" maxlength="160" aria-label="Lesson title" value="' + h(f.title) + '">' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="m">Module</label><input type="text" id="m" maxlength="120" value="' + h(f.module) + '"></div>' +
+        '<div class="field"><label class="flabel" for="mi">Minutes</label><input type="number" id="mi" min="1" max="600" value="' + h(f.minutes) + '"></div>' +
+        '<label class="tog" for="pv"><input type="checkbox" id="pv"' + (f.preview ? ' checked' : '') + '><div><b>Free preview</b><span>Open to everyone, even without access.</span></div></label></div>' +
+        '<div class="field"><label class="flabel" for="b">Lesson <span class="hint">' + RICH_HINT + '</span></label><textarea class="editor-body" id="b" maxlength="60000">' + h(f.body) + '</textarea></div>' +
+        '<div class="stack"><p class="section-title">Video and images</p><input type="file" id="up" accept="video/*,image/*" aria-label="Upload lesson video or image"><div class="progress" id="upp" hidden><i></i></div>' +
+        (l.media.length ? '<div class="media-grid">' + l.media.map(function (m) {
+          return '<figure>' + (m.mime.indexOf('video/') === 0 ? '<video muted playsinline preload="metadata" src="/api/media/' + h(m.id) + '"></video>' : '<img alt="" src="/api/media/' + h(m.id) + '">') +
+            (m.id === l.video_media_id ? '<span class="vis shared">Lesson video</span>' : m.mime.indexOf('video/') === 0 ? '<button class="btn sm" style="position:absolute;left:6px;top:6px" type="button" data-vid="' + h(m.id) + '">Use as lesson video</button>' : '') +
+            '<button class="btn sm" style="position:absolute;left:6px;bottom:6px" type="button" data-ins="' + h(m.id) + '">Insert in text</button></figure>';
+        }).join('') + '</div>' : '') + '</div>' +
+        '<div class="live-bar"><button class="btn primary" type="submit">Save lesson</button><button class="btn ghost" type="button" id="prev">Preview</button><button class="btn danger" type="button" id="del">Delete</button></div></form><div id="pvbox"></div>';
+      function read() { f = { title: $('#t').value, module: $('#m').value, minutes: $('#mi').value, preview: $('#pv').checked, body: $('#b').value }; Store.set(key, { base: l.updated_at, fields: f }); }
+      $('#lef').addEventListener('input', read);
+      $('#lef').addEventListener('change', read);
+      $('#lef').addEventListener('submit', function (e) {
+        e.preventDefault(); read();
+        api.request('PUT', '/api/studio/lessons/' + l.id, { title: f.title, module: f.module, minutes: f.minutes || null, preview: f.preview, body: f.body })
+          .then(function () { Store.del(key); L.toast('Lesson saved'); route(); }, function (err) { L.formError($('#lef'), err.status === 0 ? 'Offline. Your text is kept on this device.' : err.message); });
+      });
+      $('#prev').addEventListener('click', function () { read(); var map = {}; l.media.forEach(function (m) { map[m.id] = m.mime; }); $('#pvbox').innerHTML = '<article class="article card"><h1>' + h(f.title) + '</h1><div class="prose">' + window.LabMarkdown.render(f.body, { media: map }) + '</div></article>'; $('#pvbox').scrollIntoView({ behavior: 'smooth' }); });
+      $('#up').addEventListener('change', function () {
+        var file = this.files[0]; if (!file) return; var pb = $('#upp'); pb.hidden = false;
+        api.upload(file, 'lesson_id=' + l.id, function (x) { $('i', pb).style.width = Math.round(x * 100) + '%'; }).then(function (m) {
+          return m.mime.indexOf('video/') === 0 && !l.video_media_id ? api.request('PUT', '/api/studio/lessons/' + l.id, { video_media_id: m.id }) : null;
+        }).then(function () { L.toast('Uploaded'); route(); }, function (err) { pb.hidden = true; L.toast(err.message); });
+      });
+      $$('[data-vid]').forEach(function (b) { b.addEventListener('click', function () { api.request('PUT', '/api/studio/lessons/' + l.id, { video_media_id: b.getAttribute('data-vid') }).then(route, function (err) { L.toast(err.message); }); }); });
+      $$('[data-ins]').forEach(function (b) { b.addEventListener('click', function () { insertAtCursor($('#b'), '\n\n![](media:' + b.getAttribute('data-ins') + ')\n\n'); read(); L.toast('Inserted. Save to keep it.'); }); });
+      L.armed($('#del'), 'Tap again to delete', function () { api.request('DELETE', '/api/studio/lessons/' + l.id).then(function () { Store.del(key); location.hash = '#/studio/course/' + l.course.id; }); });
+    });
+  };
+  var RICH_HINT = '## heading · **bold** · _italic_ · - list · &gt; quote · [link](https://…)';
+  function insertAtCursor(ta, text) {
+    var s = ta.selectionStart || ta.value.length, e = ta.selectionEnd || s;
+    ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+    ta.selectionStart = ta.selectionEnd = s + text.length; ta.focus();
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  /* ---------- cohorts (coaches and editors) ---------- */
+  views.cohorts = function () {
+    if (!has('coach', 'editor')) return forbidden('Cohorts are managed by coaches and editors.');
+    return Promise.all([api.get('/api/cohorts'), api.get('/api/courses')]).then(function (r) {
+      var cs = r[0], courses = r[1];
+      app.innerHTML = head('Learn', 'Cohorts', 'A cohort is a group of people who share access to a course.') +
+        (cs.length ? '<div class="list">' + cs.map(function (c) { return '<a class="li" href="#/cohorts/' + c.id + '"><span class="main-col"><span class="t">' + h(c.title) + '</span><span class="d">' + h(c.course_title || 'No course') + '</span></span><span class="side">' + c.members + ' people</span></a>'; }).join('') + '</div>' : '<div class="list"><p class="empty">No cohorts yet.</p></div>') +
+        '<form class="card form" id="nf" novalidate><p class="section-title">New cohort</p><div class="form-grid"><div class="field"><label class="flabel" for="t">Name</label><input type="text" id="t" maxlength="120" placeholder="Fall 4.0 group"></div>' +
+        '<div class="field"><label class="flabel" for="c">Course</label><select id="c"><option value="">None</option>' + courses.map(function (c) { return '<option value="' + c.id + '">' + h(c.title) + '</option>'; }).join('') + '</select></div></div>' +
+        '<div class="row"><button class="btn primary" type="submit">Create cohort</button></div></form>';
+      $('#nf').addEventListener('submit', function (e) {
+        e.preventDefault();
+        api.request('POST', '/api/cohorts', { title: $('#t').value, course_id: $('#c').value || null }).then(function (c) { location.hash = '#/cohorts/' + c.id; }, function (err) { L.formError($('#nf'), err.message); });
+      });
+    });
+  };
+  views.cohort = function (id) {
+    if (!has('coach', 'editor')) return forbidden('Cohorts are managed by coaches and editors.');
+    return api.get('/api/cohorts/' + id).then(function (c) {
+      app.innerHTML = '<a class="back" href="#/cohorts">← Cohorts</a>' + head('Cohort', c.title, c.course_title ? 'Course: ' + c.course_title : 'No course linked', '<button class="btn danger" type="button" id="del">Delete</button>') +
+        '<form class="card form" id="af" novalidate><div class="field"><label class="flabel" for="em">Add people by email <span class="hint">one per line or comma separated</span></label><textarea id="em" placeholder="riley@example.com"></textarea></div><div class="row"><button class="btn primary" type="submit">Add</button></div></form>' +
+        '<div class="stack"><p class="section-title">Members · ' + c.members.length + '</p>' + (c.members.length ? '<div class="list">' + c.members.map(function (m) { return '<div class="li"><span class="main-col"><span class="t small">' + h(m.name) + '</span><span class="d">' + h(m.email) + '</span></span><button class="btn sm ghost" type="button" data-rm="' + m.id + '">Remove</button></div>'; }).join('') + '</div>' : '<div class="list"><p class="empty">No one yet.</p></div>') + '</div>';
+      $('#af').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var emails = $('#em').value.split(/[\s,;]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+        api.request('POST', '/api/cohorts/' + c.id + '/members', { emails: emails }).then(function (r) {
+          L.toast(r.added + ' added' + (r.missing.length ? '. No account yet: ' + r.missing.join(', ') : ''));
+          route();
+        }, function (err) { L.formError($('#af'), err.message); });
+      });
+      $$('[data-rm]').forEach(function (b) { L.armed(b, 'Confirm', function () { api.request('DELETE', '/api/cohorts/' + c.id + '/members/' + b.getAttribute('data-rm')).then(route); }); });
+      L.armed($('#del'), 'Tap again to delete', function () { api.request('DELETE', '/api/cohorts/' + c.id).then(function () { location.hash = '#/cohorts'; }); });
+    });
+  };
 
   /* The decision engine, kept as a tool. */
   views.engine = function () {
@@ -602,6 +822,7 @@
       '<div class="stack"><p class="section-title">Account</p><div class="card stack">' +
       '<p><b>' + h(ME.user.name) + '</b> · <span class="muted">' + h(ME.user.email) + '</span></p>' +
       '<p class="small muted">Roles: ' + h(ME.user.roles.join(', ')) + '</p>' +
+      '<p class="small" id="memline"></p>' +
       '<details class="more"><summary>Change password</summary><form class="form" id="pwf" novalidate>' +
       '<div class="field"><label class="flabel" for="cur">Current password</label><input type="password" id="cur" autocomplete="current-password"></div>' +
       '<div class="field"><label class="flabel" for="npw">New password</label><input type="password" id="npw" autocomplete="new-password"></div>' +
@@ -614,6 +835,12 @@
       '<div class="row"><button class="btn" type="button" id="signout">Sign out</button></div></div></div>';
   }
   function bindSettings() {
+    api.get('/api/me/learning').then(function (d) {
+      var el = $('#memline'); if (!el) return;
+      var m = d.membership;
+      el.innerHTML = (m && m.active ? '<span class="tag ok">Member</span> ' + h(m.plan) + (m.expires_at ? ' \u00b7 until ' + h(new Date(m.expires_at).toLocaleDateString()) : '') : '<span class="tag">Not a member</span>') +
+        (d.cohorts.length ? ' \u00b7 Cohorts: ' + d.cohorts.map(function (c) { return h(c.title); }).join(', ') : '');
+    }, function () {});
     $('#prefs').addEventListener('toggle', function once() {
       $('#prefs').removeEventListener('toggle', once);
       api.get('/api/me/prefs').then(function (d) {
@@ -763,7 +990,7 @@
     return api.get('/api/studio/posts').then(null, function (err) { if (err.status === 0) return []; throw err; }).then(function (posts) {
       posts = localDrafts().concat(posts);
       var groups = ['local', 'in_review', 'draft', 'scheduled', 'published'];
-      app.innerHTML = offlineNote(posts) + head('Publishing Studio', has('editor') ? 'All posts' : 'Your posts', 'Quick Read, The Work and Field Study. Drafts save on this device as you type.', '<a class="btn primary" href="#/studio/new">New post</a>') +
+      app.innerHTML = offlineNote(posts) + head('Publishing Studio', has('editor') ? 'All posts' : 'Your posts', 'Quick Read, The Work and Field Study. Drafts save on this device as you type.', '<div class="row">' + (has('editor') ? '<a class="btn" href="#/studio/courses">Courses</a>' : '') + '<a class="btn primary" href="#/studio/new">New post</a></div>') +
         groups.map(function (g) {
           var list = posts.filter(function (p) { return p.status === g; });
           if (!list.length) return '';
@@ -816,7 +1043,7 @@
           '<div class="field"><span class="flabel">Lane</span><div class="seg-btns" id="lane">' + Object.keys(LANES).map(function (k) { return '<button type="button" data-v="' + k + '" aria-pressed="' + (f.lane === k) + '"' + (liveNoEdit ? ' disabled' : '') + '>' + LANES[k] + '</button>'; }).join('') + '</div></div>' +
           '<input class="editor-title" type="text" id="title" placeholder="Title" maxlength="160" aria-label="Title" value="' + h(f.title) + '"' + (liveNoEdit ? ' disabled' : '') + '>' +
           '<div class="field"><label class="flabel" for="summary">Caption / summary</label><input type="text" id="summary" maxlength="400" value="' + h(f.summary) + '"' + (liveNoEdit ? ' disabled' : '') + '></div>' +
-          '<div class="field"><label class="flabel" for="body">Body <span class="hint">Blank line between paragraphs</span></label><textarea class="editor-body" id="body" maxlength="60000"' + (liveNoEdit ? ' disabled' : '') + '>' + h(f.body) + '</textarea></div>' +
+          '<div class="field"><label class="flabel" for="body">Body <span class="hint">' + RICH_HINT + '</span></label><textarea class="editor-body" id="body" maxlength="60000"' + (liveNoEdit ? ' disabled' : '') + '>' + h(f.body) + '</textarea></div>' +
           '<div class="form-grid"><div class="field"><label class="flabel" for="tags">Tags <span class="hint">comma separated</span></label><input type="text" id="tags" value="' + h(f.tags) + '"' + (liveNoEdit ? ' disabled' : '') + '></div>' +
           '<div class="field"><label class="flabel" for="credit">Author credit</label><input type="text" id="credit" maxlength="120" value="' + h(f.author_credit) + '"' + (liveNoEdit ? ' disabled' : '') + '></div></div>' +
           '<div class="stack"><p class="section-title">Photos and video</p>' +
@@ -824,7 +1051,8 @@
             '<div class="field"><label class="flabel" for="up">Add a photo or short video</label><input type="file" id="up" accept="image/*,video/*" multiple' + (liveNoEdit ? ' disabled' : '') + '></div><div id="uploads" class="stack-sm"></div>' +
             (p.media.length ? '<div class="media-grid">' + p.media.map(function (m) {
               return '<figure>' + (m.mime.indexOf('video/') === 0 ? '<video muted playsinline preload="metadata" src="/api/media/' + h(m.id) + '"></video>' : '<img alt="" src="/api/media/' + h(m.id) + '">') +
-                (m.id === f.thumbnail_media_id ? '<span class="vis shared">Thumbnail</span>' : m.mime.indexOf('image/') === 0 && !liveNoEdit ? '<button class="btn sm" style="position:absolute;left:6px;bottom:6px" type="button" data-thumb="' + h(m.id) + '">Use as thumbnail</button>' : '') + '</figure>';
+                (m.id === f.thumbnail_media_id ? '<span class="vis shared">Thumbnail</span>' : m.mime.indexOf('image/') === 0 && !liveNoEdit ? '<button class="btn sm" style="position:absolute;left:6px;bottom:6px" type="button" data-thumb="' + h(m.id) + '">Use as thumbnail</button>' : '') +
+                (!liveNoEdit ? '<button class="btn sm" style="position:absolute;right:6px;top:6px" type="button" data-ins="' + h(m.id) + '">Insert</button>' : '') + '</figure>';
             }).join('') + '</div>' : '')) +
           '</div>' +
           (editor && !isLocal ? '<details class="more"><summary>Schedule</summary><div class="form-grid"><div class="field"><label class="flabel" for="when">Publish at</label><input type="datetime-local" id="when"></div></div><div class="row"><button class="btn" type="button" id="sched">Schedule</button></div></details>' +
@@ -901,6 +1129,7 @@
           if (isLocal) { location.hash = '#/studio'; return; }
           api.request('DELETE', '/api/studio/posts/' + p.id).then(function () { L.toast('Deleted'); location.hash = '#/studio'; }, function (err) { L.toast(err.message); });
         });
+        $$('[data-ins]').forEach(function (b) { b.addEventListener('click', function () { insertAtCursor($('#body'), '\n\n![](media:' + b.getAttribute('data-ins') + ')\n\n'); read(); local(); L.toast('Placed in the text'); }); });
         $$('[data-thumb]').forEach(function (b) { b.addEventListener('click', function () { f.thumbnail_media_id = b.getAttribute('data-thumb'); local(); save().then(null, function () {}); }); });
         if ($('#up')) $('#up').addEventListener('change', function () { Array.prototype.forEach.call(this.files, uploadOne); this.value = ''; });
         var revs = $('#revs');
@@ -940,12 +1169,12 @@
     if (!has('admin')) return forbidden('Admin is for administrators.');
     var ROLES = ['coach', 'contributor', 'editor', 'admin'];
     return api.get('/api/admin/users').then(function (users) {
-      app.innerHTML = head('Admin', 'People and permissions', 'Everyone starts as an athlete. Grant staff roles here.') +
+      app.innerHTML = head('Admin', 'People and permissions', 'Everyone starts as an athlete. Grant staff roles and membership here.', '<a class="btn ghost" href="#/cohorts">Cohorts</a>') +
         '<input type="search" id="q" placeholder="Search people" aria-label="Search people">' +
         '<div class="list" id="ul">' + users.map(function (u) {
           return '<div class="li" data-name="' + h((u.name + ' ' + u.email).toLowerCase()) + '"><span class="main-col"><span class="t">' + h(u.name) + '</span><span class="d">' + h(u.email) + (u.athlete_id ? ' · ' + playerId(u.athlete_id) : '') + '</span>' +
             '<span class="checks" data-u="' + u.id + '">' + ROLES.map(function (r) { return '<label><input type="checkbox" value="' + r + '"' + (u.roles.indexOf(r) >= 0 ? ' checked' : '') + (u.id === ME.user.id && r === 'admin' ? ' disabled' : '') + '> ' + r + '</label>'; }).join('') + '</span></span>' +
-            '<span class="side"><button class="btn sm ghost" type="button" data-reset="' + u.id + '">Reset link</button></span></div>';
+            '<span class="side"><select class="msel" data-m="' + u.id + '" aria-label="Membership for ' + h(u.name) + '"><option value="none"' + (!u.membership ? ' selected' : '') + '>No membership</option><option value="active"' + (u.membership && u.membership.active ? ' selected' : '') + '>Member</option><option value="cancelled"' + (u.membership && !u.membership.active ? ' selected' : '') + '>Lapsed</option></select><button class="btn sm ghost" type="button" data-reset="' + u.id + '">Reset link</button></span></div>';
         }).join('') + '</div><div id="linkbox"></div>' +
         '<div class="stack"><p class="section-title">System</p><div class="card stack" id="sys"><p class="small muted">Loading\u2026</p></div></div>';
       Promise.all([api.get('/api/admin/status'), api.get('/api/admin/backups')]).then(function (r) {
@@ -959,6 +1188,10 @@
       }, function () { $('#sys').innerHTML = '<p class="small muted">System status needs a connection.</p>'; });
       $('#q').addEventListener('input', function () { var q = this.value.toLowerCase(); $$('#ul .li').forEach(function (l) { l.hidden = l.getAttribute('data-name').indexOf(q) < 0; }); });
       $('#ul').addEventListener('change', function (e) {
+        if (e.target.matches('.msel')) {
+          api.request('PUT', '/api/admin/users/' + e.target.getAttribute('data-m') + '/membership', { status: e.target.value }).then(function () { L.toast('Membership updated'); }, function (err) { L.toast(err.message); });
+          return;
+        }
         var box = e.target.closest('.checks'); if (!box) return;
         var roles = ['athlete'].concat($$('input:checked', box).map(function (i) { return i.value; }));
         if (box.getAttribute('data-u') === String(ME.user.id)) roles.push('admin');
@@ -1410,9 +1643,11 @@
     [/^\/play$/, 'play', 'play'], [/^\/play\/match\/new$/, 'matchNew', 'play'], [/^\/play\/match\/([0-9a-f-]{36})$/, 'match', 'play'],
     [/^\/play\/events$/, 'events', 'play'], [/^\/play\/events\/new$/, 'eventForm', 'play'], [/^\/play\/events\/(\d+)$/, 'event', 'play'], [/^\/play\/events\/(\d+)\/edit$/, 'eventForm', 'play'],
     [/^\/play\/leaderboard$/, 'leaderboard', 'play'], [/^\/notifications$/, 'notifications', ''],
-    [/^\/learn$/, 'learn', 'learn', true], [/^\/learn\/engine$/, 'engine', 'learn', true], [/^\/learn\/([\w-]+)$/, 'post', 'learn', true],
+    [/^\/learn$/, 'learn', 'learn', true], [/^\/learn\/courses$/, 'learnCourses', 'learn', true], [/^\/learn\/course\/([\w-]+)$/, 'course', 'learn', true], [/^\/learn\/course\/([\w-]+)\/(\d+)$/, 'lesson', 'learn', true], [/^\/learn\/engine$/, 'engine', 'learn', true], [/^\/learn\/([\w-]+)$/, 'post', 'learn', true],
     [/^\/profile$/, 'profile', 'profile'],
     [/^\/coach$/, 'coach', 'home'], [/^\/coach\/new$/, 'coachNew', 'home'], [/^\/coach\/(\d+)$/, 'coachAthlete', 'home'], [/^\/coach\/(\d+)\/code$/, 'coachCode', 'home'],
+    [/^\/studio\/courses$/, 'studioCourses', 'home'], [/^\/studio\/course\/(\d+)$/, 'courseEdit', 'home'], [/^\/studio\/lesson\/(\d+)$/, 'lessonEdit', 'home'],
+    [/^\/cohorts$/, 'cohorts', 'learn'], [/^\/cohorts\/(\d+)$/, 'cohort', 'learn'],
     [/^\/studio$/, 'studio', 'home'], [/^\/studio\/([\w-]+)$/, 'studioEdit', 'home'],
     [/^\/admin$/, 'admin', 'home'], [/^\/sync$/, 'sync', '']
   ];
@@ -1436,7 +1671,7 @@
     $$('.nav a').forEach(function (a) { if (a.getAttribute('data-nav') === p.r[2]) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     app.innerHTML = '<p class="muted small" role="status">Loading…</p>';
     window.scrollTo(0, 0);
-    Promise.resolve().then(function () { return views[p.r[1]](p.m[1], p.query); }).catch(function (err) {
+    Promise.resolve().then(function () { return views[p.r[1]](p.m[1], p.query, p.m[2]); }).catch(function (err) {
       if (err.status === 401) return;
       var offline = err.status === 0;
       app.innerHTML = head(offline ? 'Offline' : err.status === 404 ? 'Not found' : err.status === 403 ? 'No access' : 'Something went wrong',

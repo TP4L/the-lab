@@ -276,7 +276,76 @@ CREATE TABLE IF NOT EXISTS job_log (
 );
 `;
 
-const MIGRATIONS = [SCHEMA, PLAY, JOBS];
+/* Learn: courses, lessons, membership, cohorts, progress, saved posts. */
+const LEARN = `
+CREATE TABLE IF NOT EXISTS courses (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  summary TEXT NOT NULL DEFAULT '',
+  cover_media_id TEXT,
+  access TEXT NOT NULL DEFAULT 'members' CHECK (access IN ('public','members','cohort')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS lessons (
+  id INTEGER PRIMARY KEY,
+  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 0,
+  module TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  video_media_id TEXT,
+  minutes INTEGER,
+  preview INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- Membership is granted by an admin for now; source records where it came from
+-- so a payment provider can manage its own rows later.
+CREATE TABLE IF NOT EXISTS memberships (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  plan TEXT NOT NULL DEFAULT 'member',
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','cancelled')),
+  expires_at TEXT,
+  source TEXT NOT NULL DEFAULT 'manual',
+  note TEXT NOT NULL DEFAULT '',
+  granted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS cohorts (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
+  starts_at TEXT,
+  ends_at TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS cohort_members (
+  cohort_id INTEGER NOT NULL REFERENCES cohorts(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (cohort_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS lesson_progress (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+  completed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, lesson_id)
+);
+CREATE TABLE IF NOT EXISTS saved_posts (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, post_id)
+);
+ALTER TABLE media ADD COLUMN lesson_id INTEGER REFERENCES lessons(id) ON DELETE SET NULL;
+ALTER TABLE media ADD COLUMN course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS lessons_course ON lessons(course_id, position);
+`;
+
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

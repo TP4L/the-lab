@@ -2,6 +2,7 @@
 const crypto = require('node:crypto');
 const { HttpError, withStatus, str, oneOf, int, isoTime, list } = require('../http.js');
 const { tx, now } = require('../db.js');
+const MD = require('../../web/markdown.js');
 
 const LANES = { quick_read: 'Quick Read', the_work: 'The Work', field_study: 'Field Study' };
 const EDITABLE = ['lane', 'title', 'summary', 'body', 'tags', 'author_credit', 'thumbnail_media_id'];
@@ -164,6 +165,9 @@ module.exports = function publishing(r, { db, auth, notifier }) {
     if (!p) throw new HttpError(404, 'Post not found.');
     const out = shape(p);
     out.media = db.prepare('SELECT id, mime FROM media WHERE post_id = ? ORDER BY created_at').all(p.id);
+    // Rendered, sanitised HTML so the website can show the same article as the app.
+    const map = {}; out.media.forEach(m => { map[m.id] = m.mime; });
+    out.body_html = MD.render(out.body, { media: map });
     delete out.review_note; delete out.author_id; delete out.version;
     return out;
   });

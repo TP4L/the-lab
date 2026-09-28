@@ -15,7 +15,8 @@ const MEDIA_TYPES = {
 };
 const MAX_MEDIA = 200 * 1024 * 1024;
 
-module.exports = function athletes(r, { db, auth, config, notifier }) {
+module.exports = function athletes(r, ctx) {
+  const { db, auth, config, notifier } = ctx;
   const claimLimit = limiter(8, 60 * 60 * 1000);
 
   function load(id) {
@@ -224,6 +225,8 @@ module.exports = function athletes(r, { db, auth, config, notifier }) {
       const live = p.status === 'published' || (p.status === 'scheduled' && p.publish_at <= now());
       return !write && live;
     }
+    // Course covers and lesson videos: gated by course access (learn.js).
+    if (m.lesson_id || m.course_id) return ctx.learn ? ctx.learn.mediaAllowed(user, m, write) : false;
     return false;
   }
 
@@ -238,6 +241,8 @@ module.exports = function athletes(r, { db, auth, config, notifier }) {
 
     const athleteId = query.get('athlete_id') ? int(query.get('athlete_id'), 'athlete_id', { min: 1 }) : null;
     const postId = query.get('post_id') ? int(query.get('post_id'), 'post_id', { min: 1 }) : null;
+    const lessonId = query.get('lesson_id') ? int(query.get('lesson_id'), 'lesson_id', { min: 1 }) : null;
+    const courseId = query.get('course_id') ? int(query.get('course_id'), 'course_id', { min: 1 }) : null;
     let visibility = 'private';
     if (athleteId) {
       const level = auth.athleteAccess(user, athleteId);
@@ -247,8 +252,13 @@ module.exports = function athletes(r, { db, auth, config, notifier }) {
       const p = db.prepare('SELECT author_id FROM posts WHERE id = ?').get(postId);
       if (!p || !(auth.has(user, 'editor') || (p.author_id === user.id && auth.has(user, 'contributor')))) throw new HttpError(404, 'Post not found.');
       visibility = 'public';
+    } else if (lessonId || courseId) {
+      if (!auth.has(user, 'editor')) throw new HttpError(403, 'Only editors can upload course media.');
+      const ok = lessonId ? db.prepare('SELECT 1 FROM lessons WHERE id = ?').get(lessonId) : db.prepare('SELECT 1 FROM courses WHERE id = ?').get(courseId);
+      if (!ok) throw new HttpError(404, lessonId ? 'Lesson not found.' : 'Course not found.');
+      visibility = 'private';
     } else {
-      throw new HttpError(400, 'Attach the upload to an athlete_id or a post_id.');
+      throw new HttpError(400, 'Attach the upload to an athlete, post, course or lesson.');
     }
 
     const prior = db.prepare('SELECT * FROM media WHERE id = ?').get(id);
@@ -275,8 +285,8 @@ module.exports = function athletes(r, { db, auth, config, notifier }) {
     });
     if (!size) { fs.rmSync(tmp, { force: true }); throw new HttpError(400, 'The file is empty.'); }
     fs.renameSync(tmp, dest);
-    db.prepare('INSERT INTO media (id, owner_id, athlete_id, post_id, visibility, mime, size, file) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, user.id, athleteId, postId, visibility, mime, size, file);
+    db.prepare('INSERT INTO media (id, owner_id, athlete_id, post_id, lesson_id, course_id, visibility, mime, size, file) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, user.id, athleteId, postId, lessonId, courseId, visibility, mime, size, file);
     return withStatus(201, { id, mime, size, visibility });
   }, { raw: true });
 

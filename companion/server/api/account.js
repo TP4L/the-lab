@@ -147,9 +147,11 @@ module.exports = function account(r, { db, auth, config }) {
   r.get('/api/admin/users', ({ user, query }) => {
     auth.require(user, 'admin');
     const q = '%' + (query.get('q') || '').trim() + '%';
-    return db.prepare(`SELECT u.*, a.id AS athlete_id FROM users u LEFT JOIN athletes a ON a.user_id = u.id
+    return db.prepare(`SELECT u.*, a.id AS athlete_id, m.status AS m_status, m.expires_at AS m_expires, m.plan AS m_plan FROM users u
+      LEFT JOIN athletes a ON a.user_id = u.id LEFT JOIN memberships m ON m.user_id = u.id
       WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY u.name COLLATE NOCASE LIMIT 200`).all(q, q)
-      .map(u => ({ ...auth.userRow(u), athlete_id: u.athlete_id }));
+      .map(u => ({ ...auth.userRow(u), athlete_id: u.athlete_id,
+        membership: u.m_status ? { plan: u.m_plan, status: u.m_status, expires_at: u.m_expires, active: u.m_status === 'active' && (!u.m_expires || u.m_expires > new Date().toISOString()) } : null }));
   });
   r.put('/api/admin/users/:id/roles', ({ user, params, body }) => {
     auth.require(user, 'admin');

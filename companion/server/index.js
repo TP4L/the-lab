@@ -34,6 +34,7 @@ function createApp(opts = {}) {
   const r = createRouter();
   const notifier = require('./api/notify.js').createNotifier(db);
   const ctx = { db, auth, config, notifier, mailer };
+  ctx.jobsFirst = key => Number(db.prepare('INSERT OR IGNORE INTO job_log (key) VALUES (?)').run(key).changes) === 1;
   const jobs = require('./jobs.js').createJobs(ctx);
   if (opts.jobs !== false) jobs.start();
 
@@ -45,6 +46,7 @@ function createApp(opts = {}) {
   require('./api/athletes.js')(r, ctx);
   require('./api/publishing.js')(r, ctx);
   require('./api/play.js')(r, ctx);
+  require('./api/learn.js')(r, ctx);
   require('./api/notify.js').routes(r, ctx);
 
   /* Admin: list and download nightly backups (for an off-site copy). */
