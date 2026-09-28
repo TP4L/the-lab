@@ -209,7 +209,10 @@
       }
       app.innerHTML = offlineNote(rows) +
         head('Train', coach ? 'Sessions' : 'Your training', coach ? 'Run a session courtside. Scores save on this device first and sync when there’s signal.' : 'Every session your coach records against you.',
-          coach ? '<div class="row"><a class="btn ghost" href="#/coach/templates">Templates</a><a class="btn" href="#/train/new?quick=1">Counter</a><a class="btn primary" href="#/train/new">New session</a></div>' : '') +
+          '<div class="row">' + (coach ? '<a class="btn ghost" href="#/coach/templates">Templates</a>' : '') + '<a class="btn" href="#/train/scoreboard">Scoreboard</a>' + (coach ? '<a class="btn" href="#/train/new?quick=1">Counter</a><a class="btn primary" href="#/train/new">New session</a>' : '') + '</div>') +
+        (boards().length ? '<div class="stack"><p class="section-title">Scoreboards on this device</p><div class="list">' + boards().slice(0, 5).map(function (bd) {
+          return '<a class="li" href="#/train/scoreboard/' + h(bd.id) + '"><span class="main-col"><span class="t small">' + h(bd.name) + '</span><span class="d mono">' + (bd.done ? 'Final' : 'Game ' + (bd.games.length + 1) + ' \u00b7 ' + bd.cur.scores.join('\u2013')) + '</span></span><span class="side">' + h(L.when(new Date(bd.updated).toISOString())) + '</span></a>';
+        }).join('') + '</div></div>' : '') +
         '<div class="stack" id="assigned"></div>' +
         (live.length ? '<div class="stack"><p class="section-title">Live</p><div class="list">' + live.map(row).join('') + '</div></div>' : '') +
         '<div class="stack"><p class="section-title">History</p>' + (done.length ? '<div class="list">' + done.map(row).join('') + '</div>' : '<div class="list"><p class="empty">No completed sessions yet.</p></div>') + '</div>';
@@ -390,6 +393,7 @@
         '<div class="drill-tabs" role="tablist" id="tabs"></div>' +
         '<p class="drill-info" id="info"></p>' +
         '<div id="board"></div>' +
+        voiceBar() +
         '<div class="live-bar"><button class="btn" type="button" id="undo">Undo last</button><button class="btn primary" type="button" id="finish">Finish session</button></div></div>';
 
       function save() { Store.set('session:' + id, s); $('#saved').textContent = 'Saved on device · ' + s.events.length + ' taps'; }
@@ -478,6 +482,12 @@
         location.hash = '#/train/' + id;
       });
       tabs(); board(); save();
+      bindVoice(s.athletes.map(function (a) { return a.name; }), 'counts', function (cmd) {
+        if (cmd.action === 'undo') return undo();
+        if (s.items[cur].measure !== 'reps') { L.toast('Voice scores make/miss drills. Enter this drill by hand.'); return; }
+        record(s.athletes[cmd.index].id, cmd.action);
+      });
+      window.addEventListener('hashchange', function offv() { stopVoice(); window.removeEventListener('hashchange', offv); });
     });
   };
 
@@ -1323,6 +1333,163 @@
     });
   };
 
+  /* ================= CUSTOM SCOREBOARDS ================= */
+  /* Runs entirely on the device: works offline, autosaves every tap, resumes
+     after closing. Two-sided boards can be recorded as a match afterwards. */
+  var SIDE_COLORS = ['#1F6FEB', '#C2410C', '#15803D', '#7E22CE'];
+  var NAMED_COLORS = { red: '#DC2626', blue: '#1F6FEB', green: '#15803D', orange: '#C2410C', purple: '#7E22CE', yellow: '#CA8A04', pink: '#DB2777', teal: '#0F766E', black: '#111827', gray: '#6B7280', grey: '#6B7280' };
+  function sideColor(name, i) { var w = String(name || '').toLowerCase().split(/\s+/).filter(function (x) { return NAMED_COLORS[x]; })[0]; return w ? NAMED_COLORS[w] : SIDE_COLORS[i]; }
+  function boards() { return Store.keys('board:').map(function (k) { return Store.get(k); }).filter(Boolean).sort(function (a, b) { return b.updated - a.updated; }); }
+
+  views.boardNew = function () {
+    var st = { sides: ['Blue', 'Orange'], to: 11, winBy: 2, bestOf: 1, minutes: 0 };
+    function paint() {
+      app.innerHTML = '<a class="back" href="#/train">← Train</a>' + head('Scoreboard Studio', 'Custom scoreboard', 'Any game, any rules. Saves on this device as you score.') +
+        '<form class="form" id="bf" novalidate>' +
+        '<div class="field"><label class="flabel" for="bn">Name</label><input type="text" id="bn" maxlength="80" placeholder="e.g. Skinny singles to 7"></div>' +
+        '<div class="field"><span class="flabel">Sides <span class="hint">2–4</span></span><div class="stack-sm" id="sides">' + st.sides.map(function (n, i) {
+          return '<div class="row"><span class="swatch" style="background:' + sideColor(n, i) + '" aria-hidden="true"></span><input type="text" data-side="' + i + '" value="' + h(n) + '" maxlength="40" aria-label="Side ' + (i + 1) + ' name" style="flex:1;min-width:0">' + (st.sides.length > 2 ? '<button class="btn sm ghost" type="button" data-rmside="' + i + '" aria-label="Remove side">✕</button>' : '') + '</div>';
+        }).join('') + '</div>' + (st.sides.length < 4 ? '<div class="row"><button class="btn ghost sm" type="button" id="addside">Add side</button></div>' : '') + '</div>' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="to">Game to</label><input type="number" id="to" min="1" max="99" value="' + st.to + '"></div>' +
+        '<div class="field"><span class="flabel">Win by</span><div class="seg-btns" data-k="winBy"><button type="button" data-v="1" aria-pressed="' + (st.winBy === 1) + '">1</button><button type="button" data-v="2" aria-pressed="' + (st.winBy === 2) + '">2</button></div></div>' +
+        '<div class="field"><span class="flabel">Best of</span><div class="seg-btns" data-k="bestOf">' + [1, 3, 5, 7].map(function (v) { return '<button type="button" data-v="' + v + '" aria-pressed="' + (st.bestOf === v) + '">' + v + '</button>'; }).join('') + '</div></div>' +
+        '<div class="field"><label class="flabel" for="mins">Time limit <span class="hint">minutes per game, 0 = none</span></label><input type="number" id="mins" min="0" max="120" value="' + st.minutes + '"></div></div>' +
+        '<div class="row"><button class="btn primary" type="submit">Start scoring</button></div></form>';
+      $$('#sides [data-side]').forEach(function (inp) { inp.addEventListener('input', function () { st.sides[+inp.getAttribute('data-side')] = inp.value; }); });
+      $$('[data-rmside]').forEach(function (b) { b.addEventListener('click', function () { keep(); st.sides.splice(+b.getAttribute('data-rmside'), 1); paint(); }); });
+      if ($('#addside')) $('#addside').addEventListener('click', function () { keep(); st.sides.push(['Green', 'Purple'][st.sides.length - 2]); paint(); });
+      $$('.seg-btns').forEach(function (box) { box.addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; keep(); st[box.getAttribute('data-k')] = Number(b.getAttribute('data-v')); paint(); }); });
+      $('#bf').addEventListener('submit', function (e) {
+        e.preventDefault(); keep();
+        if (st.sides.some(function (n) { return !n.trim(); })) return L.formError($('#bf'), 'Name every side.');
+        var id = L.uuid();
+        var b = { id: id, name: $('#bn').value.trim() || st.sides.join(' vs '), sides: st.sides.map(function (n) { return n.trim(); }), rules: { to: st.to, winBy: st.winBy, bestOf: st.bestOf, minutes: st.minutes },
+          games: [], cur: { scores: st.sides.map(function () { return 0; }), hist: [], golden: false }, timer: { left: st.minutes * 60000, running: false, at: 0 }, done: false, updated: Date.now() };
+        Store.set('board:' + id, b);
+        location.hash = '#/train/scoreboard/' + id;
+      });
+      function keep() {
+        st.to = Math.max(1, Math.min(99, parseInt($('#to').value, 10) || 11));
+        st.minutes = Math.max(0, Math.min(120, parseInt($('#mins').value, 10) || 0));
+      }
+    }
+    paint();
+  };
+
+  views.board = function (id) {
+    var b = Store.get('board:' + id);
+    if (!b) { app.innerHTML = head('Scoreboard', 'Not found on this device', 'Scoreboards live on the device they were started on.') + '<div class="row"><a class="btn" href="#/train">Back to Train</a></div>'; return; }
+    var tick = null, voice = null;
+    function save() { b.updated = Date.now(); Store.set('board:' + id, b); }
+    function wins(i) { return b.games.filter(function (g) { return g.winner === i; }).length; }
+    function need() { return Math.floor(b.rules.bestOf / 2) + 1; }
+    function timeLeft() { return b.timer.running ? Math.max(0, b.timer.left - (Date.now() - b.timer.at)) : b.timer.left; }
+    function leader() {
+      var s = b.cur.scores, top = Math.max.apply(null, s);
+      var at = s.map(function (v, i) { return v === top ? i : -1; }).filter(function (i) { return i >= 0; });
+      return at.length === 1 ? at[0] : -1;
+    }
+    function checkGame(byTime) {
+      var s = b.cur.scores, i = leader();
+      if (i < 0) { if (byTime) { b.cur.golden = true; L.toast('Time. Scores level: next point wins.'); } return; }
+      var others = s.filter(function (_, k) { return k !== i; }), lead = s[i] - Math.max.apply(null, others);
+      var won = b.cur.golden || byTime || (s[i] >= b.rules.to && lead >= b.rules.winBy);
+      if (!won) return;
+      stopTimer();
+      b.games.push({ scores: s.slice(), winner: i, by: byTime ? 'time' : b.cur.golden ? 'golden' : 'score' });
+      if (wins(i) >= need()) { b.done = true; L.toast(b.sides[i] + ' wins the match'); }
+      else { L.toast('Game to ' + b.sides[i] + ' ' + s.join('–')); b.cur = { scores: b.sides.map(function () { return 0; }), hist: [], golden: false }; b.timer.left = b.rules.minutes * 60000; }
+      save();
+    }
+    function point(i, v) {
+      if (b.done) return;
+      b.cur.scores[i] = Math.max(0, b.cur.scores[i] + v);
+      b.cur.hist.push({ i: i, v: v });
+      try { navigator.vibrate && navigator.vibrate(10); } catch (e) {}
+      save(); checkGame(false); paint();
+    }
+    function undo() {
+      if (b.cur.hist.length) { var last = b.cur.hist.pop(); b.cur.scores[last.i] -= last.v; save(); paint(); L.toast('Undone'); return; }
+      if (b.games.length) {
+        // Reopen the last game: accidental game-point tap.
+        var g = b.games.pop(); b.done = false;
+        b.cur = { scores: g.scores.slice(), hist: [], golden: false };
+        var li = g.winner; b.cur.scores[li] = Math.max(0, b.cur.scores[li] - 1);
+        save(); paint(); L.toast('Reopened game ' + (b.games.length + 1)); return;
+      }
+      L.toast('Nothing to undo.');
+    }
+    function startTimer() { if (!b.rules.minutes || b.timer.running || b.done) return; b.timer.running = true; b.timer.at = Date.now(); save(); runTick(); }
+    function stopTimer() { if (!b.timer.running) return; b.timer.left = timeLeft(); b.timer.running = false; save(); }
+    function runTick() {
+      clearInterval(tick);
+      tick = setInterval(function () {
+        if (!document.body.contains($('#clock'))) { clearInterval(tick); return; }
+        var left = timeLeft();
+        $('#clock').textContent = fmtClock(left);
+        if (left <= 0 && b.timer.running) { b.timer.running = false; b.timer.left = 0; save(); checkGame(true); paint(); try { navigator.vibrate && navigator.vibrate([80, 60, 80]); } catch (e) {} }
+      }, 250);
+    }
+    function fmtClock(ms) { var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+    function paint() {
+      var n = b.sides.length;
+      app.innerHTML = '<div class="live"><div class="live-head"><a class="back" href="#/train">← Train</a><span class="small muted mono">Saved on device</span></div>' +
+        '<div class="head-row"><h1 style="font-size:20px">' + h(b.name) + '</h1><span class="small mono">To ' + b.rules.to + ', win by ' + b.rules.winBy + (b.rules.bestOf > 1 ? ', best of ' + b.rules.bestOf : '') + '</span></div>' +
+        '<div class="row"><span class="small mono">Game ' + (b.games.length + (b.done ? 0 : 1)) + ' · ' + b.sides.map(function (s, i) { return h(s) + ' ' + wins(i); }).join(' · ') + '</span>' +
+        (b.rules.minutes ? '<span class="clock" id="clock">' + fmtClock(timeLeft()) + '</span><button class="btn sm" type="button" id="tgl">' + (b.timer.running ? 'Pause' : 'Start clock') + '</button>' : '') +
+        (b.cur.golden ? '<span class="tag call">Next point wins</span>' : '') + '</div>' +
+        (b.done ? '<div class="focus-card"><p class="eyebrow">Final</p><p class="big">' + h(b.sides[b.games[b.games.length - 1].winner]) + ' wins</p><p class="small" style="opacity:.8">' + b.games.map(function (g) { return g.scores.join('–'); }).join(', ') + '</p></div>' : '') +
+        '<div class="board n' + n + '">' + b.sides.map(function (s, i) {
+          return '<div class="side" style="--c:' + sideColor(s, i) + '"><button type="button" class="plus" data-p="' + i + '" aria-label="Point to ' + h(s) + ', ' + b.cur.scores[i] + ' now"' + (b.done ? ' disabled' : '') + '><span class="nm">' + h(s) + '</span><span class="num">' + b.cur.scores[i] + '</span><span class="lbl">Tap for a point</span></button>' +
+            '<button type="button" class="minus" data-m="' + i + '" aria-label="Take a point from ' + h(s) + '"' + (b.done ? ' disabled' : '') + '>− 1</button></div>';
+        }).join('') + '</div>' +
+        (b.games.length ? '<p class="small mono">Games: ' + b.games.map(function (g, k) { return (k + 1) + ') ' + g.scores.join('–') + (g.by === 'time' ? ' (time)' : g.by === 'golden' ? ' (next point)' : ''); }).join(' · ') + '</p>' : '') +
+        voiceBar('board') +
+        '<div class="live-bar"><button class="btn" type="button" id="undo">Undo</button>' +
+        (b.done && n === 2 ? '<button class="btn primary" type="button" id="rec">Record as match</button>' : '') +
+        (b.done ? '<button class="btn" type="button" id="again">Rematch</button>' : '<button class="btn ghost" type="button" id="end">End</button>') + '</div></div>';
+      $$('[data-p]').forEach(function (x) { x.addEventListener('click', function () { point(+x.getAttribute('data-p'), 1); }); });
+      $$('[data-m]').forEach(function (x) { x.addEventListener('click', function () { point(+x.getAttribute('data-m'), -1); }); });
+      $('#undo').addEventListener('click', undo);
+      if ($('#tgl')) $('#tgl').addEventListener('click', function () { if (b.timer.running) stopTimer(); else startTimer(); paint(); });
+      if ($('#end')) L.armed($('#end'), 'Tap again to end', function () { stopTimer(); Store.del('board:' + id); location.hash = '#/train'; });
+      if ($('#again')) $('#again').addEventListener('click', function () { b.games = []; b.done = false; b.cur = { scores: b.sides.map(function () { return 0; }), hist: [], golden: false }; b.timer = { left: b.rules.minutes * 60000, running: false, at: 0 }; save(); paint(); });
+      if ($('#rec')) $('#rec').addEventListener('click', function () {
+        Store.set('match-prefill', { games: b.games.map(function (g) { return g.scores; }), best_of: [1, 3, 5].indexOf(b.rules.bestOf) >= 0 ? b.rules.bestOf : 5, game_to: b.rules.to, win_by: b.rules.winBy, names: b.sides });
+        location.hash = '#/play/match/new';
+      });
+      bindVoice(b.sides, 'points', function (cmd) { if (cmd.action === 'undo') undo(); else point(cmd.index, 1); });
+      if (b.timer.running) runTick();
+    }
+    window.addEventListener('hashchange', function off() { clearInterval(tick); stopVoice(); window.removeEventListener('hashchange', off); });
+    paint();
+  };
+
+  /* ---------- shared voice controls ---------- */
+  var voiceOn = false, voiceHandle = null, voiceCb = null, voiceNames = [], voiceMode = 'counts';
+  function voiceBar() {
+    if (!window.LabVoice || !window.LabVoice.supported()) return '<p class="small muted">Voice scoring (experimental) isn’t available in this browser.</p>';
+    return '<div class="voice"><button class="btn sm' + (voiceOn ? ' primary' : '') + '" type="button" id="vbtn" aria-pressed="' + voiceOn + '">' + (voiceOn ? 'Voice on' : 'Voice (experimental)') + '</button><span class="small muted" id="vheard">' + (voiceOn ? 'Listening… say a name and “make” or “miss”, or “undo”.' : 'Every spoken score shows here with Undo. Not yet tested with earbuds or music.') + '</span></div>';
+  }
+  function bindVoice(names, mode, cb) {
+    voiceNames = names; voiceMode = mode; voiceCb = cb;
+    var btn = $('#vbtn'); if (!btn) return;
+    if (voiceOn) $('#vheard').textContent = mode === 'points' ? 'Listening… say a side’s name, or “undo”.' : 'Listening… say a name and “make” or “miss”, or “undo”.';
+    btn.addEventListener('click', function () { if (voiceOn) stopVoice(); else startVoice(); route(); });
+  }
+  function startVoice() {
+    voiceOn = true;
+    voiceHandle = window.LabVoice.listen(function (text) {
+      var cmd = window.LabVoice.parse(text, voiceNames, { mode: voiceMode });
+      var el = $('#vheard');
+      if (el) el.textContent = 'Heard “' + text.trim() + '”' + (cmd ? '' : ' · not understood, nothing scored');
+      if (cmd && voiceCb) voiceCb(cmd);
+    }, function (state, err) {
+      if (state === 'error' && (err === 'not-allowed' || err === 'service-not-allowed')) { voiceOn = false; L.toast('Microphone permission was refused.'); route(); }
+    });
+  }
+  function stopVoice() { voiceOn = false; if (voiceHandle) { voiceHandle.stop(); voiceHandle = null; } }
+
   /* ================= PLAY ================= */
   var MATCH_KIND = { casual: 'Casual', training: 'Training', competition: 'Competition' };
   var STATUS_CLASS = { scheduled: 'draft', recorded: 'in_review', confirmed: 'published', verified: 'published', disputed: 'scheduled' };
@@ -1420,6 +1587,16 @@
           if (k === 'doubles') $$('.pfield[data-slot="2"]').forEach(function (f) { f.hidden = !st.doubles; });
           if (k === 'best_of') paintGames();
         });
+        var pre = Store.get('match-prefill');
+        if (pre) {
+          Store.del('match-prefill');
+          ['best_of', 'game_to', 'win_by'].forEach(function (k) { var box = $('[data-k="' + k + '"]'); var btn = box && $('button[data-v="' + pre[k] + '"]', box); if (btn) btn.click(); });
+          $('[data-k="doubles"] button[data-v="false"]').click();
+          pre.games.forEach(function (g, i) { var a = $('[data-g="' + i + '"][data-t="0"]'), bb = $('[data-g="' + i + '"][data-t="1"]'); if (a && bb) { a.value = g[0]; bb.value = g[1]; } });
+          if ($('#p11') && !$('#p11').getAttribute('data-me')) $('#p11').value = pre.names[0];
+          $('#p21').value = pre.names[1];
+          L.toast('Scores filled in from the scoreboard. Swap names for player IDs to link LAB members.');
+        }
         var confirmDup = false;
         $('#mf').addEventListener('submit', function (e) {
           e.preventDefault();
@@ -1754,6 +1931,7 @@
     [/^\/signin$/, 'signin', '', true], [/^\/signup$/, 'signup', '', true], [/^\/forgot$/, 'forgot', '', true], [/^\/reset\/([\w-]+)$/, 'reset', '', true],
     [/^\/?$/, 'home', 'home'],
     [/^\/train$/, 'train', 'train'], [/^\/train\/new$/, 'trainNew', 'train'],
+    [/^\/train\/scoreboard$/, 'boardNew', 'train'], [/^\/train\/scoreboard\/([0-9a-f-]{36})$/, 'board', 'train'],
     [/^\/train\/([0-9a-f-]{36})\/live$/, 'live', 'train'], [/^\/train\/([0-9a-f-]{36})$/, 'session', 'train'],
     [/^\/play$/, 'play', 'play'], [/^\/play\/match\/new$/, 'matchNew', 'play'], [/^\/play\/match\/([0-9a-f-]{36})$/, 'match', 'play'],
     [/^\/play\/events$/, 'events', 'play'], [/^\/play\/events\/new$/, 'eventForm', 'play'], [/^\/play\/events\/(\d+)$/, 'event', 'play'], [/^\/play\/events\/(\d+)\/edit$/, 'eventForm', 'play'],

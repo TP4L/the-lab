@@ -461,3 +461,19 @@ input[type=datetime-local],input[type=email],input[type=search]{width:100%;font:
 .prose figcaption{font-size:13.5px;color:var(--ink-soft);margin-top:6px;}
 .prose a{color:var(--accent);}
 .msel{width:auto;padding:5px 8px;font-size:12.5px;}
+
+/* ---------- custom scoreboard ---------- */
+.swatch{width:18px;height:18px;border-radius:50%;flex:none;}
+.board{display:grid;gap:10px;grid-template-columns:1fr 1fr;}
+.board.n3,.board.n4{grid-template-columns:1fr 1fr;}
+.board .side{display:flex;flex-direction:column;border:3px solid var(--c);border-radius:8px;overflow:hidden;background:var(--surface);}
+.board .plus{border:0;background:color-mix(in srgb,var(--c) 14%,var(--surface));color:var(--ink);min-height:min(42vh,340px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.board.n3 .plus,.board.n4 .plus{min-height:min(26vh,220px);}
+.board .plus:active{filter:brightness(.93);}
+.board .plus .nm{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--c);}
+.board .plus .num{font-family:var(--display);font-weight:800;font-size:clamp(64px,22vw,140px);line-height:1;font-variant-numeric:tabular-nums;}
+.board .plus .lbl{font-family:var(--mono);font-size:11px;color:var(--ink-faint);}
+.board .minus{border:0;border-top:1px solid var(--rule);background:var(--surface);padding:10px;font-family:var(--mono);font-size:13px;font-weight:600;cursor:pointer;color:var(--ink-soft);}
+.board button:disabled{opacity:.5;cursor:default;}
+.clock{font-family:var(--display);font-weight:800;font-size:22px;font-variant-numeric:tabular-nums;padding:2px 10px;border:2px solid var(--ink);border-radius:4px;}
+.voice{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px dashed var(--rule);border-radius:4px;}
