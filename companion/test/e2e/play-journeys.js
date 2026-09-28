@@ -98,11 +98,12 @@ const log = (...a) => console.log(...a);
   log('scanner fallback:', (await owner.p.textContent('#scanbox')).slice(0, 50));
   await owner.p.fill('#code', code); await owner.p.click('#codef button'); await owner.p.waitForTimeout(700);
   for (let i = 0; i < 4; i++) { await owner.p.click('[data-in]'); await owner.p.waitForTimeout(600); }
-  log('checked in:', (await owner.p.textContent('#tab .small.muted')).split('.')[0]);
+  log('checked in:', (await owner.p.textContent('#tab > p.small.muted')).split('.')[0]);
   await shot(owner, 'checkin');
   await owner.p.click('#next'); await owner.p.waitForTimeout(900);
+  await owner.p.click('#go'); await owner.p.waitForTimeout(900);
   const r1 = await owner.p.$$eval('.court-card', x => x.length);
-  log('round 1 courts:', r1, '| sitting:', (await owner.p.textContent('#tab')).match(/Sitting out: [^.]*/)?.[0]);
+  log('round 1 courts:', r1, '| sitting:', (await owner.p.textContent('#tab')).match(/Resting: [^.]*/)?.[0]);
   await shot(owner, 'courts');
   // A player on court sees their assignment
   const onCourt = [A, Bp, ...more];
@@ -118,8 +119,9 @@ const log = (...a) => console.log(...a);
   // Early departure + next round
   await go(owner, '#/play/events/' + eid);
   await owner.p.click('#etabs [data-v=people]'); await owner.p.waitForTimeout(400);
-  await owner.p.click('[data-active][data-to="0"]'); await owner.p.waitForTimeout(500);
+  await owner.p.click('[data-pp][data-body*="active"]'); await owner.p.waitForTimeout(500);
   await owner.p.click('#next'); await owner.p.waitForTimeout(900);
+  await owner.p.click('#go'); await owner.p.waitForTimeout(900);
   log('round 2 posted, rounds:', await owner.p.$$eval('#tab .section-title', x => x.map(y => y.textContent)));
   await owner.p.click('#etabs [data-v=standings]'); await owner.p.waitForTimeout(400);
   log('standings rows:', await owner.p.$$eval('.summary-table tbody tr', x => x.length));

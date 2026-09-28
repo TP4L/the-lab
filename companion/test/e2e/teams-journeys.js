@@ -22,7 +22,7 @@ const log = (...a) => console.log(...a);
   const go = async (u, hash, ms = 700) => { await u.p.goto(B + hash); await u.p.waitForTimeout(ms); };
   const org = await user('Brett Owner', 'owner@lab.test', false);
   await go(org, '#/play/events/new');
-  await org.p.fill('#t', 'Saturday Cup'); await org.p.selectOption('#pm', 'fixed'); await org.p.fill('#courts', '2');
+  await org.p.fill('#t', 'Saturday Cup'); await org.p.selectOption('#mode', 'fixed'); await org.p.fill('#courts', '2');
   await org.p.click('#ef button[type=submit]'); await org.p.waitForTimeout(700);
   const eid = await org.p.evaluate(() => location.hash.split('/').pop());
   const ps = [];

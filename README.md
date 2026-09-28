@@ -72,10 +72,10 @@ It needs Node 22.13 or newer and has no dependencies.
 |---|---|
 | **Home** | Current focus, assigned training, recent sessions, notes from your coach, upcoming events, continue learning, new Field Notes, staff shortcuts. |
 | **Train** | Scoreboard Studio: 1–10 drills measured by make/miss, score, time or feel. One-player and four-player counters, custom scoreboards (timed, best-of), templates, assigned training, session notes, voice scoring (experimental). |
-| **Play** | Matches with confirmation, disputes, verification and corrections. Events with registration, waitlists, QR check-in, rotating round robins or fixed-partner teams, knockout brackets, live courts, standings, leaderboard. |
+| **Play** | Matches with confirmation, disputes, verification and corrections. Events in eight formats (Round Robin, Race to, Pre-Mapped Doubles, Unlucky, Rivalry, Fixed Partners, 3v3 Team Draft, Fallout), sign-up links that need no account, player and spectator pages, QR check-in, walk-ins, breaks, timed rounds, single and double elimination, live courts, standings, leaderboard. |
 | **Learn** | Field Notes with rich text, courses and lessons (everyone, members or cohort), progress, saved posts, the decision engine. |
 | **Profile** | Player card with check-in QR, claiming, goals, coach notes, reflections, results, notification settings (including phone push), account and privacy, account deletion. |
-| **Coach Workspace** | Roster, claim codes, private vs shared notes, media, templates, assigning training, cohorts. |
+| **Coach Workspace** | Roster, claim codes, private vs shared notes, media, templates, assigning training, cohorts. The Events desk: Pending Interest (find the group before picking a date), Team Planner (invitations, court blocks, player recaps) and live events. |
 | **Publishing Studio** | Posts and courses: drafts, uploads, preview, review, schedule, publish, revisions. |
 | **Admin** | Roles, membership, reset links, system status, backups. |
 

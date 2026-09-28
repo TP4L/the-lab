@@ -183,33 +183,82 @@ Each player is one of `{athlete_id}` (yourself, or someone you coach),
 recording a match for athletes they coach, without playing in it, is
 verified at once.
 
-## Events, check-in, round robins
+## Events, check-in, rounds
 
 | Method | Path | Who | Notes |
 |---|---|---|---|
-| GET | `/events` | signed in | Published events, plus your drafts. Includes `my_state`. |
-| POST | `/events` | coach | `{title, starts_at, location, description, courts, capacity, format, game_to, status}` |
-| GET | `/events/:id` | signed in | `me`, `counts`, `people`, `rounds` (with live matches), `standings`. Organizers also get player IDs and check-in state. |
-| PUT | `/events/:id` | organizer | Setting `status: "cancelled"` notifies everyone signed up. |
-| POST | `/events/:id/register` | athlete | Goes to `waitlist` when the event is at capacity. |
+| GET | `/events` | signed in | Published events, plus your drafts. Includes `my_state` and `mode_label`. Never includes share links. |
+| POST | `/events` | coach | See **Event settings** below. |
+| GET | `/events/:id` | signed in | `me` (number, state, check-in, break), `counts`, `people`, `rounds` (live matches with `acks`), `standings`, `race`, `teams`, `team_standings`, `bracket`. Organizers also get `links {share, watch}`, contact details, player links for guests, `alerts` per player, `undo` and, for Pre-Mapped Doubles, `schedule`. |
+| PUT | `/events/:id` | organizer | Any setting. `mode` can't change once matches exist. `status: "cancelled"` notifies everyone signed up. |
+| POST | `/events/:id/duplicate` | organizer | `{weeks: 1-8}`. Weekly drafts with the same format; no players or results. |
+| POST | `/events/:id/links` | organizer | `{reset: "share"\|"watch"}`. The old link stops working; registered players keep their own links. |
+| POST | `/events/:id/register` | athlete | Goes to `waitlist` when full. Refused (409) when registration is closed. |
 | POST | `/events/:id/interest` | athlete | |
 | POST | `/events/:id/withdraw` | athlete | Moves the first waitlisted player in, and notifies them. |
-| POST | `/events/:id/checkin` | organizer | `{code}` (a QR payload `THELAB:…`, the 10-character code, or a player ID) or `{athlete_id}`. Walk-ins are registered on the spot. |
-| PUT | `/events/:id/people/:aid` | organizer | `{active}` for late arrivals and early departures; `{state}` to move people between registered, waitlist and withdrawn. |
-| POST | `/events/:id/rounds` | organizer | Starts the next round. See below. |
+| POST | `/events/:id/me` | athlete | `{action: break\|back\|leave}`. Leaving frees the spot for the waitlist. |
+| POST | `/events/:id/checkin` | organizer | `{code}` (a QR payload `THELAB:…`, the 10-character code, or a player ID) or `{athlete_id}`. |
+| POST | `/events/:id/walkin` | organizer | `{name, email?, phone?, checked_in?}`. A player without an account; returns their player `link`. |
+| PUT | `/events/:id/people/:aid` | organizer | `{checked_in}`, `{active}`, `{on_break}`, or `{state: registered\|waitlist\|withdrawn}`. |
+| POST | `/events/:id/attendance/undo` | organizer | Undoes the latest roster change. Refused once a round has started after it. |
+| GET | `/events/:id/rounds/preview?seed=` | organizer | The next round without saving it: courts, sides, head starts, who rests, `seed`. |
+| POST | `/events/:id/rounds` | organizer | `{seed?, force?}`. Send the preview's `seed` to start exactly that round. |
+| POST | `/events/:id/stop` | organizer | Stops every court in the live round: players enter the score as it stands, ties allowed. |
+| POST | `/events/:id/schedule` | organizer | Pre-Mapped Doubles: plans every round now (from sign-ups if nobody has checked in). |
+| POST | `/matches/:id/reopen` | organizer | Back to unscored so the score can be entered again. |
+| POST | `/matches/:id/ack` | player | "Got it": the player has seen their court. |
+| POST | `/me/link-guest` | signed in | `{token}` (a player link or its token). Moves a link registration, its courts and results into the account. |
 | GET | `/me/checkin` | athlete | `{player_id, code, qr}` for the player card QR. |
 
-**How rounds are built.** Rounds are built one at a time from the players who
-are checked in and active right now, so late arrivals and early departures
-take effect next round.
-- Players who have played the fewest games go on court first.
-- Groupings minimise repeat partners, then repeat opponents.
-- Left and right sides follow each player's preferred side, otherwise they
-  alternate.
-- Starting a round while the current one still has unscored matches returns
+**Event settings:**
+
+| Field | Values |
+|---|---|
+| `mode` | `rotate` (Round Robin), `race` (Race to), `premapped` (Pre-Mapped Doubles), `unlucky`, `rivalry`, `fixed` (Fixed Partners), `draft3` (3v3 Team Draft), `fallout` |
+| `courts` | 1–40 |
+| `capacity` | 2–500, or none |
+| `scoring`, `game_to` | `traditional` (default 11) or `rally` (default 21); 5–30 |
+| `round_end` | `all` (every court finishes), `timer` (needs `round_minutes`), `first` (the first finished court stops the round) |
+| `round_minutes` | 1–60: rounds get `ends_at` |
+| `round_limit` | 2–24 |
+| `race_target` | 11–200 (Race to; default 50) |
+| `elimination` | `single` or `double` (Fallout; double takes up to 8 teams) |
+| `registration_open`, `show_roster` | true or false |
+| `status` | `draft`, `published`, `live`, `complete`, `cancelled` |
+
+**How rounds are built.** One round at a time, from players who are checked
+in, playing and not on a break, so late arrivals, breaks and departures take
+effect next round.
+- Players with the fewest games go first, then those who have rested most.
+- Groupings avoid repeat partners and, except in Rivalry, repeat opponents.
+  Rivalry rewards meeting the same opponents again.
+- Unlucky gives each team a head start of 0, 3 or 6 (`start1`, `start2` on
+  the match). Scores can't be lower than the head start.
+- Race to ends the event when a round finishes with someone at the target.
+- Pre-Mapped Doubles follows the saved schedule. If the players present don't
+  match the next planned round, the rounds still to come are rebuilt.
+- 3v3 Team Draft puts two teams of three on a court for three games
+  (same `matchup`); winning two takes the matchup.
+- Starting a round while the current one has unscored matches returns
   **409** unless you send `force`.
-- Players in a round-robin match enter the score with
-  `PUT /matches/:id {version, games}`.
+- Players enter scores with `PUT /matches/:id {version, games}`; the
+  organizer confirms with `POST /matches/:id/verify`.
+
+The engine aims for fairness; it doesn't guarantee a mathematically perfect
+schedule.
+
+### Public links (no account)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/public/events/:shareToken` | The sign-up page: details, counts, who's coming (if shown), live courts and standings, `registration {open, full}`. Drafts return 404. |
+| POST | `/public/events/:shareToken/register` | `{name, email, phone?}` returns `{token, number, state}`. A signed-in athlete registers with their account instead. One sign-up per email per event. Emails the player link when email is set up. |
+| GET | `/watch/:watchToken` | Spectators: courts, standings, bracket, results. No contact details. |
+| GET | `/g/:playerToken` | A guest's player page: the event plus `me` and `guest {name, number, player_id, qr, linked, alerts}`. |
+| POST | `/g/:playerToken/score` | `{match_id, games, version?}` for their own match, until the organizer confirms it. |
+| POST | `/g/:playerToken/ack` | `{match_id}` |
+| POST | `/g/:playerToken/status` | `{action: break\|back\|leave}` |
+| POST | `/g/:playerToken/push` | A Web Push subscription for court alerts; `{test: true}` sends a test. `/push/off` removes it. |
 
 ## Leaderboard
 
@@ -300,23 +349,51 @@ public once the course is published.
 
 ## Team events and brackets
 
-Events have `partner_mode`: `rotating` (a mixer) or `fixed` (teams).
+Fixed Partners and Fallout use teams of two; 3v3 Team Draft uses teams of
+three.
 
 | Method | Path | Who | Notes |
 |---|---|---|---|
 | POST | `/events/:id/register` | athlete | `{partner_player_id?}`. On fixed-partner events this signs up the partner and forms the team. |
-| POST | `/events/:id/teams` | organizer | `{p1, p2, name?}` |
-| POST | `/events/:id/teams/auto` | organizer | Pairs everyone registered who has no team. |
-| DELETE | `/events/:id/teams/:teamId` | organizer | Refused once the team has played. |
-| POST | `/events/:id/rounds` | organizer | On fixed-partner events, schedules whole teams. |
-| POST | `/events/:id/bracket` | organizer | `{seeding: standings\|order, size?, force?}`. Single elimination. |
+| POST | `/events/:id/teams` | organizer | `{p1, p2, p3?, name?}` |
+| POST | `/events/:id/teams/auto` | organizer | Pairs everyone without a team; for 3v3, a snake draft by rating. |
+| DELETE | `/events/:id/teams/:teamId` | organizer | Refused once any team member has played. |
+| POST | `/events/:id/bracket` | organizer | `{seeding: standings\|order, size?, force?}`. Uses the event's `elimination`. |
 
 **Brackets:**
 - Top seeds get byes.
-- Winners advance as bracket matches are scored.
-- Correcting a score re-routes the next match while it's still unplayed.
-- `GET /events/:id` includes `teams`, `team_standings` and
-  `bracket {rounds, champion}`.
+- Winners (and, in double elimination, losers) move on as matches are scored.
+- In double elimination, if the losers-side team wins the grand final, a
+  deciding game is played.
+- Correcting a score re-routes a later match while it's still unplayed.
+- `GET /events/:id` includes `bracket {elimination, rounds, losers, finals, champion}`.
+
+## Pending Interest
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET/POST | `/interest` | coach | `{title, kind, description, skill_level, location, timing, min_people, max_people, options: [{label, starts_at?}]}`. `kind`: training, event, league, clinic, open_play. |
+| GET/PUT/DELETE | `/interest/:id` | owner | Includes `link`, `responses`, per-option tallies and `progress`. |
+| POST | `/interest/:id/status` | owner | `{status: open\|closed}` |
+| DELETE | `/interest/:id/responses/:rid` | owner | |
+| POST | `/interest/:id/schedule` | owner | `{starts_at, ends_at?, location?, include_maybe?}`. Creates a Team Planner plan with the responders as invitees; returns `{plan_id}`. |
+| GET | `/public/interest/:token?edit=` | anyone | Counts, never names. `edit` returns your own answer. |
+| POST | `/public/interest/:token/respond` | anyone | `{name, email, phone?, status: interested\|maybe, option_ids, notes, edit_token?}`. Past `max_people`, interested answers join the waitlist. Returns `edit_token` for changes. |
+
+## Team Planner
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET/POST | `/plans` | coach | `{title, starts_at, ends_at, timezone, location, sport, coaches, message, agenda, handoff, capacity, status, blocks, players}` |
+| GET/PUT/DELETE | `/plans/:id` | owner | PUT takes `version`; a stale version returns 409 with the current plan. `blocks` (up to 30): `{start_time, end_time, court, lead, drill, instructions}`. `handoff` is coaches only. |
+| POST | `/plans/:id/players` | owner | `{players: [{name, email?, phone?, athlete_id?, court?}]}`. Up to 100 per plan. |
+| PUT/DELETE | `/plans/:id/players/:pid` | owner | Contact, `court`, `rsvp`, and recap text `recap_observation`, `recap_cue`, `recap_next`. |
+| POST | `/plans/:id/players/:pid/recap` | owner | `{publish}`. The player sees it on their invitation page. |
+| POST | `/plans/:id/invite` | owner | Publishes a draft; emails invitation links when email is set up. Returns `{sent, mail}`. |
+| POST | `/plans/:id/event` | owner | `{mode?, courts?}`. A live event with everyone who said In registered. |
+| GET/POST | `/plan-library` | coach | Saved `group` (players) and `drill` (`{drill, instructions}`) entries. DELETE `/plan-library/:id`. |
+| GET | `/i/:token` | anyone | The player's invitation: plan, blocks, their answer, court and published recap. Never the handoff or other players' contacts. Drafts return 404. |
+| POST | `/i/:token/rsvp` | anyone | `{rsvp: in\|out\|maybe}`. In when full joins the waitlist; the longest-waiting player moves in when a spot opens. |
 
 ## Phone notifications (Web Push)
 

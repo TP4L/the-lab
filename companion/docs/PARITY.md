@@ -67,19 +67,41 @@ deployed on Render.
 
 ## 6. Games and events
 
+The website's event tools (Pending Interest, Team Planner and the Private
+Event Desk) are rebuilt here, so events live in one system with one login.
+
 | Item | Status | Notes |
 |---|---|---|
 | Casual, training and competition matches, with sides, format and scores | Done | |
 | Self-recorded, opponent-confirmed, organizer-verified, disputed; correction history; duplicate checks | Done | |
+| Pending Interest: interest checks with minimum and maximum, day and time options, a response link, interested / maybe / waitlist, progress, CSV export, close and reopen, set the date | Done | Converts into a Team Planner plan. |
+| Team Planner: date, time zone, location, coaches, message, agenda, court blocks (up to 30), private handoff notes, players (up to 100) with courts | Done | |
+| Team Planner: personal invitation links, In / Out / Maybe, waitlist with automatic promotion | Done | Invitations are emailed when email is set up; otherwise copy or text each link. |
+| Team Planner: one observation, one cue, one next task per player, published to that player's link | Done | |
+| Saved groups and saved drills | Done | |
+| Plan into a live event | Done | Everyone who said In is registered. The website doesn't have this step. |
+| Formats: Round Robin, Race to ( ), Pre-Mapped Doubles, Unlucky (0/3/6 head starts), Rivalry, Fixed Partners, 3v3 Team Draft, Fallout | Done | Rotations aim for fairness; they don't guarantee a perfect schedule. |
+| Fallout single and double elimination, byes, grand-final deciding game | Done | Double elimination takes up to 8 teams. |
+| Settings: courts, capacity, round limit, timed rounds, traditional or rally scoring, round ends when every court / the timer / the first court finishes, race target | Done | |
+| Registration without an account, player numbers, personal player page | Done | |
+| Player and spectator links, QR codes, link resets | Done | Unlisted links: anyone holding one sees names and event details. |
+| Registration open or closed, show or hide who's coming | Done | |
+| Walk-ins, check-in by QR or code, preview and approve the next round, stop all courts, reopen a result, confirm scores | Done | |
+| Late arrivals, breaks, returns, leaving (waitlist moves up), attendance undo before the next change or round | Done | |
+| Court acknowledgments ("Got it") visible to the host | Done | |
+| Players enter their own score, host confirms | Done | |
+| Weekly duplicates (1–8 drafts) | Done | |
+| Calendar file, CSV of roster, results and standings | Done | |
+| Linking a link registration to an account (My Events) | Done | Play → "Signed up with a link". |
 | Event discovery, interest, registration, waitlist, participants | Done | |
-| QR check-in | Done | Camera scanning where the browser supports it (Chrome on Android). Otherwise the organizer types the code shown under the QR. |
-| Rotating round robins, courts, live scores, standings, late arrivals and early departures | Done | |
-| Fixed-partner team events, partner sign-up, team standings | Done | |
-| Knockout brackets with byes and auto-advance | Done | |
-| Leaderboard with opt-out | Done | |
+| Leaderboard with opt-out | Done | Counts confirmed and verified results from players with accounts. |
 | In-app notifications with deep links and preferences | Done | |
-| Reminders 24 hours and 1 hour before events | Done | |
-| Phone push notifications | Configure | `VAPID_*` keys. On iPhone, only when THE LAB is added to the Home Screen (iOS 16.4+). |
+| Reminders 24 hours and 1 hour before events | Done | Automatic, including phone alerts for link-only players. |
+| Sound chime on court changes while the page is open | Done | |
+| Phone push notifications, including for link-only players, with delivery status for the host | Configure | `VAPID_*` keys. "Accepted" means the push service took it, not that the phone showed it. On iPhone, only from the Home Screen (iOS 16.4+). |
+| Payment for events | Blocked | Prices can go in the event details; nothing is charged. See section 8. |
+| Automated SMS | Next | Text buttons open the phone's messaging app. Sending texts automatically needs an SMS service such as Twilio. |
+| Live scores offline | No | Live events refresh every 3 seconds and need a connection. |
 
 ## 7. Publishing Studio
 
