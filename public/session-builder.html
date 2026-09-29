@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>THE LAB · Session Builder</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0d1115;color:#eaf0f4}body{margin:0}main{max-width:1080px;margin:auto;padding:36px 22px}a{color:#75dbcc}small,.muted{color:#9caab4}h1{font-size:clamp(32px,6vw,60px);letter-spacing:-2px;margin:18px 0}h2{font-size:23px}.grid{display:grid;grid-template-columns:1fr 1.2fr;gap:24px}.panel{background:#151c23;border:1px solid #29343e;border-radius:18px;padding:24px}label{display:block;margin:18px 0 8px;font-size:14px}input,select,textarea,button{box-sizing:border-box;font:inherit;border-radius:9px;padding:12px;width:100%;background:#0d1319;color:#eef3f5;border:1px solid #374550}textarea{min-height:140px;resize:vertical}button{cursor:pointer;background:#75dbcc;color:#102522;font-weight:700;margin-top:20px}button.secondary{background:transparent;color:#c9d5dd}.eyebrow{letter-spacing:3px;font-size:12px;color:#75dbcc}.flight{border-top:1px solid #33404a;padding:16px 0}.flight b{color:#75dbcc}#plan{min-height:460px;line-height:1.65}#plan:focus{outline:2px solid #75dbcc}#status{min-height:24px} @media(max-width:750px){.grid{grid-template-columns:1fr}}@media print{body{background:white;color:black}header,.form,.actions,.muted{display:none}.grid{display:block}.panel{background:white;border:0}#plan{color:black}.flight b{color:black}main{padding:0}}
+</style><main><header><a href="/">← Decision engine</a><p class="eyebrow">THE LAB / COACH TOOLS / 02</p><h1>Build the next session.</h1><p class="muted">Find the problem. Train the solution. Test it under pressure.</p></header>
+<div class="grid"><section class="panel form"><h2>Session inputs</h2><p class="muted">This rule-based builder uses your selected focus. Notes are included for your review; they are not analyzed by AI. Inputs stay in this tab.</p>
+<label for="athlete">Athlete or group</label><input id="athlete" maxlength="120" placeholder="e.g. Tuesday training group">
+<label for="size">Players per court</label><select id="size"><option value="4">4 · rotating doubles</option><option value="2">2 · partner reps</option><option value="1">1 · coach-fed reps</option></select>
+<label for="focus">Training focus</label><select id="focus"><option value="movement">Movement & preparation</option><option value="reset">Resets & transition</option><option value="counter">Counters & pressure</option><option value="decision">Shot selection</option></select>
+<label for="rounds">Rounds per flight</label><select id="rounds"><option value="1">1 · 26 minutes of work</option><option value="2">2 · 52 minutes of work</option><option value="3">3 · 78 minutes of work</option></select>
+<label for="notes">Your coaching notes</label><textarea id="notes" maxlength="6000" placeholder="What did you observe? What needs to change?"></textarea><button id="build">Build session draft</button></section>
+<section class="panel"><p class="eyebrow">COACH REVIEW</p><div id="plan" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Editable session draft"><h2>Your next session starts here.</h2><p>Select a focus and build a draft. Then edit any cue, constraint or test to fit the athlete.</p></div><div class="actions"><button class="secondary" id="copy">Copy plan</button><button class="secondary" id="print">Print / save PDF</button><p id="status" role="status"></p></div></section></div></main>
+<script>
+const drills={
+movement:['Move early enough to choose the shot.','Cooperative crosscourt reps. Recover between balls and name Height, Time and Balance before changing direction.','Live points: track whether preparation allowed a choice. Keep one cue: feet early, hands ready.','Open points. Track late preparation and the longest rally. Compare the opening and closing rounds.'],
+reset:['Create enough time and balance to move forward.','Coach or partner feeds into transition. Reset to an agreed target, recover balance, then move.','Live points from transition. Track resets that buy time and allow a balanced next ball.','Open points. Count successful transitions and identify which ball made the next move possible.'],
+counter:['Prepare for the attack and organize the next ball.','Controlled speed-up and counter reps. Begin at a pace both players can read and reset the rally after each exchange.','Live points: speed up only when the selected Height, Time and Balance read supports it. Track the counter and next-ball position.','Open points. Track attacks absorbed, balanced counters and recoveries after the exchange.'],
+decision:['Read the ball before choosing the action.','Cooperative rallies. Name Neutral, Defensive or Offensive and choose one action from that read.','Live points: pause between rallies to identify the read, action and expected next ball.','Open points. Record one sound choice and one choice to revisit. Separate decision errors from execution errors.']
+};
+const $=id=>document.getElementById(id);
+function el(tag,text){const n=document.createElement(tag);n.textContent=text;return n;}
+function build(){
+const d=drills[$('focus').value],r=Number($('rounds').value),s=Number($('size').value),p=$('plan');p.replaceChildren();
+p.append(el('h2',($('athlete').value.trim()||'THE LAB')+' · Session draft'),el('p','Primary goal: '+d[0]),el('p',(26*r)+' minutes of work + warm-up, feedback and rotation time.'));
+[5,8,13].forEach((m,i)=>{const n=document.createElement('div');n.className='flight';n.append(el('b','Flight '+(i+1)+' · '+m+' minutes × '+r+' round'+(r>1?'s':'')),el('p',d[i+1]));p.append(n);});
+const rotation=s===4?'For four players, use AB vs CD, AC vs BD, AD vs BC across successive rounds. Continue the sequence between flights.':s===2?'Alternate feeder and receiver each round; switch ends between flights.':'Use coach-fed reps with recovery breaks; the coach adjusts feed difficulty to the athlete.';
+p.append(el('h3','Rotation & feedback'),el('p',rotation),el('p','Between flights: What changed in Height, Time or Balance? Which cue helped? Record the longest rally. Use the same starting condition to compare rounds.'));
+if($('notes').value.trim())p.append(el('h3','Coach observations to review'),el('p',$('notes').value.trim()));
+p.append(el('h3','Next session'),el('p','Keep one cue that worked. Choose one problem still unresolved. Record the result of the pressure test before setting the next focus.'));
+$('status').textContent='Draft ready. Click the plan to edit before sharing.';
+}
+$('build').onclick=build;$('print').onclick=()=>window.print();
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('plan').innerText);$('status').textContent='Plan copied.';}catch(e){$('status').textContent='Select the plan text and copy it manually.';}};
+</script></html>
