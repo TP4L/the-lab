@@ -537,3 +537,9 @@ a.bslot:hover{border-color:var(--ink);}
 .host-ctl summary{cursor:pointer;}
 fieldset.field{border:0;padding:0;margin:0;min-width:0;}
 fieldset.field legend{padding:0;margin-bottom:6px;}
+
+/* ---------- demo ---------- */
+.demobar{background:var(--warn-soft);color:var(--ink);border-bottom:1px solid var(--warn);font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-align:center;padding:7px 16px;}
+.demo-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:8px;}
+.demo-btns .btn{flex-direction:column;align-items:flex-start;text-align:left;gap:4px;min-height:64px;padding:12px 14px;}
+.demo-btns .btn span{font-family:var(--body);font-size:13px;letter-spacing:0;text-transform:none;font-weight:400;opacity:.85;}

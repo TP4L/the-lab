@@ -16,6 +16,7 @@ function createApp(opts = {}) {
 
   const config = {
     adminEmail: opts.adminEmail || '',
+    demo: !!opts.demo,
     googleClientId: opts.googleClientId || '',
     googleClientSecret: opts.googleClientSecret || '',
     googleEnabled: !!(opts.googleClientId && opts.googleClientSecret),
@@ -49,7 +50,7 @@ function createApp(opts = {}) {
   const { MODES } = require('./formats.js');
   const { SCORING, ROUND_END } = require('./api/play.js');
   const { KINDS } = require('./api/planning.js');
-  r.get('/api/meta', () => ({ lanes: LANES, version: 4, google: !!config.googleEnabled, push: !!config.pushEnabled, email: !!config.mailEnabled, modes: MODES, scoring: SCORING, round_end: ROUND_END, interest_kinds: KINDS }));
+  r.get('/api/meta', () => ({ lanes: LANES, version: 4, google: !!config.googleEnabled, push: !!config.pushEnabled, email: !!config.mailEnabled, demo: !!config.demo, modes: MODES, scoring: SCORING, round_end: ROUND_END, interest_kinds: KINDS }));
 
   require('./api/account.js')(r, ctx);
   require('./api/training.js')(r, ctx);
@@ -59,6 +60,7 @@ function createApp(opts = {}) {
   require('./api/learn.js')(r, ctx);
   require('./api/coaching.js')(r, ctx);
   require('./api/planning.js')(r, ctx);
+  require('./demo.js').routes(r, ctx);
   require('./api/notify.js').routes(r, ctx);
 
   /* Admin: list and download nightly backups (for an off-site copy). */
@@ -167,22 +169,31 @@ module.exports = { createApp };
 
 if (require.main === module) {
   const port = Number(process.env.PORT) || 8787;
-  const file = process.env.LAB_DB || path.join(__dirname, '..', 'data', 'lab.db');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
+  // Demo mode: sample data in memory, fresh on every start, nothing sent out.
+  const demo = process.env.DEMO_MODE === '1';
+  const file = demo ? ':memory:' : process.env.LAB_DB || path.join(__dirname, '..', 'data', 'lab.db');
+  if (!demo) fs.mkdirSync(path.dirname(file), { recursive: true });
   const { server } = createApp({
-    file,
-    mediaDir: process.env.LAB_MEDIA_DIR,
-    adminEmail: process.env.ADMIN_EMAIL || '',
+    file, demo,
+    backupDir: demo ? null : undefined,
+    mediaDir: demo ? fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'lab-demo-')) : process.env.LAB_MEDIA_DIR,
+    adminEmail: demo ? require('./demo.js').DEMO_USERS.host.email : process.env.ADMIN_EMAIL || '',
     publicUrl: process.env.PUBLIC_URL || `http://localhost:${port}`,
     secureCookies: process.env.SECURE_COOKIES === '1',
-    resendKey: process.env.RESEND_API_KEY || '',
+    resendKey: demo ? '' : process.env.RESEND_API_KEY || '',
     mailFrom: process.env.MAIL_FROM || '',
-    vapidPublic: process.env.VAPID_PUBLIC_KEY || '',
+    vapidPublic: demo ? '' : process.env.VAPID_PUBLIC_KEY || '',
     vapidPrivate: process.env.VAPID_PRIVATE_KEY || '',
     vapidSubject: process.env.VAPID_SUBJECT || '',
-    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+    googleClientId: demo ? '' : process.env.GOOGLE_CLIENT_ID || '',
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     trustProxy: process.env.TRUST_PROXY === '1'
   });
-  server.listen(port, () => console.log(`THE LAB running at http://localhost:${port}`));
+  server.listen(port, () => {
+    console.log(`THE LAB running at http://localhost:${port}${demo ? ' (demo)' : ''}`);
+    if (!demo) return;
+    require('./demo.js').seedDemo(`http://127.0.0.1:${port}`).then(() => console.log('Demo data ready.'), e => console.error('Demo seeding failed:', e));
+    // Start fresh once a day; the host restarts the service.
+    setTimeout(() => process.exit(0), 24 * 3600e3).unref();
+  });
 }

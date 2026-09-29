@@ -45,3 +45,23 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+
+  # A public demo with sample data. It keeps everything in memory, so it needs
+  # no disk and starts fresh on every restart (and at least once a day).
+  # No email, phone notifications or Google sign-in: nothing leaves the demo.
+  - type: web
+    name: the-lab-demo
+    runtime: docker
+    rootDir: companion
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DEMO_MODE
+        value: "1"
+      - key: SECURE_COOKIES
+        value: "1"
+      - key: TRUST_PROXY
+        value: "1"

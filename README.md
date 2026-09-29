@@ -100,6 +100,22 @@ restart.
 - `companion/docs/PARITY.md` lists what's done, what needs infrastructure, and
   what remains before the iOS and Android releases.
 
+### Demo
+
+`DEMO_MODE=1 npm start` (in `companion/`) runs a demo with sample pickleball
+data and one-tap sign-in as the host, a player or an assistant coach. It
+includes:
+- a live Rivalry event on courts 4 and 5
+- a double-elimination Fallout bracket
+- a Race to 50 and a 3v3 draft
+- an interest check
+- a coached session plan with a recap
+- Field Notes and a course
+
+The data lives in memory, so it resets on every restart and at least once a
+day. Email, phone notifications and Google sign-in are off. `render.yaml`
+includes a free `the-lab-demo` service that runs it.
+
 ## Layout
 
 | Path | What's in it |

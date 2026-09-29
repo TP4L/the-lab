@@ -57,6 +57,8 @@
   views.signin = function (_, query) {
     app.innerHTML = '<div class="auth-wrap"><h1 class="brandmark">THE <span>LAB</span></h1><p class="muted">Know what to work on, do the work, record what happened, know what comes next.</p>' +
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
+      '<div class="card stack demo-card" id="democard" hidden><p class="section-title">Try the demo</p><p class="small">Sample players, a live event on courts 4 and 5, a double-elimination bracket, interest checks, a coached session plan and Field Notes. Nothing is emailed, and everything resets daily.</p>' +
+      '<div class="demo-btns"><button class="btn primary" type="button" data-demo="host">Host and coach<span>Brett: runs events, plans, publishing</span></button><button class="btn" type="button" data-demo="player">Player<span>Jordan: courts, scores, notes, recap</span></button><button class="btn ghost" type="button" data-demo="coach">Assistant coach<span>Austin: roster and training</span></button></div></div>' +
       '<a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
@@ -70,7 +72,12 @@
         .then(function (m) { setMe(m); location.hash = '#/'; }, function (err) { L.formError($('#f'), err.status === 0 ? 'You’re offline. Sign in needs a connection.' : err.message); });
     });
     if (META.google) $('#gbtn').hidden = false;
-    $('#em').focus();
+    if (META.demo) $('#democard').hidden = false;
+    $$('[data-demo]').forEach(function (b) { b.addEventListener('click', function () {
+      api.request('POST', '/api/demo/login', { as: b.getAttribute('data-demo') }).then(function () { return api.request('GET', '/api/me'); })
+        .then(function (m) { setMe(m); location.hash = b.getAttribute('data-demo') === 'player' ? '#/play' : '#/coach/desk'; }, function (err) { L.toast(err.message); });
+    }); });
+    if (!META.demo) $('#em').focus();
   };
 
   views.signup = function () {
@@ -1905,7 +1912,9 @@
   if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
 
   // Confirm the session is still valid, then render.
-  api.request('GET', '/api/meta').then(function (m) { META = m; Store.set('meta', m); if ($('#gbtn') && m.google) $('#gbtn').hidden = false; }, function () {});
+  function demoBar() { $('#demobar').hidden = !META.demo; if ($('#democard') && META.demo) $('#democard').hidden = false; }
+  demoBar();
+  api.request('GET', '/api/meta').then(function (m) { META = m; Store.set('meta', m); if ($('#gbtn') && m.google) $('#gbtn').hidden = false; demoBar(); }, function () {});
   if (ME) api.request('GET', '/api/me').then(function (m) { setMe(m); }, function (err) { if (err.status === 401) setMe(null); }).then(function () { route(); pollBell(); });
   else route();
   L.status(); L.flush();
