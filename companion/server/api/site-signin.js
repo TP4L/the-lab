@@ -9,12 +9,12 @@ const hex=/^[a-f0-9]{64}$/;
 module.exports=function(r,{db,auth,config}){
  const cookie=(value,age)=>`lab_site_state=${value}; Path=/api/site-bridge/signin; HttpOnly; SameSite=Lax; Max-Age=${age}${config.secureCookies?'; Secure':''}`;
  function redirect(res,to,cookies){res.writeHead(302,{Location:to,'Cache-Control':'no-store','Referrer-Policy':'no-referrer',...(cookies?{'Set-Cookie':cookies}:{})});res.end()}
- r.get('/api/site-bridge/signin/start',({user,res})=>{
+ r.get('/api/site-bridge/signin/start',({user,res,query})=>{
   if(config.demo)throw new HttpError(403,'Shared sign-in is unavailable in demo mode.');
   const state=random(),verifier=random();
   db.prepare('DELETE FROM website_signin_states WHERE expires_at<?').run(Date.now());
   db.prepare('INSERT INTO website_signin_states(state_hash,verifier,user_id,expires_at) VALUES(?,?,?,?)').run(sha256(state),verifier,user?.id||null,Date.now()+600000);
-  redirect(res,SITE+'/app-signin?'+new URLSearchParams({state,challenge:sha256(verifier)}),cookie(state,600));
+  redirect(res,SITE+'/app-signin?'+new URLSearchParams({state,challenge:sha256(verifier),...(query.get('workspace')==='1'?{workspace:'1'}:{})}),cookie(state,600));
  });
  r.get('/api/site-bridge/signin/callback',async({req,res,user,query})=>{
   const fail=message=>redirect(res,'/#/signin?error='+encodeURIComponent(message),cookie('',0));
@@ -26,6 +26,29 @@ module.exports=function(r,{db,auth,config}){
   let d;
   try{const response=await config.fetchImpl(SITE+'/api/app-signin',{method:'POST',redirect:'error',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'exchange',code,verifier:pending.verifier}),signal:AbortSignal.timeout(12000)});d=await response.json();if(!response.ok)throw Error(d.error||'Website sign-in unavailable.');}
   catch(e){return fail(e.message||'Website sign-in unavailable. Please retry.')}
+  if(d.staff===true){
+   try {
+    if(!hex.test(d.token||'')||typeof d.subject!=='string'||!d.subject||!['brettadamstp@gmail.com','austinajie@gmail.com'].includes(d.email)||!Number.isFinite(d.expiresAt)||d.expiresAt<=Date.now())throw Error('Staff identity could not be verified.');
+    const id=tx(db,()=>{
+     const prior=db.prepare('SELECT user_id FROM website_staff_connections WHERE subject=?').get(d.subject);
+     const player=db.prepare('SELECT user_id FROM website_identities WHERE subject=?').get(d.subject);
+     if(prior&&player&&prior.user_id!==player.user_id)throw Error('These identities need review before linking.');
+     let id=prior?.user_id||player?.user_id||pending.user_id;
+     if(pending.user_id&&id!==pending.user_id)throw Error('Sign out and continue with your own staff account.');
+     if(!id){
+      if(db.prepare('SELECT id FROM users WHERE email=?').get(d.email))throw Error('Sign in to your existing app account once, then open Your workspace and connect staff access.');
+      id=Number(db.prepare('INSERT INTO users(email,name,password_hash,roles) VALUES(?,?,?,?)').run(d.email,d.name||d.email,'oauth$website$'+random(),'["athlete"]').lastInsertRowid);
+     }
+     const account=db.prepare('SELECT email FROM users WHERE id=?').get(id);
+     if(account.email.toLowerCase()!==d.email)throw Error('The app and website staff emails must match. Sign out and use your own staff account.');
+     const other=db.prepare('SELECT subject FROM website_staff_connections WHERE user_id=?').get(id);
+     if(other&&other.subject!==d.subject)throw Error('A different website identity is already connected.');
+     db.prepare('INSERT INTO website_staff_connections(user_id,subject,email,token,expires_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET token=excluded.token,expires_at=excluded.expires_at,email=excluded.email').run(id,d.subject,d.email,d.token,d.expiresAt);
+     return id;
+    });
+    return redirect(res,'/#/workspace',[cookie('',0),auth.startSession(id).cookie]);
+   }catch(e){return fail(e.message||'Staff connection could not complete.')}
+  }
   if(!hex.test(d.token||'')||typeof d.subject!=='string'||!d.subject||typeof d.email!=='string'||! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)||typeof d.athlete?.id!=='string'||typeof d.athlete?.name!=='string')return fail('Website identity could not be verified.');
   try{
    const id=tx(db,()=>{

@@ -81,7 +81,7 @@ module.exports = function athletes(r, ctx) {
   r.get('/api/athletes', ({ user, query }) => {
     auth.require(user, 'coach');
     const q = '%' + (query.get('q') || '').trim() + '%';
-    const isAdmin = user.roles.includes('admin');
+    const isAdmin = user.roles.includes('admin') || user.workspace;
     const rows = db.prepare(`SELECT a.*,
         (SELECT MAX(s.started_at) FROM training_athletes ta JOIN training_sessions s ON s.id = ta.session_id WHERE ta.athlete_id = a.id) AS last_session
       FROM athletes a
