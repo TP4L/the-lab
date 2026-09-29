@@ -19,10 +19,10 @@ const log = (...a) => console.log(...a);
     const me = await p.evaluate(async () => (await (await fetch('/api/me')).json()));
     return { c, p, pid: me.athlete_id ? 'LAB-' + String(me.athlete_id).padStart(5, '0') : null };
   }
-  const go = async (u, hash, ms = 700) => { await u.p.goto(B + hash); await u.p.waitForTimeout(ms); };
+  const go = async (u, hash, ms = 700) => { if (u.p.url() === B + hash) await u.p.reload(); else await u.p.goto(B + hash); await u.p.waitForTimeout(ms); };
   const org = await user('Brett Owner', 'owner@lab.test', false);
   await go(org, '#/play/events/new');
-  await org.p.fill('#t', 'Saturday Cup'); await org.p.selectOption('#mode', 'fixed'); await org.p.fill('#courts', '2');
+  await org.p.fill('#t', 'Saturday Cup'); await org.p.selectOption('#mode', 'fixed');
   await org.p.click('#ef button[type=submit]'); await org.p.waitForTimeout(700);
   const eid = await org.p.evaluate(() => location.hash.split('/').pop());
   const ps = [];
@@ -37,6 +37,7 @@ const log = (...a) => console.log(...a);
   log('teams after auto:', await org.p.$$eval('#tab .li .t', x => x.map(y => y.textContent)));
   await org.p.click('#etabs [data-v=bracket]'); await org.p.waitForTimeout(400);
   await org.p.selectOption('#bseed', 'order'); await org.p.click('#mkbr'); await org.p.waitForTimeout(900);
+  await org.p.click('#gob'); await org.p.waitForTimeout(900);
   log('bracket columns:', await org.p.$$eval('.bcol .section-title', x => x.map(y => y.textContent)), '| slots:', await org.p.$$eval('.bslot', x => x.map(y => y.textContent.replace(/\s+/g, ' ').trim())));
   await org.p.screenshot({ path: OUT + '/e2e/bracket-start.png', fullPage: true });
   // Score the semifinal from the bracket, then the final.

@@ -116,11 +116,14 @@
         }, function () {});
       }, ms);
     }
+    function clock(sec) { sec = Math.max(0, sec); return Math.floor(sec / 60) + ':' + ('0' + (sec % 60)).slice(-2); }
     function timerHTML(rd) {
       if (!rd || rd.status !== 'live') return '';
       if (rd.stopped) return '<p class="timer over">Play stopped. Enter scores as they stand.</p>';
-      if (!rd.ends_at) return '';
-      return '<p class="timer" data-ends="' + h(rd.ends_at) + '" role="timer" aria-live="off"></p>';
+      var t = rd.timer;
+      if (!t) return '';
+      if (t.running) return '<p class="timer" data-ends="' + h(t.ends_at) + '" role="timer" aria-live="off"></p>';
+      return '<p class="timer paused" role="timer">' + (t.remaining <= 0 ? 'Time’s up. Enter scores as they stand.' : (t.started ? 'Timer paused · ' + clock(t.remaining) + ' left' : 'Timer ready · ' + clock(t.remaining) + ', starts when the host says go')) + '</p>';
     }
     var tick = null;
     function runTimers() {
@@ -258,7 +261,7 @@
 
     views.eventForm = function (id) {
       if (!has('coach')) return C.forbidden('Only coaches and organizers can create events.');
-      return (id ? api.get('/api/events/' + id) : Promise.resolve({ title: '', description: '', location: '', starts_at: new Date(Date.now() + 864e5).toISOString(), courts: 2, capacity: null, format: 'round_robin', mode: 'rotate', scoring: 'traditional', game_to: 11, round_end: 'all', round_minutes: null, round_limit: null, race_target: 50, elimination: 'single', registration_open: true, show_roster: true, status: 'published' })).then(function (e) {
+      return (id ? api.get('/api/events/' + id) : Promise.resolve({ title: '', description: '', location: '', starts_at: new Date(Date.now() + 864e5).toISOString(), courts: 2, capacity: null, format: 'round_robin', mode: 'rotate', scoring: 'traditional', game_to: 11, round_end: 'all', round_minutes: null, round_limit: null, race_target: 50, elimination: 'single', registration_open: true, show_roster: true, late_join: true, court_numbers: [1, 2], status: 'published' })).then(function (e) {
         var locked = id && (e.rounds.length || e.bracket);
         app.innerHTML = '<a class="back" href="' + (id ? '#/play/events/' + id : '#/play/events') + '">← ' + (id ? 'Event' : 'Events') + '</a>' + head('Organizer', id ? 'Edit event' : 'New event') +
           '<form class="card form" id="ef" novalidate>' +
@@ -267,7 +270,8 @@
           '<div class="field"><label class="flabel" for="en">Ends <span class="hint">optional</span></label><input type="datetime-local" id="en" value="' + local(e.ends_at) + '"></div>' +
           '<div class="field"><label class="flabel" for="loc">Location</label><input type="text" id="loc" maxlength="200" value="' + h(e.location) + '"></div></div>' +
           '<div class="field"><label class="flabel" for="mode">Format</label><select id="mode"' + (locked ? ' disabled' : '') + '>' + Object.keys(MODES).map(function (k) { return '<option value="' + k + '"' + (e.mode === k ? ' selected' : '') + '>' + MODES[k] + '</option>'; }).join('') + '</select><p class="small muted" id="modehelp"></p>' + (locked ? '<p class="small muted">The format is locked once play has started.</p>' : '') + '</div>' +
-          '<div class="form-grid"><div class="field"><label class="flabel" for="courts">Courts</label><input type="number" id="courts" min="1" max="40" value="' + e.courts + '"></div>' +
+          '<fieldset class="field"><legend class="flabel">Courts</legend><div class="court-pick">' + Array.apply(null, { length: Math.max(6, Math.max.apply(null, e.court_numbers || [e.courts])) }).map(function (_, i) { var n = i + 1, on = (e.court_numbers || Array.apply(null, { length: e.courts }).map(function (_, j) { return j + 1; })).indexOf(n) >= 0; return '<label><input type="checkbox" value="' + n + '"' + (on ? ' checked' : '') + (locked && ['draft3', 'fallout'].indexOf(e.mode) >= 0 ? ' disabled' : '') + '> ' + n + '</label>'; }).join('') + '</div><p class="small muted">Pick the actual courts you have, e.g. 4 and 5.</p></fieldset>' +
+          '<div class="form-grid">' +
           '<div class="field"><label class="flabel" for="cap">Player capacity</label><input type="number" id="cap" min="2" max="500" value="' + (e.capacity || '') + '" placeholder="No limit"></div>' +
           '<div class="field"><label class="flabel" for="scoring">Scoring</label><select id="scoring"><option value="traditional"' + (e.scoring !== 'rally' ? ' selected' : '') + '>Traditional</option><option value="rally"' + (e.scoring === 'rally' ? ' selected' : '') + '>Rally scoring</option></select></div>' +
           '<div class="field"><label class="flabel" for="gto">Games to</label><input type="number" id="gto" min="5" max="30" value="' + e.game_to + '"></div></div>' +
@@ -278,7 +282,8 @@
           '<div class="field" id="elimf"><label class="flabel" for="elim">Elimination</label><select id="elim"><option value="single"' + (e.elimination !== 'double' ? ' selected' : '') + '>Single elimination</option><option value="double"' + (e.elimination === 'double' ? ' selected' : '') + '>Double elimination (up to 8 teams)</option></select></div>' +
           '<div class="field"><label class="flabel" for="desc">Details</label><textarea id="desc" maxlength="4000" placeholder="What to bring, prices, parking. Prices here are information only; this doesn’t take payment.">' + h(e.description) + '</textarea></div>' +
           '<div class="toggles"><label class="tog" for="ropen"><input type="checkbox" id="ropen"' + (e.registration_open ? ' checked' : '') + '><div><b>Registration open</b><span>Players can sign up with the event link.</span></div></label>' +
-          '<label class="tog" for="roster"><input type="checkbox" id="roster"' + (e.show_roster ? ' checked' : '') + '><div><b>Show who’s coming</b><span>Players see the names of everyone registered.</span></div></label></div>' +
+          '<label class="tog" for="roster"><input type="checkbox" id="roster"' + (e.show_roster ? ' checked' : '') + '><div><b>Show who’s coming</b><span>Players see the names of everyone registered.</span></div></label>' +
+          '<label class="tog" for="late"><input type="checkbox" id="late"' + (e.late_join !== false ? ' checked' : '') + '><div><b>Late joining</b><span>Rotating formats: players can still join after play starts, from the next round.</span></div></label></div>' +
           '<div class="field"><label class="flabel" for="status">Visibility</label><select id="status">' + [['draft', 'Draft (only you)'], ['published', 'Published (open for sign-ups)'], ['live', 'Live'], ['complete', 'Complete'], ['cancelled', 'Cancelled']].map(function (o) { return '<option value="' + o[0] + '"' + (e.status === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
           '<div class="row"><button class="btn primary" type="submit">Save event</button></div></form>';
         function paint() {
@@ -293,9 +298,11 @@
         paint();
         $('#ef').addEventListener('submit', function (ev) {
           ev.preventDefault();
-          var body = { title: $('#t').value, starts_at: fromLocal($('#st').value), ends_at: fromLocal($('#en').value) || null, location: $('#loc').value, courts: $('#courts').value, capacity: $('#cap').value || null,
+          var picked = $$('.court-pick input:checked').map(function (x) { return Number(x.value); });
+          if (!picked.length) return L.formError($('#ef'), 'Pick at least one court.');
+          var body = { title: $('#t').value, starts_at: fromLocal($('#st').value), ends_at: fromLocal($('#en').value) || null, location: $('#loc').value, court_numbers: picked, capacity: $('#cap').value || null,
             scoring: $('#scoring').value, game_to: $('#gto').value, round_end: $('#rend').value, round_minutes: $('#rmin').value || null, round_limit: $('#rlim').value || null,
-            race_target: $('#race').value || null, elimination: $('#elim').value, description: $('#desc').value, registration_open: $('#ropen').checked, show_roster: $('#roster').checked, status: $('#status').value };
+            race_target: $('#race').value || null, elimination: $('#elim').value, description: $('#desc').value, registration_open: $('#ropen').checked, show_roster: $('#roster').checked, late_join: $('#late').checked, status: $('#status').value };
           if (!locked) body.mode = $('#mode').value;
           if (body.mode === 'fallout' || e.mode === 'fallout') body.round_end = 'all';
           api.request(id ? 'PUT' : 'POST', '/api/events' + (id ? '/' + id : ''), body).then(function (r) { L.toast('Event saved'); location.hash = '#/play/events/' + r.id; }, function (err) { L.formError($('#ef'), err.status === 0 ? 'Saving an event needs a connection.' : err.message); });
@@ -328,16 +335,18 @@
         if (e.mode === 'fixed' || e.mode === 'fallout') tabs.push(['bracket', 'Bracket']);
         tabs.push(['standings', 'Standings'], ['people', org ? 'Check-in' : 'Players']);
         if (org && e.mode === 'premapped') tabs.push(['schedule', 'Schedule']);
+        if (org && e.fairness) tabs.push(['fairness', 'Fairness']);
         if (org) tabs.push(['share', 'Share']);
         if (!tabs.some(function (t) { return t[0] === tab; })) tab = 'info';
-        var body = { info: info, courts: courts, teams: teamsTab, bracket: bracketTab, standings: standingsTab, people: peopleTab, schedule: scheduleTab, share: shareTab }[tab]();
+        var body = { info: info, courts: courts, teams: teamsTab, bracket: bracketTab, standings: standingsTab, people: peopleTab, schedule: scheduleTab, share: shareTab, fairness: fairnessTab }[tab]();
         var hostBtns = org ? '<div class="row"><a class="btn ghost" href="#/play/events/' + e.id + '/edit">Edit</a>' +
-          (e.mode !== 'fallout' && ['published', 'live', 'draft'].indexOf(e.status) >= 0 ? '<button class="btn primary" type="button" id="next">Preview round ' + (e.rounds.length + 1) + '</button>' : '') +
+          (['published', 'live', 'draft'].indexOf(e.status) >= 0 && (e.mode !== 'fallout' || !e.bracket) ? '<button class="btn primary" type="button" id="next">' + (e.started ? 'Preview round ' + (e.rounds.length + 1) : 'Preview event') + '</button>' : '') +
           (liveRound && !liveRound.stopped ? '<button class="btn danger" type="button" id="stop">Stop all courts</button>' : '') +
           (e.status === 'live' ? '<button class="btn ghost" type="button" id="finish">Finish event</button>' : '') + '</div>' : '';
         app.innerHTML = '<a class="back" href="#/play">← Play</a>' + C.offlineNote(e) +
           head((e.status === 'live' ? 'Live · ' : e.status === 'draft' ? 'Draft · ' : e.status === 'complete' ? 'Final · ' : '') + (e.mode_label || MODES[e.mode]), e.title, fmtWhen(e.starts_at) + (e.location ? ' · ' + e.location : ''), hostBtns) +
           (org && e.undo ? '<div class="banner"><span>Last change: ' + h(e.undo.label) + '.</span><button class="btn sm" type="button" id="undo">Undo</button></div>' : '') +
+          (org && e.draw && e.draw.stale ? '<div class="banner"><span>The roster or settings changed since your preview. Preview again before starting.</span></div>' : '') +
           '<div id="preview"></div>' +
           (!org && e.me && e.me.state === 'registered' && e.status !== 'complete' ? assignmentCard(e, mine) + selfButtons(e) : '') +
           (org && liveRound && tab !== 'courts' ? timerHTML(liveRound) : '') +
@@ -363,11 +372,35 @@
               (!e.me || e.me.state === 'withdrawn' ? '<button class="btn" type="button" data-reg="interest">Interested</button>' : '') +
               (e.me && e.me.state !== 'withdrawn' ? '<button class="btn ghost" type="button" data-reg="withdraw">Withdraw</button>' : '') + '</div>' : '') +
             (closed && (!e.me || e.me.state === 'withdrawn') ? '<p class="small muted">Registration is closed.</p>' : '') +
+            (e.started && ['complete', 'cancelled'].indexOf(e.status) < 0 ? '<p class="small muted">' + (e.locked ? 'Play has started and the teams are locked.' : e.late_join ? 'Play has started. Late joining is open: new players are added from the next round.' : 'Play has started. Late joining is closed.') + '</p>' : '') +
             (e.me && e.me.state !== 'withdrawn' ? '<p class="small">You’re <b>' + h(e.me.state) + '</b>' + (e.me.number ? ' as player #' + e.me.number : '') + (e.me.checked_in ? ', checked in.' : '. Show the QR on your Profile at check-in.') + '</p>' : '') +
             (!me || !me.athlete_id ? '<p class="small muted">Set up your athlete profile to register.</p>' : '') +
             '<div class="row">' + calendarButton() + '</div></div>';
         }
-        function courts() { return courtsHTML(e, { mine: mine, org: org, link: true }) + (e.rounds.length ? '<div class="row"><button class="btn sm ghost" type="button" data-csv="matches">Download results (CSV)</button></div>' : ''); }
+        function courts() { return (org ? hostControls() : '') + courtsHTML(e, { mine: mine, org: org, link: true }) + (e.rounds.length ? '<div class="row"><button class="btn sm ghost" type="button" data-csv="matches">Download results (CSV)</button></div>' : ''); }
+        /* Courts & round timing: the timer, round length, which courts, late joining. */
+        function hostControls() {
+          var t = liveRound && liveRound.timer, ended = !liveRound || liveRound.stopped;
+          var maxCourt = Math.max(6, Math.max.apply(null, e.court_numbers));
+          var rotating = ['rotate', 'race', 'premapped', 'unlucky', 'rivalry'].indexOf(e.mode) >= 0;
+          return '<details class="card host-ctl"' + (Store.get('hostctl', true) ? ' open' : '') + '><summary class="section-title">Courts & round timing</summary><div class="stack">' +
+            (t && !ended ? '<div class="stack-sm"><p class="flabel">Round ' + liveRound.number + ' timer</p><div class="row">' +
+              (t.running ? '<button class="btn" type="button" data-timer="stop">Stop timer</button>' : '<button class="btn primary" type="button" data-timer="start"' + (t.remaining <= 0 ? ' disabled' : '') + '>' + (t.started ? 'Resume timer' : 'Start timer') + '</button>') +
+              '<button class="btn ghost" type="button" data-adj="add">Add 1 minute</button><button class="btn ghost" type="button" id="treset">Reset timer</button></div>' +
+              '<p class="small muted">Stop timer pauses the clock. Stop all courts ends the round and asks for scores.</p></div>' : '') +
+            '<form class="row" id="lenf" novalidate><label class="flabel" for="rlen">Upcoming rounds (minutes)</label><input type="number" id="rlen" min="1" max="60" value="' + (e.round_minutes || '') + '" placeholder="No timer" style="width:110px"><button class="btn sm" type="submit">Save round length</button></form>' +
+            '<fieldset class="field"><legend class="flabel">Courts in use</legend><div class="court-pick">' + Array.apply(null, { length: maxCourt }).map(function (_, i) { var n = i + 1; return '<label><input type="checkbox" value="' + n + '"' + (e.court_numbers.indexOf(n) >= 0 ? ' checked' : '') + (e.locked ? ' disabled' : '') + '> ' + n + '</label>'; }).join('') + '</div>' +
+            (e.locked ? '<p class="small muted">Courts are locked now that the teams have started.</p>' : '<div class="row"><button class="btn sm" type="button" id="savecourts">Save courts</button><button class="btn sm ghost" type="button" id="addcourt">Add court ' + (maxCourt + 1) + '</button></div><p class="small muted">Changes apply from the next round. Current matches keep their courts.</p>') + '</fieldset>' +
+            (rotating ? '<div class="row"><p class="small">Late joining is <b>' + (e.late_join ? 'open' : 'closed') + '</b>.</p><button class="btn sm ghost" type="button" id="latejoin">' + (e.late_join ? 'Close late joining' : 'Allow late joining') + '</button></div><p class="small muted">Late arrivals join with the same player QR or link and are in the next round. Current courts and scores don’t change.</p>' :
+              TEAM_MODES.indexOf(e.mode) >= 0 && e.mode !== 'fixed' ? '<p class="small muted">Team rosters lock once play starts.</p>' : '') +
+            '</div></details>';
+        }
+        function fairnessTab() {
+          var f = e.fairness || [];
+          return '<p class="small muted">Completed rounds only. Time before arriving and breaks don’t count as rests, and rest is counted in rounds, not minutes. This shows the rotation; it doesn’t guarantee equal playing time.</p>' +
+            (f.length ? '<div class="table-wrap card" style="padding:0" tabindex="0" role="region" aria-label="Rotation fairness, scrolls sideways"><table class="summary-table"><thead><tr><th>Player</th><th>Now</th><th>Games</th><th>Rest rounds</th><th>Longest rest streak</th><th>Repeated partners</th></tr></thead><tbody>' +
+              f.map(function (r) { return '<tr><td>' + h((r.number ? '#' + r.number + ' ' : '') + r.name) + '</td><td>' + h(r.now) + '</td><td class="n">' + r.games + '</td><td class="n">' + r.rests + '</td><td class="n">' + r.longest_rest + '</td><td class="n">' + r.repeated_partners + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="list"><p class="empty">No confirmed players yet.</p></div>');
+        }
         function standingsTab() { return standingsHTML(e, mine) + '<div class="row"><button class="btn sm ghost" type="button" data-csv="standings">Download standings (CSV)</button></div>'; }
         function teamsTab() {
           var size = e.mode === 'draft3' ? 3 : 2;
@@ -391,7 +424,7 @@
           var build = org ? '<div class="card stack"><p class="section-title">' + (b ? 'Rebuild bracket' : 'Create the bracket') + '</p><div class="form-grid">' +
             '<div class="field"><label class="flabel" for="bseed">Seeding</label><select id="bseed"><option value="standings">By standings</option><option value="order">In team order</option></select></div>' +
             '<div class="field"><label class="flabel" for="bsize">Teams in bracket</label><input type="number" id="bsize" min="2" max="' + (e.elimination === 'double' ? 8 : 64) + '" value="' + Math.min(e.teams.length, e.elimination === 'double' ? 8 : 64) + '"></div></div>' +
-            '<div class="row"><button class="btn ' + (b ? 'danger' : 'primary') + '" type="button" id="mkbr">' + (b ? 'Rebuild bracket' : 'Create bracket') + '</button></div><p class="small muted">' + (e.elimination === 'double' ? 'Double elimination: a team is out after two losses. If the team from the losers side wins the grand final, a deciding game is played.' : 'Top seeds get byes when the number of teams isn’t a power of two.') + ' Winners move on as scores come in.</p></div>' : '';
+            '<div class="row"><button class="btn ' + (b ? 'danger' : 'primary') + '" type="button" id="mkbr">' + (b ? 'Rebuild bracket' : 'Preview bracket') + '</button></div><p class="small muted">' + (e.elimination === 'double' ? 'Double elimination: a team is out after two losses. If the team from the losers side wins the grand final, a deciding game is played.' : 'Top seeds get byes when the number of teams isn’t a power of two.') + ' Winners move on as scores come in.</p></div>' : '';
           return (b ? bracketHTML(e, true) : (org ? '' : '<div class="list"><p class="empty">No bracket yet.</p></div>')) + build;
         }
         function peopleTab() {
@@ -455,7 +488,21 @@
         if ($('#undo')) $('#undo').addEventListener('click', function () { api.request('POST', '/api/events/' + e.id + '/attendance/undo', {}).then(function () { L.toast('Undone'); C.route(); }, function (err) { L.toast(err.message); }); });
         if ($('#stop')) L.armed($('#stop'), 'Tap again to stop every court', function () { api.request('POST', '/api/events/' + e.id + '/stop', {}).then(function () { L.toast('Courts stopped. Players enter the score as it stands.'); C.route(); }, function (err) { L.toast(err.message); }); });
         if ($('#finish')) L.armed($('#finish'), 'Tap again to finish', function () { put({ status: 'complete' }, 'Event finished. Final standings are saved.'); });
-        if ($('#next')) $('#next').addEventListener('click', function () { preview(e, null); });
+        if ($('#next')) $('#next').addEventListener('click', function () { if (e.mode === 'fallout') bracketPreview(e); else preview(e, null); });
+        var rnd = e.rounds.length ? e.rounds[e.rounds.length - 1].number : 0;
+        var cmd = function (path, body, msg) { return api.request('POST', '/api/events/' + e.id + path, body).then(function () { if (msg) L.toast(msg); C.route(); }, function (err) { L.toast(err.message); C.route(); }); };
+        $$('[data-timer]').forEach(function (b) { b.addEventListener('click', function () { var go = b.getAttribute('data-timer') === 'start'; cmd('/timer', { round: rnd, running: go }, go ? 'Timer running' : 'Timer paused'); }); });
+        $$('[data-adj]').forEach(function (b) { b.addEventListener('click', function () { cmd('/timer/adjust', { round: rnd, operation: 'add' }, 'Added 1 minute'); }); });
+        if ($('#treset')) L.armed($('#treset'), 'Tap again to reset', function () { cmd('/timer/adjust', { round: rnd, operation: 'reset' }, 'Timer reset and paused. Scores are kept.'); });
+        if ($('#lenf')) $('#lenf').addEventListener('submit', function (ev) { ev.preventDefault(); put({ round_minutes: $('#rlen').value || null }, 'Saved. Upcoming rounds use this length.'); });
+        if ($('#savecourts')) $('#savecourts').addEventListener('click', function () { cmd('/courts', { numbers: $$('.court-pick input:checked').map(function (x) { return Number(x.value); }) }, 'Courts saved for the next round. Preview again.'); });
+        if ($('#addcourt')) $('#addcourt').addEventListener('click', function () {
+          var n = Number(this.textContent.replace(/\D/g, ''));
+          var lab = document.createElement('label'); lab.innerHTML = '<input type="checkbox" value="' + n + '" checked> ' + n; $('.court-pick').appendChild(lab);
+          this.textContent = 'Add court ' + (n + 1);
+        });
+        if ($('#latejoin')) $('#latejoin').addEventListener('click', function () { put({ late_join: !e.late_join }, e.late_join ? 'Late joining closed' : 'Late joining open'); });
+        var hc = $('.host-ctl'); if (hc) hc.addEventListener('toggle', function () { Store.set('hostctl', hc.open); });
         // Teams
         if ($('#mktm')) $('#mktm').addEventListener('click', function () {
           api.request('POST', '/api/events/' + e.id + '/teams', { p1: Number($('#tp1').value), p2: Number($('#tp2').value), p3: $('#tp3') ? Number($('#tp3').value) : undefined, name: $('#tnm').value }).then(function () { L.toast('Team made'); C.route(); }, function (err) { L.toast(err.message); });
@@ -469,7 +516,7 @@
                 if (err.status === 409) L.toast(err.message, { label: 'Rebuild', run: function () { mk(true); } }); else L.toast(err.message);
               });
           };
-          if (e.bracket) L.armed($('#mkbr'), 'Tap again to rebuild', function () { mk(false); }); else $('#mkbr').addEventListener('click', function () { mk(false); });
+          if (e.bracket) L.armed($('#mkbr'), 'Tap again to rebuild', function () { mk(false); }); else $('#mkbr').addEventListener('click', function () { bracketPreview(e, $('#bseed').value, Number($('#bsize').value) || undefined); });
         }
         if ($('#mksched')) $('#mksched').addEventListener('click', function () { api.request('POST', '/api/events/' + e.id + '/schedule', {}).then(function () { L.toast('Schedule built'); C.route(); }, function (err) { L.toast(err.message); }); });
         // Check-in and roster
@@ -508,11 +555,38 @@
                 c.teams.map(function (t) { return '<p class="tm">' + (t.label ? '<b>' + h(t.label) + '</b>' : '') + t.players.map(function (p) { return '<span>' + h(numberOf(e, p.athlete_id) + p.name) + (p.side ? ' <i>' + (p.side === 'left' ? 'L' : 'R') + '</i>' : '') + '</span>'; }).join('') + '</p>'; }).join('<p class="vs">vs</p>') + '</div>';
             }).join('') + '</div>' +
             (pv.sitting.length ? '<p class="small muted">Resting: ' + pv.sitting.map(function (p) { return h(numberOf(e, p.athlete_id) + p.name); }).join(', ') + '</p>' : '') +
+            (pv.schedule && pv.schedule.length > 1 ? '<details class="stack-sm" open><summary class="section-title">Every planned round</summary>' + pv.schedule.map(function (rd) {
+              return '<div class="stack-sm"><p class="small"><b>Round ' + rd.number + '</b></p>' + rd.courts.map(function (c, i) { return '<p class="small">Court ' + h(rd.court_nums ? rd.court_nums[i] : i + 1) + ': ' + h(c[0]) + ' vs ' + h(c[1]) + '</p>'; }).join('') + (rd.sitting.length ? '<p class="small muted">Resting: ' + h(rd.sitting.join(', ')) + '</p>' : '') + '</div>';
+            }).join('') + '</details>' : '') +
+            (['race', 'rivalry', 'rotate', 'unlucky'].indexOf(e.mode) >= 0 && !e.started ? '<p class="small muted">These are the opening matchups. Later rotations are built during play from who’s there and how the rounds went.</p>' : '') +
+            '<p class="small muted">Previewing doesn’t start anything' + (pv.timer_minutes ? ' and the ' + pv.timer_minutes + '-minute timer waits for you' : '') + '. This draw is saved; if the roster or settings change, you’ll be asked to preview again.</p>' +
             '<div class="row"><button class="btn primary" type="button" id="go">Start round ' + pv.number + '</button>' + (e.mode === 'premapped' && !pv.rebuilt ? '' : '<button class="btn" type="button" id="reshuffle">Shuffle again</button>') + '<button class="btn ghost" type="button" id="cancelpv">Cancel</button></div></div>';
           $('#go').addEventListener('click', function () {
-            api.request('POST', '/api/events/' + e.id + '/rounds', { seed: pv.seed, force: !!open }).then(function () { eventTab[id] = 'courts'; L.toast('Round ' + pv.number + ' is on. Players were notified.'); C.route(); }, function (err) { L.toast(err.message); });
+            api.request('POST', '/api/events/' + e.id + '/rounds', { force: !!open }).then(function () { eventTab[id] = 'courts'; L.toast('Round ' + pv.number + ' is on. Players were notified.' + (pv.timer_minutes ? ' Start the timer when they’re ready.' : '')); C.route(); }, function (err) {
+              if (err.data && err.data.stale_preview) { L.toast(err.message); preview(e, null); } else L.toast(err.message);
+            });
           });
           if ($('#reshuffle')) $('#reshuffle').addEventListener('click', function () { preview(e, Math.floor(Math.random() * 1e9)); });
+          $('#cancelpv').addEventListener('click', function () { box.innerHTML = ''; });
+          box.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }, function (err) { box.innerHTML = '<p class="flag" role="alert">' + h(err.message) + '</p>'; });
+      }
+      /* Fallout: the full bracket before it's created, then start from that draw. */
+      function bracketPreview(e, seeding, size) {
+        var box = $('#preview');
+        box.innerHTML = '<p class="small muted" role="status">Drawing the bracket…</p>';
+        api.request('GET', '/api/events/' + e.id + '/bracket/preview?seeding=' + (seeding || 'order') + (size ? '&size=' + size : '')).then(function (pv) {
+          box.innerHTML = '<div class="card stack preview"><p class="section-title">Bracket preview · ' + pv.size + ' teams</p>' +
+            '<div class="row"><label class="flabel" for="pvseed">Seeding</label><select id="pvseed"><option value="order"' + (pv.seeding === 'order' ? ' selected' : '') + '>In team order</option><option value="standings"' + (pv.seeding === 'standings' ? ' selected' : '') + '>By standings</option></select></div>' +
+            bracketHTML({ bracket: pv.bracket }, false) +
+            '<p class="small muted">' + (e.elimination === 'double' ? 'Double elimination: two losses and you’re out. If the losers-side team wins the grand final, a deciding game is played. ' : '') + 'Previewing doesn’t start anything. This draw is saved; if the teams or settings change, you’ll be asked to preview again.</p>' +
+            '<div class="row"><button class="btn primary" type="button" id="gob">Start bracket</button><button class="btn ghost" type="button" id="cancelpv">Cancel</button></div></div>';
+          $('#pvseed').addEventListener('change', function () { bracketPreview(e, this.value, size); });
+          $('#gob').addEventListener('click', function () {
+            api.request('POST', '/api/events/' + e.id + '/bracket', {}).then(function () { eventTab[id] = 'bracket'; L.toast('Bracket started. Teams were notified.'); C.route(); }, function (err) {
+              if (err.data && err.data.stale_preview) { L.toast(err.message); bracketPreview(e, seeding, size); } else L.toast(err.message);
+            });
+          });
           $('#cancelpv').addEventListener('click', function () { box.innerHTML = ''; });
           box.scrollIntoView({ block: 'start', behavior: 'smooth' });
         }, function (err) { box.innerHTML = '<p class="flag" role="alert">' + h(err.message) + '</p>'; });
@@ -535,7 +609,8 @@
             !e.registration.open ? '<p class="flag">Registration is closed. Ask the host if you’d like to play.</p>' :
             e.me && e.me.state !== 'withdrawn' ? '<div class="banner"><span>You’re ' + h(e.me.state) + ' with your account.</span><a class="btn sm primary" href="#/play/events/' + e.id + '">Open event</a></div>' :
             e.signed_in && e.has_profile ? '<div class="card stack"><p class="section-title">Sign up</p><div class="row"><button class="btn primary" type="button" id="acct">' + (e.registration.full ? 'Join the waitlist' : 'Sign up with my account') + '</button></div></div>' :
-            '<form class="card form" id="regf" novalidate><p class="section-title">' + (e.registration.full ? 'Join the waitlist' : 'Sign up') + '</p>' +
+            '<form class="card form" id="regf" novalidate><p class="section-title">' + (e.registration.full ? 'Join the waitlist' : e.registration.late ? 'Join now' : 'Sign up') + '</p>' +
+            (e.registration.late ? '<p class="small">Play has started. Sign up and you’re checked in for the next round' + (e.registration.full ? ' once a spot opens' : '') + '. You may rest a round depending on courts.</p>' : '') +
             '<div class="form-grid"><div class="field"><label class="flabel" for="rn">Your name</label><input type="text" id="rn" maxlength="60" autocomplete="name"></div>' +
             '<div class="field"><label class="flabel" for="re">Email</label><input type="email" id="re" maxlength="200" autocomplete="email"></div>' +
             '<div class="field"><label class="flabel" for="rp">Phone <span class="hint">optional</span></label><input type="tel" id="rp" maxlength="30" autocomplete="tel"></div></div>' +

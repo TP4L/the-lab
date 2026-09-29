@@ -203,6 +203,10 @@ verified at once.
 | POST | `/events/:id/attendance/undo` | organizer | Undoes the latest roster change. Refused once a round has started after it. |
 | GET | `/events/:id/rounds/preview?seed=` | organizer | The next round without saving it: courts, sides, head starts, who rests, `seed`. |
 | POST | `/events/:id/rounds` | organizer | `{seed?, force?}`. Send the preview's `seed` to start exactly that round. |
+| POST | `/events/:id/timer` | organizer | `{round, running}`: start, stop (pause) or resume the current round's timer. The round number must be the current round. |
+| POST | `/events/:id/timer/adjust` | organizer | `{round, operation: add\|reset}`. Add keeps the timer running or paused; after time is up it stays paused. Reset restores the round's own length, paused. Ended rounds are refused. |
+| POST | `/events/:id/courts` | organizer | `{numbers: [4, 5, 6]}`: the courts for future rounds. Current matches keep theirs. Locked once 3v3 or Fallout starts. |
+| GET | `/events/:id/bracket/preview?seeding=&size=` | organizer | The full bracket before it's created: byes, losers side and finals. Saved as the draw; `POST /events/:id/bracket {}` starts from it. |
 | POST | `/events/:id/stop` | organizer | Stops every court in the live round: players enter the score as it stands, ties allowed. |
 | POST | `/events/:id/schedule` | organizer | Pre-Mapped Doubles: plans every round now (from sign-ups if nobody has checked in). |
 | POST | `/matches/:id/reopen` | organizer | Back to unscored so the score can be entered again. |
@@ -223,7 +227,8 @@ verified at once.
 | `round_limit` | 2–24 |
 | `race_target` | 11–200 (Race to; default 50) |
 | `elimination` | `single` or `double` (Fallout; double takes up to 8 teams) |
-| `registration_open`, `show_roster` | true or false |
+| `registration_open`, `show_roster`, `late_join` | true or false. `late_join`: rotating formats stay open after play starts; late sign-ups are checked in for the next round. 3v3 and Fallout always lock. |
+| `court_numbers` | The actual courts, e.g. `[4, 5]` (1–40). Older events number from 1 up to `courts`. |
 | `status` | `draft`, `published`, `live`, `complete`, `cancelled` |
 
 **How rounds are built.** One round at a time, from players who are checked
@@ -246,6 +251,22 @@ effect next round.
 
 The engine aims for fairness; it doesn't guarantee a mathematically perfect
 schedule.
+
+**Previews and the saved draw.** `GET /rounds/preview` (and the bracket
+preview) saves the draw. `POST /rounds` without a `seed` starts exactly that
+draw. Any roster, team, court or settings change marks it stale; starting
+then returns **409** with `stale_preview: true` until the host previews
+again. For Pre-Mapped Doubles the preview includes every planned round.
+Previewing never starts the timer.
+
+**Timers.** Each timed round starts paused (`timer {duration, remaining,
+running, ends_at, started}` on the round). Changing `round_minutes` affects
+upcoming rounds only; each round keeps its own length.
+
+**Fairness.** Organizers get `fairness`: per confirmed player, `now`
+(playing, resting, waiting, on break, left), `games`, `rests`,
+`longest_rest` and `repeated_partners`, from completed rounds only. Time
+before arriving and breaks aren't rests.
 
 ### Public links (no account)
 

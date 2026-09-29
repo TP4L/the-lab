@@ -172,7 +172,7 @@ test('timed rounds, first-court stop, stop all courts, ties when stopped, round 
   let ev = await checkInAll(coach, e);
   ev = (await coach.post(`/api/events/${e.id}/rounds`, { seed: 5 })).body;
   const rd = ev.rounds[0];
-  assert.ok(rd.ends_at, 'timer set');
+  assert.deepEqual([rd.timer.duration, rd.timer.running, rd.ends_at], [720, false, null], 'a new round waits, timer paused');
   assert.equal(rd.matches.length, 2);
   // A tie isn't allowed while play is on.
   assert.equal((await coach.put(`/api/matches/${rd.matches[0].id}`, { version: rd.matches[0].version, games: [[8, 8]] })).status, 400);

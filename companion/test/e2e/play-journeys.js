@@ -20,7 +20,7 @@ const log = (...a) => console.log(...a);
     const me = await p.evaluate(async () => (await (await fetch('/api/me')).json()));
     return { c, p, aid: me.athlete_id, pid: me.athlete_id ? 'LAB-' + String(me.athlete_id).padStart(5, '0') : null };
   }
-  const go = async (u, hash, ms = 600) => { await u.p.goto(B + hash); await u.p.waitForTimeout(ms); };
+  const go = async (u, hash, ms = 600) => { if (u.p.url() === B + hash) await u.p.reload(); else await u.p.goto(B + hash); await u.p.waitForTimeout(ms); };
   const shot = (u, n) => u.p.screenshot({ path: `${OUT}/e2e/${n}.png`, fullPage: true });
 
   const owner = await user('Brett Owner', 'owner@lab.test');
@@ -81,7 +81,7 @@ const log = (...a) => console.log(...a);
   // ---- Event: create, register, check in (code + tap), rounds, scores, standings ----
   await go(owner, '#/play/events/new');
   await owner.p.fill('#t', 'Thursday Round Robin'); await owner.p.fill('#loc', 'Court 1-2, Riverside');
-  await owner.p.fill('#courts', '1');
+  await owner.p.uncheck('.court-pick input[value="2"]');
   await owner.p.click('#ef button[type=submit]'); await owner.p.waitForTimeout(700);
   const eid = await owner.p.evaluate(() => location.hash.split('/').pop());
   log('event', eid, await owner.p.textContent('h1'));

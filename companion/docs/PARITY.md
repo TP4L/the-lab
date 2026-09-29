@@ -89,6 +89,12 @@ Event Desk) are rebuilt here, so events live in one system with one login.
 | Walk-ins, check-in by QR or code, preview and approve the next round, stop all courts, reopen a result, confirm scores | Done | |
 | Late arrivals, breaks, returns, leaving (waitlist moves up), attendance undo before the next change or round | Done | |
 | Court acknowledgments ("Got it") visible to the host | Done | |
+| Preview event before starting: full Fallout bracket, every Pre-Mapped round, opening matchups for rotating formats; the draw is saved and goes stale on roster or settings changes | Done | |
+| Host timer: starts paused; start, stop (pause), resume, add 1 minute, reset; upcoming round length | Done | Stop timer pauses; Stop all courts ends the round. |
+| Late joining for rotating formats, with a switch | Done | 3v3 and Fallout lock once started. |
+| Choosing the actual court numbers | Done | Changes apply from the next round. |
+| Rotation fairness table | Done | Visibility only; rest counted in rounds, not minutes. |
+| Mid-match substitutions, undoing a round, late-arrival prize rules, closing registration before the last round | Next | Not on the website either. |
 | Players enter their own score, host confirms | Done | |
 | Weekly duplicates (1–8 drafts) | Done | |
 | Calendar file, CSV of roster, results and standings | Done | |

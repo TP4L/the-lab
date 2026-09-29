@@ -606,7 +606,17 @@ CREATE INDEX IF NOT EXISTS plan_players_plan ON plan_players(plan_id);
 CREATE INDEX IF NOT EXISTS plan_blocks_plan ON plan_blocks(plan_id, ord);
 `;
 
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING];
+/* Host controls: chosen court numbers, late joining, the saved preview
+   ("draw") and per-round timers that start paused. */
+const HOST_CONTROLS = `
+ALTER TABLE events ADD COLUMN court_numbers TEXT;
+ALTER TABLE events ADD COLUMN late_join INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE events ADD COLUMN draw TEXT;
+ALTER TABLE rounds ADD COLUMN duration_sec INTEGER;
+ALTER TABLE rounds ADD COLUMN remaining_sec INTEGER;
+`;
+
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

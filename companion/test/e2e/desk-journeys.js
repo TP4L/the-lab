@@ -102,7 +102,7 @@ const shot = (u, name) => u.p.screenshot({ path: `${OUT}/e2e/${name}.png`, fullP
   /* ---------- 3. Guest-link event: Unlucky, first finish stops the round ---------- */
   await go(host, '#/play/events/new');
   await host.p.fill('#t', 'Thursday Unlucky Mixer'); await host.p.selectOption('#mode', 'unlucky');
-  await host.p.fill('#courts', '2'); await host.p.selectOption('#rend', 'first'); await host.p.fill('#rmin', '12'); await host.p.fill('#rlim', '4');
+  await host.p.selectOption('#rend', 'first'); await host.p.fill('#rmin', '12'); await host.p.fill('#rlim', '4');
   log('mode help:', await host.p.textContent('#modehelp'));
   await host.p.click('#ef button[type=submit]'); await host.p.waitForTimeout(800);
   const eventHash = await host.p.evaluate(() => location.hash);

@@ -301,6 +301,27 @@ module.exports = function play(r, ctx) {
   /* ---------- live-event scoring rules ---------- */
   function roundRow(id) { return id ? db.prepare('SELECT * FROM rounds WHERE id = ?').get(id) : null; }
   function roundStopped(e, rd) { return !!rd && (!!rd.stopped_at || (e.round_end === 'timer' && !!rd.ends_at && rd.ends_at <= now())); }
+  /* The courts in use, e.g. [4, 5]. Older events number from 1. */
+  function courtNumbers(e) {
+    try { const x = e.court_numbers && JSON.parse(e.court_numbers); if (Array.isArray(x) && x.length) return x; } catch {}
+    return Array.from({ length: e.courts || 1 }, (_, i) => i + 1);
+  }
+  const LOCKED = ['draft3', 'fallout']; // fixed teams: roster and courts lock once play starts
+  const started = e => e.status === 'live' || !!db.prepare('SELECT 1 FROM rounds WHERE event_id = ?').get(e.id) || !!db.prepare('SELECT 1 FROM bracket_games WHERE event_id = ?').get(e.id);
+  /* A saved preview goes stale when the roster or settings change; the host
+     is asked to preview again before starting. */
+  function invalidateDraw(eid) { db.prepare(`UPDATE events SET draw = CASE WHEN draw IS NULL THEN NULL ELSE '{"stale":true}' END WHERE id = ?`).run(eid); }
+  const drawOf = e => { try { return e.draw ? JSON.parse(e.draw) : null; } catch { return null; } };
+  /* Round timer. Running: ends_at is set. Paused: remaining_sec holds the
+     time left. Rounds from before timers could pause only have ends_at. */
+  function timerOf(rd) {
+    if (!rd) return null;
+    const left = iso => Math.max(0, Math.round((new Date(iso) - Date.now()) / 1000));
+    if (rd.duration_sec == null) return rd.ends_at ? { duration: null, running: true, ends_at: rd.ends_at, remaining: left(rd.ends_at), started: true } : null;
+    const running = !!rd.ends_at;
+    const remaining = running ? left(rd.ends_at) : rd.remaining_sec;
+    return { duration: rd.duration_sec, running, ends_at: rd.ends_at, remaining, started: running || remaining !== rd.duration_sec };
+  }
   function scoreRules(m) {
     const e = eventOf(m), rd = roundRow(m.round_id);
     return { allowTie: !!e && roundStopped(e, rd), starts: [m.start1 || 0, m.start2 || 0] };
@@ -417,18 +438,26 @@ module.exports = function play(r, ctx) {
       elimination: v('elimination', x => oneOf(x, ['single', 'double'], 'elimination')) || 'single',
       registration_open: b.registration_open === undefined ? (cur.registration_open === undefined ? 1 : cur.registration_open) : flag(b.registration_open),
       show_roster: b.show_roster === undefined ? (cur.show_roster === undefined ? 1 : cur.show_roster) : flag(b.show_roster),
+      late_join: b.late_join === undefined ? (cur.late_join === undefined ? 1 : cur.late_join) : flag(b.late_join),
+      court_numbers: b.court_numbers !== undefined ? (b.court_numbers === null ? null : JSON.stringify(courtList(b.court_numbers))) : b.courts !== undefined ? null : (cur.court_numbers === undefined ? null : cur.court_numbers),
       status: v('status', x => oneOf(x, ['draft', 'published', 'live', 'complete', 'cancelled'], 'status')) || 'draft'
     };
     if (!out.title || !out.starts_at) throw new HttpError(400, 'title and starts_at are required.');
     if (out.mode === 'race' && !out.race_target) out.race_target = 50;
     if (out.round_end === 'timer' && !out.round_minutes) throw new HttpError(400, 'Set the round length in minutes when the timer ends each round.');
     out.partner_mode = ['fixed', 'fallout'].includes(out.mode) ? 'fixed' : 'rotating';
+    if (out.court_numbers) out.courts = JSON.parse(out.court_numbers).length;
     return out;
   }
-  const COLS = ['title', 'description', 'location', 'starts_at', 'ends_at', 'capacity', 'courts', 'format', 'mode', 'partner_mode', 'scoring', 'game_to', 'round_limit', 'round_minutes', 'round_end', 'race_target', 'elimination', 'registration_open', 'show_roster', 'status'];
+  function courtList(v) {
+    const nums = [...new Set(list(v, 'court_numbers', { max: 40, item: (x, f) => int(x, f, { min: 1, max: 40, required: true }) }))].sort((a, b) => a - b);
+    if (!nums.length) throw new HttpError(400, 'Choose at least one court.');
+    return nums;
+  }
+  const COLS = ['title', 'description', 'location', 'starts_at', 'ends_at', 'capacity', 'courts', 'format', 'mode', 'partner_mode', 'scoring', 'game_to', 'round_limit', 'round_minutes', 'round_end', 'race_target', 'elimination', 'registration_open', 'show_roster', 'status', 'late_join', 'court_numbers'];
   function insertEvent(organizerId, f) {
     return Number(db.prepare(`INSERT INTO events (organizer_id, ${COLS.join(', ')}, share_token, watch_token) VALUES (?, ${COLS.map(() => '?').join(', ')}, ?, ?)`)
-      .run(organizerId, ...COLS.map(c => f[c]), newToken(), newToken()).lastInsertRowid);
+      .run(organizerId, ...COLS.map(c => (f[c] !== undefined ? f[c] : { late_join: 1, court_numbers: null }[c])), newToken(), newToken()).lastInsertRowid);
   }
   function people(eventId) {
     return db.prepare(`SELECT ep.*, a.name, a.side AS preferred_side, a.user_id, a.rating FROM event_people ep JOIN athletes a ON a.id = ep.athlete_id
@@ -459,7 +488,7 @@ module.exports = function play(r, ctx) {
   }
   function roundsOf(e, user) {
     return db.prepare('SELECT * FROM rounds WHERE event_id = ? ORDER BY number').all(e.id).map(rd => ({
-      id: rd.id, number: rd.number, status: rd.status, created_at: rd.created_at, ends_at: rd.ends_at, stopped_at: rd.stopped_at, stopped: roundStopped(e, rd),
+      id: rd.id, number: rd.number, status: rd.status, created_at: rd.created_at, ends_at: rd.ends_at, stopped_at: rd.stopped_at, stopped: roundStopped(e, rd), timer: timerOf(rd),
       sitting_out: JSON.parse(rd.sitting_out).map(id => ({ athlete_id: id, name: (db.prepare('SELECT name FROM athletes WHERE id = ?').get(id) || {}).name })),
       matches: db.prepare('SELECT id FROM matches WHERE round_id = ? ORDER BY court, matchup, created_at').all(rd.id).map(m => full(m.id, user))
     }));
@@ -487,6 +516,7 @@ module.exports = function play(r, ctx) {
     ['id', 'title', 'description', 'location', 'starts_at', 'ends_at', 'capacity', 'courts', 'format', 'mode', 'partner_mode', 'scoring', 'game_to', 'round_limit', 'round_minutes', 'round_end', 'race_target', 'elimination', 'status', 'created_at', 'updated_at'].forEach(k => { out[k] = e[k]; });
     Object.assign(out, {
       mode_label: F.MODES[e.mode] || e.mode, registration_open: !!e.registration_open, show_roster: !!e.show_roster,
+      court_numbers: courtNumbers(e), started: started(e), late_join: !!e.late_join, locked: LOCKED.includes(e.mode) && started(e),
       organizer: org, organizer_name: (db.prepare('SELECT name FROM users WHERE id = ?').get(e.organizer_id) || {}).name,
       me: me ? { athlete_id: me.athlete_id, number: me.number, state: me.state, checked_in: !!me.checked_in_at, active: !!me.active, on_break: !!me.on_break } : null,
       counts: { registered: ps.filter(p => p.state === 'registered').length, waitlist: ps.filter(p => p.state === 'waitlist').length, interested: ps.filter(p => p.state === 'interested').length, checked_in: ps.filter(p => p.checked_in_at && p.state === 'registered').length },
@@ -505,6 +535,9 @@ module.exports = function play(r, ctx) {
     if (org) {
       out.links = { share: `#/e/${e.share_token}`, watch: `#/watch/${e.watch_token}` };
       out.undo = lastUndo(e);
+      const d = drawOf(e);
+      out.draw = d ? { stale: !!d.stale, kind: d.kind || null } : null;
+      if (e.mode !== 'fallout') out.fairness = fairness(e);
       if (e.mode === 'premapped') out.schedule = scheduleView(e);
     }
     return out;
@@ -573,6 +606,7 @@ module.exports = function play(r, ctx) {
     if (!TEAM_MODES.includes(e.mode)) throw new HttpError(400, 'This event rotates partners. Switch it to Fixed Partners, Fallout or 3v3 Team Draft for teams.');
     const ids = [body.p1, body.p2, body.p3].filter(x => x !== undefined && x !== null && x !== '').map((x, i) => int(x, `p${i + 1}`, { min: 1, required: true }));
     makeTeam(e, ids, str(body.name, 'name', { max: 60 }));
+    invalidateDraw(e.id);
     return withStatus(201, eventFull(eventRow(e.id), user));
   });
   /* Auto teams. Pairs: checked-in first, in sign-up order. 3v3: a snake
@@ -587,6 +621,7 @@ module.exports = function play(r, ctx) {
         const rated = free.slice().sort((a, b) => (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0));
         F.snakeTeams(rated, Math.floor(rated.length / 3)).forEach(t => makeTeam(e, t.map(p => p.athlete_id), ''));
       } else for (let i = 0; i + 1 < free.length; i += 2) makeTeam(e, [free[i].athlete_id, free[i + 1].athlete_id], '');
+      invalidateDraw(e.id);
     });
     return eventFull(eventRow(e.id), user);
   });
@@ -598,6 +633,7 @@ module.exports = function play(r, ctx) {
     const used = db.prepare(`SELECT 1 FROM matches m JOIN match_players p ON p.match_id = m.id WHERE m.event_id = ? AND p.athlete_id IN (${ids.map(() => '?').join(',')}) LIMIT 1`).get(e.id, ...ids);
     if (used) throw new HttpError(409, 'This team has already played. Teams are locked once they start.');
     db.prepare('DELETE FROM event_teams WHERE id = ?').run(t.id);
+    invalidateDraw(e.id);
     return eventFull(eventRow(e.id), user);
   });
 
@@ -647,7 +683,9 @@ module.exports = function play(r, ctx) {
   /* ---------- knockout brackets (Fallout): single or double elimination ---------- */
   function bracketOf(e) {
     const gs = db.prepare('SELECT * FROM bracket_games WHERE event_id = ?').all(e.id);
-    if (!gs.length) return null;
+    return gs.length ? bracketView(e, gs) : null;
+  }
+  function bracketView(e, gs) {
     const teams = {}; teamsOf(e.id).forEach(t => { teams[t.id] = t; });
     const tm = id => (id && teams[id] ? { id, label: teams[id].label } : null);
     const view = g => {
@@ -720,7 +758,9 @@ module.exports = function play(r, ctx) {
           else if (known && !a && !b) next.settled = 1;
           else if (known && (!a || !b)) { next.settled = 1; next.winner_team = a || b; }
           else if (bothTeams && !next.match_id) {
-            next.match_id = insertMatch(e, { bracket: true, code: g.code }, [teamPlayers(teams[a]), teamPlayers(teams[b])]);
+            const busy = new Set(db.prepare("SELECT court FROM matches WHERE event_id = ? AND bracket = 1 AND status = 'scheduled' AND court IS NOT NULL").all(e.id).map(x => x.court));
+            const court = courtNumbers(e).find(c => !busy.has(c)) || null;
+            next.match_id = insertMatch(e, { bracket: true, code: g.code, court }, [teamPlayers(teams[a]), teamPlayers(teams[b])]);
             created.push([teams[a], teams[b], F.bracketLabel(g, gs, e.elimination)]);
           }
         }
@@ -729,16 +769,50 @@ module.exports = function play(r, ctx) {
     }
     created.forEach(([a, b, name]) => notifyTeams(e, a, b, `${e.title}: ${name}`));
   }
-  r.post('/api/events/:id/bracket', ({ user, params, body }) => {
-    const e = organizerEvent(user, params.id);
+  function seededTeams(e, seedingIn, sizeIn) {
     if (!['fixed', 'fallout'].includes(e.mode)) throw new HttpError(400, 'Brackets are for fixed-partner events. Switch the event to Fallout or Fixed Partners first.');
     const all = teamsOf(e.id);
-    const seeding = oneOf(body.seeding || 'standings', ['standings', 'order'], 'seeding');
+    const seeding = oneOf(seedingIn || 'standings', ['standings', 'order'], 'seeding');
     let seeded = seeding === 'standings' ? teamStandings(e).map(s => all.find(t => t.id === s.team_id)).filter(Boolean) : all;
-    const limit = body.size ? int(body.size, 'size', { min: 2, max: 64 }) : seeded.length;
-    seeded = seeded.slice(0, limit);
+    const size = sizeIn ? int(sizeIn, 'size', { min: 2, max: 64 }) : null;
+    seeded = seeded.slice(0, size || seeded.length);
     if (seeded.length < 2) throw new HttpError(400, 'A bracket needs at least 2 teams.');
     if (e.elimination === 'double' && seeded.length > 8) throw new HttpError(400, 'Double elimination takes up to 8 teams. Set the bracket size to 8 or fewer.');
+    return { seeded, seeding, size };
+  }
+  /* The whole bracket before anything is created: first-round games, byes,
+     and every later game with the teams that are already certain. */
+  r.get('/api/events/:id/bracket/preview', ({ user, params, query }) => {
+    const e = organizerEvent(user, params.id);
+    const { seeded, seeding, size } = seededTeams(e, query.get('seeding'), query.get('size'));
+    const graph = F.bracketGraph(seeded.length, e.elimination);
+    const seedTeam = x => { const t = seeded[Number(x.slice(5)) - 1]; return t ? t.id : null; };
+    const gs = graph.games.map(g => ({ ...g, team_a: g.src_a.startsWith('seed:') ? seedTeam(g.src_a) : null, team_b: g.src_b.startsWith('seed:') ? seedTeam(g.src_b) : null, settled: 0, winner_team: null, loser_team: null, match_id: null }));
+    const by = {}; gs.forEach(g => { by[g.code] = g; });
+    // Settle byes only; everything else waits for play.
+    for (let pass = 0, changed = true; changed && pass < 40; pass++) {
+      changed = false;
+      gs.forEach(g => {
+        if (g.settled || g.src_a.startsWith('X:')) return;
+        const val = side => { const x = g['src_' + side]; if (x.startsWith('seed:')) return g['team_' + side]; const [k, c] = x.split(':'); const f = by[c]; return f.settled ? (k === 'W' ? f.winner_team : f.loser_team) : undefined; };
+        const a = val('a'), b = val('b');
+        if (a !== undefined) g.team_a = a;
+        if (b !== undefined) g.team_b = b;
+        if (a !== undefined && b !== undefined && (!a || !b)) { g.settled = 1; g.winner_team = a || b; changed = true; }
+      });
+    }
+    db.prepare('UPDATE events SET draw = ? WHERE id = ?').run(JSON.stringify({ kind: 'bracket', seeding, size, at: now() }), e.id);
+    return { seeding, size: seeded.length, bracket: bracketView(e, gs) };
+  });
+  r.post('/api/events/:id/bracket', ({ user, params, body }) => {
+    const e = organizerEvent(user, params.id);
+    let seedingIn = body.seeding, sizeIn = body.size;
+    if (seedingIn === undefined && sizeIn === undefined) {
+      const d = drawOf(e);
+      if (d && d.stale) throw new HttpError(409, 'The teams or settings changed since your preview. Preview again before starting.', { stale_preview: true });
+      if (d && d.kind === 'bracket') { seedingIn = d.seeding; sizeIn = d.size; }
+    }
+    const { seeded } = seededTeams(e, seedingIn, sizeIn);
     if (db.prepare("SELECT 1 FROM bracket_games g JOIN matches m ON m.id = g.match_id WHERE g.event_id = ? AND m.status != 'scheduled'").get(e.id) && !body.force) {
       throw new HttpError(409, 'The bracket already has results. Send force to rebuild it.');
     }
@@ -750,6 +824,7 @@ module.exports = function play(r, ctx) {
       graph.games.forEach(g => db.prepare('INSERT INTO bracket_games (event_id, code, section, round, pos, src_a, src_b, team_a, team_b) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
         .run(e.id, g.code, g.section, g.round, g.pos, g.src_a, g.src_b, g.src_a.startsWith('seed:') ? seedTeam(g.src_a) : null, g.src_b.startsWith('seed:') ? seedTeam(g.src_b) : null));
       if (e.status === 'published' || e.status === 'draft') db.prepare("UPDATE events SET status = 'live', updated_at = ? WHERE id = ?").run(now(), e.id);
+      db.prepare('UPDATE events SET draw = NULL WHERE id = ?').run(e.id);
       resolveBracket(eventRow(e.id));
     });
     return withStatus(201, eventFull(eventRow(e.id), user));
@@ -783,6 +858,8 @@ module.exports = function play(r, ctx) {
     const f = eventInput(body, e);
     if (f.mode !== e.mode && db.prepare('SELECT 1 FROM matches WHERE event_id = ?').get(e.id)) throw new HttpError(409, 'The format can’t change once matches exist.');
     if (f.mode !== e.mode) db.prepare('DELETE FROM event_teams WHERE event_id = ?').run(e.id);
+    if (LOCKED.includes(e.mode) && started(e) && JSON.stringify(courtNumbers({ ...e, ...f })) !== JSON.stringify(courtNumbers(e))) throw new HttpError(409, 'Courts are locked once a team event starts.');
+    invalidateDraw(e.id);
     db.prepare(`UPDATE events SET ${COLS.map(c => c + ' = ?').join(', ')}, updated_at = ? WHERE id = ?`).run(...COLS.map(c => f[c]), now(), e.id);
     if (f.status === 'cancelled' && e.status !== 'cancelled') {
       tell(e, people(e.id).filter(p => p.state !== 'withdrawn').map(p => p.athlete_id), 'events', `${e.title} was cancelled`, '');
@@ -816,6 +893,7 @@ module.exports = function play(r, ctx) {
     touch(athleteId);
     const out = fn(touch);
     db.prepare('INSERT INTO attendance_log (event_id, athlete_id, action, before, by_user) VALUES (?, ?, ?, ?, ?)').run(e.id, athleteId, action, JSON.stringify(before), byUser || null);
+    invalidateDraw(e.id);
     return out;
   }
   function lastUndo(e) {
@@ -836,7 +914,13 @@ module.exports = function play(r, ctx) {
   function openForSignup(e, organizer) {
     if (['complete', 'cancelled'].includes(e.status) || e.status === 'draft') throw new HttpError(409, 'This event isn’t open for sign-ups.');
     if (!e.registration_open && !organizer) throw new HttpError(409, 'Registration for this event is closed. Ask the host.');
+    if (started(e)) {
+      if (LOCKED.includes(e.mode)) throw new HttpError(409, 'Teams are locked now that play has started. Ask the host.');
+      if (!e.late_join && !organizer) throw new HttpError(409, 'Late joining is closed for this event. Ask the host.');
+    }
   }
+  /* Joining after the start means you're here: checked in for the next round. */
+  const lateCheckin = (e, state) => state === 'registered' && started(e);
   /* Signed-in athlete registers, joins the waitlist, marks interest or withdraws. */
   function setState(user, e, want) {
     const aid = auth.ownAthleteId(user);
@@ -846,9 +930,11 @@ module.exports = function play(r, ctx) {
     else if (!cur) return eventFull(eventRow(e.id), user);
     if (want === 'registered' && cur && cur.state === 'registered') return eventFull(eventRow(e.id), user);
     const state = want === 'registered' && isFull(e) ? 'waitlist' : want;
+    const late = lateCheckin(e, state);
     tx(db, () => roster(e, user.id, { registered: 'register', waitlist: 'waitlist', withdrawn: 'withdraw', interested: 'interest' }[state], aid, touch => {
       db.prepare(`INSERT INTO event_people (event_id, athlete_id, state, number) VALUES (?, ?, ?, ?)
         ON CONFLICT(event_id, athlete_id) DO UPDATE SET state = excluded.state, number = COALESCE(event_people.number, excluded.number)`).run(e.id, aid, state, nextNo(e.id));
+      if (late) db.prepare('UPDATE event_people SET checked_in_at = COALESCE(checked_in_at, ?), active = 1, on_break = 0 WHERE event_id = ? AND athlete_id = ?').run(now(), e.id, aid);
       if (want === 'withdrawn') db.prepare('UPDATE event_people SET active = 0, on_break = 0 WHERE event_id = ? AND athlete_id = ?').run(e.id, aid);
       if (want === 'withdrawn' && cur && cur.state === 'registered') promoteWaitlist(e, touch);
     }));
@@ -942,6 +1028,7 @@ module.exports = function play(r, ctx) {
   }
   r.post('/api/events/:id/walkin', ({ user, params, body }) => {
     const e = organizerEvent(user, params.id);
+    if (LOCKED.includes(e.mode) && started(e)) throw new HttpError(409, 'Teams are locked now that play has started.');
     const g = guestFields(body);
     const out = tx(db, () => addGuest(e, g, { state: 'registered', checkedIn: body.checked_in !== false, byUser: user.id }));
     return withStatus(201, { added: { athlete_id: out.athlete_id, name: g.name, link: `#/g/${out.token}` }, event: eventFull(eventRow(e.id), user) });
@@ -1007,7 +1094,7 @@ module.exports = function play(r, ctx) {
       const ready = new Set(avail.map(p => p.athlete_id));
       const teamPool = teamsOf(e.id).filter(t => members(t).every(a => ready.has(a)));
       if (teamPool.length < 2) throw new HttpError(400, `Need at least 2 teams with every player checked in. ${teamPool.length} now.`);
-      const tp = buildTeamRound(teamPool, e.courts, e.id, rand);
+      const tp = buildTeamRound(teamPool, courtNumbers(e).length, e.id, rand);
       const onCourt = new Set(tp.pairs.flatMap(([a, b]) => members(a).concat(members(b))));
       return { number, kind: 'teams', pairs: tp.pairs.map(([a, b]) => [a.id, b.id]), sitting: avail.map(p => p.athlete_id).filter(id => !onCourt.has(id)) };
     }
@@ -1022,10 +1109,10 @@ module.exports = function play(r, ctx) {
       // Attendance changed (or no schedule yet): rebuild the rounds still to come.
       const total = e.round_limit || (sched ? sched.first + sched.rounds.length - 1 : 8);
       const left = Math.max(1, total - number + 1);
-      sched = { first: number, rounds: F.premap(avail, e.courts, left, history(e.id), rand) };
+      sched = { first: number, rounds: F.premap(avail, courtNumbers(e).length, left, history(e.id), rand) };
       return { number, kind: 'players', courts: sched.rounds[0].courts, sitting: sched.rounds[0].sitting, starts: null, schedule: sched, rebuilt: !!e.schedule };
     }
-    const plan = F.buildRound(avail, e.courts, history(e.id), rand, { rivalry: e.mode === 'rivalry' });
+    const plan = F.buildRound(avail, courtNumbers(e).length, history(e.id), rand, { rivalry: e.mode === 'rivalry' });
     return {
       number, kind: 'players',
       courts: plan.courts.map(teams => teams.map(t => t.map(([p, side]) => [p.athlete_id, side]))),
@@ -1036,24 +1123,31 @@ module.exports = function play(r, ctx) {
   const nameOf = id => (db.prepare('SELECT name FROM athletes WHERE id = ?').get(id) || {}).name || '';
   function planView(e, plan, seed) {
     const teams = {}; teamsOf(e.id).forEach(t => { teams[t.id] = t; });
+    const nums = courtNumbers(e);
     const courts = plan.kind === 'teams'
-      ? plan.pairs.map(([a, b], i) => ({ court: i + 1, teams: [teams[a], teams[b]].map(t => ({ label: t.label, players: members(t).map(id => ({ athlete_id: id, name: nameOf(id) })) })), games: e.mode === 'draft3' ? 3 : 1 }))
-      : plan.courts.map((c, i) => ({ court: i + 1, start: plan.starts ? plan.starts[i] : [0, 0], teams: c.map(t => ({ players: t.map(([id, side]) => ({ athlete_id: id, name: nameOf(id), side })) })) }));
-    return { seed, number: plan.number, courts, sitting: plan.sitting.map(id => ({ athlete_id: id, name: nameOf(id) })), rebuilt: !!plan.rebuilt, schedule: plan.schedule ? scheduleRounds(plan.schedule) : undefined };
+      ? plan.pairs.map(([a, b], i) => ({ court: nums[i], teams: [teams[a], teams[b]].map(t => ({ label: t.label, players: members(t).map(id => ({ athlete_id: id, name: nameOf(id) })) })), games: e.mode === 'draft3' ? 3 : 1 }))
+      : plan.courts.map((c, i) => ({ court: nums[i], start: plan.starts ? plan.starts[i] : [0, 0], teams: c.map(t => ({ players: t.map(([id, side]) => ({ athlete_id: id, name: nameOf(id), side })) })) }));
+    // Pre-Mapped Doubles: the whole plan, not just the next round.
+    const schedule = plan.schedule ? scheduleRounds(e, plan.schedule) : e.mode === 'premapped' ? scheduleView(e) : undefined;
+    return { seed, number: plan.number, courts, sitting: plan.sitting.map(id => ({ athlete_id: id, name: nameOf(id) })), rebuilt: !!plan.rebuilt, schedule, timer_minutes: e.round_minutes || null };
   }
-  function scheduleRounds(sched) {
-    return sched.rounds.map((rd, i) => ({ number: sched.first + i, courts: rd.courts.map(c => c.map(t => t.map(([id]) => nameOf(id).split(' ')[0]).join(' & '))), sitting: rd.sitting.map(id => nameOf(id).split(' ')[0]) }));
+  function scheduleRounds(e, sched) {
+    const nums = courtNumbers(e);
+    return sched.rounds.map((rd, i) => ({ number: sched.first + i, courts: rd.courts.map(c => c.map(t => t.map(([id]) => nameOf(id).split(' ')[0]).join(' & '))), court_nums: rd.courts.map((_, ci) => nums[ci]), sitting: rd.sitting.map(id => nameOf(id).split(' ')[0]) }));
   }
   function scheduleView(e) {
     if (!e.schedule) return null;
     const sched = JSON.parse(e.schedule);
     const next = nextRound(e.id);
-    return scheduleRounds(sched).filter(x => x.number >= next);
+    return scheduleRounds(e, sched).filter(x => x.number >= next);
   }
   r.get('/api/events/:id/rounds/preview', ({ user, params, query }) => {
     const e = organizerEvent(user, params.id);
     const seed = query.get('seed') ? int(query.get('seed'), 'seed', { min: 0 }) : crypto.randomInt(1e9);
-    return planView(e, planRound(e, seed), seed);
+    const plan = planRound(e, seed);
+    // Saved so "Start" runs exactly this draw. Previewing doesn't start anything.
+    db.prepare('UPDATE events SET draw = ? WHERE id = ?').run(JSON.stringify({ kind: 'round', number: plan.number, seed, at: now() }), e.id);
+    return planView(e, plan, seed);
   });
   /* Pre-Mapped Doubles: build (or rebuild) every round up front. */
   r.post('/api/events/:id/schedule', ({ user, params, body }) => {
@@ -1065,41 +1159,51 @@ module.exports = function play(r, ctx) {
     if (avail.length < 4) throw new HttpError(400, `Need at least 4 players. ${avail.length} now.`);
     const number = nextRound(e.id);
     const total = e.round_limit || 8;
-    const sched = { first: number, rounds: F.premap(avail, e.courts, Math.max(1, total - number + 1), history(e.id), F.rng(seed)) };
+    const sched = { first: number, rounds: F.premap(avail, courtNumbers(e).length, Math.max(1, total - number + 1), history(e.id), F.rng(seed)) };
     db.prepare('UPDATE events SET schedule = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(sched), now(), e.id);
+    invalidateDraw(e.id);
     return eventFull(eventRow(e.id), user);
   });
   r.post('/api/events/:id/rounds', ({ user, params, body }) => {
     const e = organizerEvent(user, params.id);
     const open = db.prepare("SELECT number FROM rounds WHERE event_id = ? AND status = 'live'").get(e.id);
     if (open && !body.force) throw new HttpError(409, `Round ${open.number} still has matches without scores. Finish it, or start the next round anyway.`);
-    const seed = body.seed === undefined ? crypto.randomInt(1e9) : int(body.seed, 'seed', { min: 0 });
+    let seed;
+    if (body.seed !== undefined) seed = int(body.seed, 'seed', { min: 0 });
+    else {
+      const d = drawOf(e);
+      if (d && d.stale) throw new HttpError(409, 'The roster or settings changed since your preview. Preview again before starting.', { stale_preview: true });
+      seed = d && d.kind === 'round' && d.number === nextRound(e.id) ? d.seed : crypto.randomInt(1e9);
+    }
     const plan = planRound(e, seed);
     const teams = {}; teamsOf(e.id).forEach(t => { teams[t.id] = t; });
-    const endsAt = e.round_minutes ? new Date(Date.now() + e.round_minutes * 60000).toISOString() : null;
+    const nums = courtNumbers(e);
+    // A new timed round starts ready, paused, until the host starts the timer.
+    const dur = e.round_minutes ? e.round_minutes * 60 : null;
     tx(db, () => {
       if (open) db.prepare("UPDATE rounds SET status = 'done' WHERE event_id = ? AND status = 'live'").run(e.id);
       if (e.status === 'published' || e.status === 'draft') db.prepare("UPDATE events SET status = 'live', updated_at = ? WHERE id = ?").run(now(), e.id);
-      const roundId = Number(db.prepare('INSERT INTO rounds (event_id, number, sitting_out, ends_at) VALUES (?, ?, ?, ?)').run(e.id, plan.number, JSON.stringify(plan.sitting), endsAt).lastInsertRowid);
+      const roundId = Number(db.prepare('INSERT INTO rounds (event_id, number, sitting_out, duration_sec, remaining_sec) VALUES (?, ?, ?, ?, ?)').run(e.id, plan.number, JSON.stringify(plan.sitting), dur, dur).lastInsertRowid);
+      db.prepare('UPDATE events SET draw = NULL WHERE id = ?').run(e.id);
       if (plan.kind === 'teams') {
         plan.pairs.forEach(([a, b], ci) => {
           if (e.mode === 'draft3') {
             const mu = db.prepare('SELECT COALESCE(MAX(matchup), 0) + 1 AS n FROM matches WHERE event_id = ?').get(e.id).n;
-            F.draftGames(members(teams[a]), members(teams[b])).forEach(([x, y], gi) => insertMatch(e, { round_id: roundId, court: ci + 1, matchup: mu, note: `Game ${gi + 1} of 3` }, [[[x[0], 'right'], [x[1], 'left']], [[y[0], 'right'], [y[1], 'left']]]));
-          } else insertMatch(e, { round_id: roundId, court: ci + 1 }, [teamPlayers(teams[a]), teamPlayers(teams[b])]);
+            F.draftGames(members(teams[a]), members(teams[b])).forEach(([x, y], gi) => insertMatch(e, { round_id: roundId, court: nums[ci], matchup: mu, note: `Game ${gi + 1} of 3` }, [[[x[0], 'right'], [x[1], 'left']], [[y[0], 'right'], [y[1], 'left']]]));
+          } else insertMatch(e, { round_id: roundId, court: nums[ci] }, [teamPlayers(teams[a]), teamPlayers(teams[b])]);
         });
       } else {
-        plan.courts.forEach((c, ci) => insertMatch(e, { round_id: roundId, court: ci + 1, start1: plan.starts ? plan.starts[ci][0] : 0, start2: plan.starts ? plan.starts[ci][1] : 0 }, c));
+        plan.courts.forEach((c, ci) => insertMatch(e, { round_id: roundId, court: nums[ci], start1: plan.starts ? plan.starts[ci][0] : 0, start2: plan.starts ? plan.starts[ci][1] : 0 }, c));
       }
       if (plan.schedule) db.prepare('UPDATE events SET schedule = ? WHERE id = ?').run(JSON.stringify(plan.schedule), e.id);
     });
     // "Round 2: Court 1 · Left side with Sam vs Jo & Max"
-    if (plan.kind === 'teams') plan.pairs.forEach(([a, b], ci) => notifyTeams(e, teams[a], teams[b], `Round ${plan.number}: Court ${ci + 1}`));
+    if (plan.kind === 'teams') plan.pairs.forEach(([a, b], ci) => notifyTeams(e, teams[a], teams[b], `Round ${plan.number}: Court ${nums[ci]}`));
     else plan.courts.forEach((c, ci) => c.forEach((team, ti) => team.forEach(([aid, side]) => {
       const partner = team.find(([q]) => q !== aid);
       const opp = c[1 - ti].map(([q]) => nameOf(q).split(' ')[0]).join(' & ');
       const head = plan.starts ? ` You start on ${plan.starts[ci][ti]}.` : '';
-      tell(e, [aid], 'courts', `Round ${plan.number}: Court ${ci + 1}`, `${side === 'left' ? 'Left' : 'Right'} side with ${partner ? nameOf(partner[0]).split(' ')[0] : ''} vs ${opp}.${head}`);
+      tell(e, [aid], 'courts', `Round ${plan.number}: Court ${nums[ci]}`, `${side === 'left' ? 'Left' : 'Right'} side with ${partner ? nameOf(partner[0]).split(' ')[0] : ''} vs ${opp}.${head}`);
     })));
     tell(e, plan.sitting, 'up_next', 'You’re up next', `You’re resting in round ${plan.number}.`);
     return withStatus(201, eventFull(eventRow(e.id), user));
@@ -1114,6 +1218,89 @@ module.exports = function play(r, ctx) {
     tell(e, waiting, 'courts', `Stop play: round ${rd.number}`, 'Enter your score as it stands.');
     return eventFull(eventRow(e.id), user);
   });
+
+  /* ---------- round timer: start, stop (pause), resume, add a minute, reset ----------
+     Commands name the round, so a stale screen can't change a different one. */
+  function currentRound(e, n) {
+    const number = int(n, 'round', { min: 1, required: true });
+    const rd = db.prepare('SELECT * FROM rounds WHERE event_id = ? AND number = ?').get(e.id, number);
+    if (!rd) throw new HttpError(404, 'Round not found.');
+    if (number !== nextRound(e.id) - 1) throw new HttpError(409, `Round ${number} isn’t the current round. Refresh the screen.`);
+    if (rd.status === 'done' || rd.stopped_at) throw new HttpError(409, `Round ${number} has ended, so its timer can’t change.`);
+    if (rd.duration_sec == null && !rd.ends_at) throw new HttpError(400, 'This round has no timer. Set a round length for upcoming rounds.');
+    if (rd.duration_sec == null) { // an older running round: give it a duration so it can pause
+      const left = Math.max(0, Math.round((new Date(rd.ends_at) - Date.now()) / 1000));
+      rd.duration_sec = e.round_minutes ? e.round_minutes * 60 : left; rd.remaining_sec = left;
+      db.prepare('UPDATE rounds SET duration_sec = ?, remaining_sec = ? WHERE id = ?').run(rd.duration_sec, rd.remaining_sec, rd.id);
+    }
+    return rd;
+  }
+  const setTimer = (rd, remaining, running) => db.prepare('UPDATE rounds SET remaining_sec = ?, ends_at = ? WHERE id = ?')
+    .run(remaining, running ? new Date(Date.now() + remaining * 1000).toISOString() : null, rd.id);
+  r.post('/api/events/:id/timer', ({ user, params, body }) => {
+    const e = organizerEvent(user, params.id);
+    const rd = currentRound(e, body.round);
+    const t = timerOf(rd);
+    const run = body.running === true;
+    if (run && !t.running) {
+      if (t.remaining <= 0) throw new HttpError(409, 'Time is up. Add a minute or reset the timer first.');
+      setTimer(rd, t.remaining, true);
+    } else if (!run && t.running) setTimer(rd, t.remaining, false);
+    return eventFull(eventRow(e.id), user);
+  });
+  r.post('/api/events/:id/timer/adjust', ({ user, params, body }) => {
+    const e = organizerEvent(user, params.id);
+    const rd = currentRound(e, body.round);
+    const op = oneOf(body.operation, ['add', 'reset'], 'operation');
+    const t = timerOf(rd);
+    if (op === 'reset') setTimer(rd, rd.duration_sec, false);
+    else if (t.running && t.remaining > 0) setTimer(rd, t.remaining + 60, true);
+    else setTimer(rd, t.remaining + 60, false); // paused, or ran out: stays paused for the host to restart
+    return eventFull(eventRow(e.id), user);
+  });
+  /* Courts in use for future rounds. Current matches keep their courts. */
+  r.post('/api/events/:id/courts', ({ user, params, body }) => {
+    const e = organizerEvent(user, params.id);
+    const nums = courtList(body.numbers);
+    if (LOCKED.includes(e.mode) && started(e)) throw new HttpError(409, 'Courts are locked once a team event starts.');
+    db.prepare('UPDATE events SET court_numbers = ?, courts = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(nums), nums.length, now(), e.id);
+    invalidateDraw(e.id);
+    return eventFull(eventRow(e.id), user);
+  });
+
+  /* ---------- rotation fairness (host visibility; not a balancing rule) ----------
+     Counts completed rounds only. Time before arriving and breaks aren't
+     scheduled rests, and rest is counted in rounds, not minutes. */
+  function fairness(e) {
+    const rounds = db.prepare('SELECT * FROM rounds WHERE event_id = ? ORDER BY number').all(e.id);
+    const live = rounds.find(x => x.status === 'live');
+    const ps = people(e.id).filter(p => p.state === 'registered' || (p.state === 'withdrawn' && p.checked_in_at));
+    const stats = {};
+    ps.forEach(p => { stats[p.athlete_id] = { athlete_id: p.athlete_id, name: p.name, number: p.number, games: 0, rests: 0, run: 0, longest_rest: 0, partners: {} }; });
+    const inMatches = rd => {
+      const out = new Set();
+      db.prepare('SELECT id FROM matches WHERE round_id = ?').all(rd.id).forEach(m => players(m.id).forEach(p => out.add(p.athlete_id)));
+      return out;
+    };
+    rounds.filter(x => x.status === 'done').forEach(rd => {
+      const sat = new Set(JSON.parse(rd.sitting_out));
+      db.prepare('SELECT id FROM matches WHERE round_id = ?').all(rd.id).forEach(m => {
+        const pl = players(m.id);
+        pl.forEach(p => {
+          const st = stats[p.athlete_id]; if (!st) return;
+          st.games++; st.run = 0;
+          pl.filter(q => q.team === p.team && q.athlete_id !== p.athlete_id).forEach(q => { st.partners[q.athlete_id] = (st.partners[q.athlete_id] || 0) + 1; });
+        });
+      });
+      sat.forEach(id => { const st = stats[id]; if (st) { st.rests++; st.run++; st.longest_rest = Math.max(st.longest_rest, st.run); } });
+    });
+    const playingNow = live ? inMatches(live) : new Set(), restingNow = live ? new Set(JSON.parse(live.sitting_out)) : new Set();
+    return ps.map(p => {
+      const st = stats[p.athlete_id];
+      const now_ = p.state === 'withdrawn' ? 'left' : p.on_break ? 'on break' : playingNow.has(p.athlete_id) ? 'playing' : restingNow.has(p.athlete_id) ? 'resting' : 'waiting';
+      return { athlete_id: st.athlete_id, name: st.name, number: st.number, now: now_, games: st.games, rests: st.rests, longest_rest: st.longest_rest, repeated_partners: Object.values(st.partners).reduce((a, n) => a + Math.max(0, n - 1), 0) };
+    }).sort((a, b) => (a.number || 0) - (b.number || 0));
+  }
 
   /* ---------- public links: sign-up page, spectator view, player page ---------- */
   function byShare(token) {
@@ -1131,7 +1318,11 @@ module.exports = function play(r, ctx) {
     if (!ep) throw new HttpError(404, 'This player link isn’t valid. Ask the host to resend it.');
     return { ep, e: eventRow(ep.event_id) };
   }
-  const publicShape = (e, data) => ({ ...data, registration: { open: !!e.registration_open && ['published', 'live'].includes(e.status), full: isFull(e) } });
+  const publicShape = (e, data) => {
+    const st = started(e);
+    const open = !!e.registration_open && ['published', 'live'].includes(e.status) && (!st || (!LOCKED.includes(e.mode) && !!e.late_join));
+    return { ...data, registration: { open, full: isFull(e), late: st && open } };
+  };
   r.get('/api/public/events/:token', ({ user, params }) => {
     const e = byShare(params.token);
     const aid = user ? auth.ownAthleteId(user) : null;
@@ -1149,7 +1340,7 @@ module.exports = function play(r, ctx) {
       throw new HttpError(409, 'That email is already signed up for this event. Use the player link from when you signed up, or ask the host to resend it.');
     }
     const state = isFull(e) ? 'waitlist' : 'registered';
-    const out = tx(db, () => addGuest(e, g, { state, checkedIn: false, byUser: null }));
+    const out = tx(db, () => addGuest(e, g, { state, checkedIn: lateCheckin(e, state), byUser: null }));
     if (ctx.mailer && ctx.mailer.enabled && ctx.config.publicUrl) {
       const link = `${ctx.config.publicUrl}/#/g/${out.token}`;
       ctx.mailer.sendSoon({ to: g.email, subject: `You’re ${state === 'waitlist' ? 'on the waitlist' : 'in'}: ${e.title}`, text: `${e.title}\n${e.location || ''}\n\nYour player page (keep this link; it shows your court, partner and scores):\n${link}`, html: `<p><b>${e.title.replace(/</g, '&lt;')}</b></p><p><a href="${link}">Open your player page</a>. Keep this link: it shows your court, partner and scores.</p>` });
