@@ -616,7 +616,15 @@ ALTER TABLE rounds ADD COLUMN duration_sec INTEGER;
 ALTER TABLE rounds ADD COLUMN remaining_sec INTEGER;
 `;
 
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS];
+const WEBSITE_CONNECTION = `
+CREATE TABLE website_connections (
+ user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ athlete_id TEXT NOT NULL UNIQUE,
+ athlete_name TEXT NOT NULL,
+ token TEXT NOT NULL,
+ connected_at TEXT NOT NULL
+);`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

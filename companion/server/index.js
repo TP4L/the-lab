@@ -53,6 +53,7 @@ function createApp(opts = {}) {
   r.get('/api/meta', () => ({ lanes: LANES, version: 4, google: !!config.googleEnabled, push: !!config.pushEnabled, email: !!config.mailEnabled, demo: !!config.demo, modes: MODES, scoring: SCORING, round_end: ROUND_END, interest_kinds: KINDS }));
 
   require('./api/account.js')(r, ctx);
+  require('./api/site-bridge.js')(r, ctx);
   require('./api/training.js')(r, ctx);
   require('./api/athletes.js')(r, ctx);
   require('./api/publishing.js')(r, ctx);

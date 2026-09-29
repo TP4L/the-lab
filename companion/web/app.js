@@ -885,7 +885,7 @@
       '<div class="row"><a class="btn ghost" href="#/play">Match history</a><a class="btn ghost" href="#/play/leaderboard">Leaderboard</a></div>' +
       '<div class="grid-2">' +
       '<div class="stack"><p class="section-title">Development</p>' +
-      '<div class="focus-card"><p class="eyebrow">Current focus · set by your coach</p><p class="big">' + h(a.focus || 'Not set yet') + '</p></div>' +
+      '<div class="focus-card"><p class="eyebrow">App training focus · set by your coach</p><p class="big">' + h(a.focus || 'Not set yet') + '</p></div>' +
       (a.plan ? '<div class="card"><p class="section-title">Development plan</p><div class="small">' + L.paras(a.plan) + '</div></div>' : '') +
       '<form class="card form" id="me-f" novalidate><p class="section-title">About me</p>' +
       '<div class="field"><label class="flabel" for="goals">Goals</label><textarea id="goals" maxlength="2000">' + h(a.goals) + '</textarea></div>' +
@@ -895,9 +895,9 @@
       '<div class="row"><button class="btn" type="submit">Save</button></div></form>' +
       '<div class="field"><label class="flabel" for="photo">Profile photo</label><input type="file" id="photo" accept="image/*"><div class="upload-row" id="photo-prog" hidden><div class="progress"><i></i></div></div></div>' +
       '</div>' +
-      '<div class="stack"><p class="section-title">Notes from your coach</p>' + notesHTML(coachNotes, false) +
-      '<p class="section-title" id="reflect">My reflections</p>' +
-      '<form class="card form" id="rf" novalidate><div class="field"><label class="flabel" for="rtext">How did it go?</label><textarea id="rtext" maxlength="5000" placeholder="What felt good, what broke down, what to try next."></textarea><p class="small muted">Your coach can see your reflections.</p></div>' +
+      '<div class="stack"><p class="section-title">App coaching notes</p>' + notesHTML(coachNotes, false) +
+      '<p class="section-title" id="reflect">App reflections</p>' +
+      '<form class="card form" id="rf" novalidate><div class="field"><label class="flabel" for="rtext">How did it go?</label><textarea id="rtext" maxlength="5000" placeholder="What felt good, what broke down, what to try next."></textarea><p class="small muted">Saved to your app profile. Use the website coaching form above to send a reflection to your website coach.</p></div>' +
       '<div class="row"><button class="btn primary" type="submit">Save reflection</button></div></form>' + notesHTML(reflections, true) +
       (p.media.length ? '<p class="section-title">Photos and video</p><div class="media-grid">' + p.media.map(mediaFigure).join('') + '</div>' : '') +
       '<p class="section-title">Session results</p>' + resultsHTML(p.results) +
@@ -937,7 +937,7 @@
     if (has('coach')) staff.push('<a href="#/coach"><b>Coach Workspace</b><span>Athletes, notes, sessions</span></a>');
     if (has('contributor', 'editor')) staff.push('<a href="#/studio"><b>Publishing Studio</b><span>Write and publish</span></a>');
     if (has('admin')) staff.push('<a href="#/admin"><b>Admin</b><span>People and permissions</span></a>');
-    return (staff.length ? '<div class="stack"><p class="section-title">Staff</p><div class="staff">' + staff.join('') + '</div></div>' : '') +
+    return '<p><a class="btn" href="#/website">Website connection</a></p>' + (staff.length ? '<div class="stack"><p class="section-title">Staff</p><div class="staff">' + staff.join('') + '</div></div>' : '') +
       '<div class="stack"><p class="section-title">Account</p><div class="card stack">' +
       '<p><b>' + h(ME.user.name) + '</b> · <span class="muted">' + h(ME.user.email) + '</span></p>' +
       '<p class="small muted">Roles: ' + h(ME.user.roles.join(', ')) + '</p>' +
