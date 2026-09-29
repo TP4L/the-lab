@@ -7,6 +7,19 @@ const { claimCode, normalizeCode, sha256, limiter } = require('../auth.js');
 const { tx, now } = require('../db.js');
 const { athleteResults } = require('./training.js');
 
+const MEASUREMENTS = [["dash_15_seconds","15-yard dash (seconds)",120],["dash_30_seconds","30-yard dash (seconds)",120],["vertical_inches","Vertical jump (inches)",100],["weight_lbs","Weight (lbs)",1500],["height_inches","Height (total inches)",120],["l_drill_seconds","L-drill (seconds)",300]];
+function measurementFields(body, current) {
+  const out = { sport: body.sport === undefined ? current.sport || '' : str(body.sport, 'sport', { max: 80 }) };
+  for (const [key, label, max] of MEASUREMENTS) {
+    const raw = body[key];
+    if (raw === undefined) { out[key] = current[key] ?? null; continue; }
+    if (raw === null || (typeof raw === 'string' && !raw.trim())) { out[key] = null; continue; }
+    const value = Number(raw);
+    if (!['string', 'number'].includes(typeof raw) || !Number.isFinite(value) || value <= 0 || value > max) throw new HttpError(400, label + ' must be greater than 0 and at most ' + max + '.');
+    out[key] = value;
+  }
+  return out;
+}
 const HANDS = ['right', 'left'];
 const SIDES = ['left', 'right', 'either'];
 const MEDIA_TYPES = {
@@ -34,6 +47,7 @@ module.exports = function athletes(r, ctx) {
   }
   function publicAthlete(a, level) {
     const out = {
+      ...measurementFields({}, a),
       id: a.id, name: a.name, hand: a.hand, side: a.side, rating: a.rating,
       goals: a.goals, focus: a.focus, plan: a.plan, photo_media_id: a.photo_media_id,
       claimed: !!a.user_id, updated_at: a.updated_at
@@ -60,8 +74,13 @@ module.exports = function athletes(r, ctx) {
     };
   }
 
+  function saveMeasurements(id, f) {
+    db.prepare('UPDATE athletes SET sport = ?, dash_15_seconds = ?, dash_30_seconds = ?, vertical_inches = ?, weight_lbs = ?, height_inches = ?, l_drill_seconds = ? WHERE id = ?').run(f.sport, f.dash_15_seconds, f.dash_30_seconds, f.vertical_inches, f.weight_lbs, f.height_inches, f.l_drill_seconds, id);
+  }
+
   function fields(body, level, current = {}) {
     const f = {
+      ...measurementFields(body, current),
       name: body.name === undefined ? current.name : str(body.name, 'name', { required: true, max: 80 }),
       hand: body.hand === undefined || body.hand === current.hand ? current.hand || '' : oneOf(body.hand, HANDS, 'hand', { allowEmpty: true }),
       side: body.side === undefined ? current.side || '' : oneOf(body.side, SIDES, 'side', { allowEmpty: true }),
@@ -99,6 +118,7 @@ module.exports = function athletes(r, ctx) {
     const id = tx(db, () => {
       const id = Number(db.prepare(`INSERT INTO athletes (name, hand, side, rating, goals, focus, plan, claim_code_hash, claim_email, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(f.name, f.hand, f.side, f.rating, f.goals, f.focus, f.plan, sha256(normalizeCode(code)), claimEmail, user.id).lastInsertRowid);
+      saveMeasurements(id, f);
       db.prepare('INSERT INTO coach_athletes (coach_id, athlete_id) VALUES (?, ?)').run(user.id, id);
       return id;
     });
@@ -121,6 +141,7 @@ module.exports = function athletes(r, ctx) {
     if(shared)Object.assign(f,shared);
     db.prepare('UPDATE athletes SET name = ?, hand = ?, side = ?, rating = ?, goals = ?, focus = ?, plan = ?, updated_at = ? WHERE id = ?')
       .run(f.name, f.hand, f.side, f.rating, f.goals, f.focus, f.plan, now(), a.id);
+    saveMeasurements(a.id, f);
     return profile(load(a.id), level);
   });
 
@@ -167,6 +188,7 @@ module.exports = function athletes(r, ctx) {
     const f = fields({ name: user.name, ...body }, 'self');
     const id = Number(db.prepare('INSERT INTO athletes (user_id, name, hand, side, rating, goals, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(user.id, f.name, f.hand, f.side, f.rating, f.goals, user.id).lastInsertRowid);
+    saveMeasurements(id, f);
     return withStatus(201, profile(load(id), 'self'));
   });
 

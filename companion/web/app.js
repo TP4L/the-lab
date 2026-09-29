@@ -888,6 +888,7 @@
       '<div class="focus-card"><p class="eyebrow">App training focus · set by your coach</p><p class="big">' + h(a.focus || 'Not set yet') + '</p></div>' +
       (a.plan ? '<div class="card"><p class="section-title">Development plan</p><div class="small">' + L.paras(a.plan) + '</div></div>' : '') +
       '<form class="card form" id="me-f" novalidate><p class="section-title">About me</p>' +
+      athleticFields(a) +
       '<div class="field"><label class="flabel" for="goals">Goals</label><textarea id="goals" maxlength="2000">' + h(a.goals) + '</textarea></div>' +
       '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Playing hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
       '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
@@ -906,7 +907,7 @@
     if(p.shared_profile_unavailable)$('#me-f').querySelectorAll('input,select,textarea,button').forEach(function(x){x.disabled=true;});
     $('#me-f').addEventListener('submit', function (e) {
       e.preventDefault();
-      api.request('PUT', '/api/athletes/' + a.id, { goals: $('#goals').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value })
+      api.request('PUT', '/api/athletes/' + a.id, { ...athleticValues(), goals: $('#goals').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value })
         .then(function () { L.toast('Saved'); }, function (err) { L.formError($('#me-f'), err.status === 0 ? 'Profile edits need a connection.' : err.message); });
     });
     $('#rf').addEventListener('submit', function (e) {
@@ -1037,6 +1038,26 @@
     });
   };
 
+
+  var ATHLETIC_METRICS = [["dash_15_seconds","15-yard dash (seconds)",120],["dash_30_seconds","30-yard dash (seconds)",120],["vertical_inches","Vertical jump (inches)",100],["weight_lbs","Weight (lbs)",1500],["height_inches","Height (total inches)",120],["l_drill_seconds","L-drill (seconds)",300]];
+  function athleticFields(a) {
+    a = a || {};
+    var sports = ['Pickleball', 'Tennis', 'Squash', 'Football', 'Basketball', 'Soccer', 'Baseball', 'Softball', 'Volleyball', 'Track and field', 'Multi-sport', 'General fitness'];
+    if (a.sport && sports.indexOf(a.sport) < 0) sports.push(a.sport);
+    return '<fieldset class="stack" style="border:0;padding:0;margin:0;min-width:0"><legend class="section-title">Sport & athletic measurements</legend><p class="small muted">Optional. Leave a measurement blank if it has not been tested.</p>' +
+      '<div class="field"><label class="flabel" for="sport">What sport?</label><select id="sport"><option value="">Select a sport</option>' +
+      sports.map(function(s) { return '<option value="' + h(s) + '"' + (a.sport === s ? ' selected' : '') + '>' + h(s) + '</option>'; }).join('') +
+      '<option value="__other">Other sport</option></select><label class="flabel" for="sport-other">Other sport name</label><input id="sport-other" type="text" maxlength="80" placeholder="Fill in if you selected Other sport"></div>' +
+      '<div class="form-grid">' + ATHLETIC_METRICS.map(function(m) {
+        return '<div class="field"><label class="flabel" for="' + m[0] + '">' + m[1] + '</label><input type="number" inputmode="decimal" step="0.01" min="0.01" max="' + m[2] + '" id="' + m[0] + '" value="' + h(a[m[0]] == null ? '' : a[m[0]]) + '"' + (m[0] === 'height_inches' ? ' placeholder="e.g. 72 = 6 ft"' : '') + '></div>';
+      }).join('') + '</div></fieldset>';
+  }
+  function athleticValues() {
+    var out = { sport: $('#sport').value === '__other' ? $('#sport-other').value : $('#sport').value };
+    ATHLETIC_METRICS.forEach(function(m) { out[m[0]] = $('#' + m[0]).value; });
+    return out;
+  }
+
   views.coachNew = function () {
     if (!has('coach')) return forbidden('Coach Workspace is for coaches.');
     app.innerHTML = '<a class="back" href="#/coach">← Athletes</a>' + head('Coach Workspace', 'New athlete profile', 'You’ll get a claim code. The athlete enters it after creating their account, and this profile becomes theirs with its history intact.') +
@@ -1047,10 +1068,11 @@
       '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">—</option>' + opts(SIDES) + '</select></div>' +
       '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20"></div></div>' +
       '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" placeholder="e.g. Third-shot drop depth"></div>' +
+      athleticFields({}) +
       '<div class="row"><button class="btn primary" type="submit">Create profile</button></div></form>';
     $('#f').addEventListener('submit', function (e) {
       e.preventDefault();
-      api.request('POST', '/api/athletes', { name: $('#nm').value, claim_email: $('#em').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value, focus: $('#focus').value })
+      api.request('POST', '/api/athletes', { ...athleticValues(), name: $('#nm').value, claim_email: $('#em').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value, focus: $('#focus').value })
         .then(function (r) { pendingCode = { athlete: r.athlete, code: r.claim_code }; location.hash = '#/coach/' + r.athlete.id + '/code'; }, function (err) { L.formError($('#f'), err.status === 0 ? 'Creating a profile needs a connection.' : err.message); });
     });
   };
@@ -1097,6 +1119,7 @@
         '<form class="card form" id="pf" novalidate><p class="section-title">Development</p>' +
         '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" value="' + h(a.focus) + '"></div>' +
         '<div class="field"><label class="flabel" for="plan">Development plan</label><textarea id="plan" maxlength="4000">' + h(a.plan) + '</textarea></div>' +
+        athleticFields(a) +
         '<div class="field"><label class="flabel" for="goals">Athlete goals</label><textarea id="goals" maxlength="2000">' + h(a.goals) + '</textarea></div>' +
         '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
         '<div class="field"><label class="flabel" for="side">Side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
@@ -1142,7 +1165,7 @@
       });
       $('#pf').addEventListener('submit', function (e) {
         e.preventDefault();
-        api.request('PUT', '/api/athletes/' + a.id, { focus: $('#focus').value, plan: $('#plan').value, goals: $('#goals').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value })
+        api.request('PUT', '/api/athletes/' + a.id, { ...athleticValues(), focus: $('#focus').value, plan: $('#plan').value, goals: $('#goals').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value })
           .then(function () { L.toast('Saved'); }, function (err) { L.formError($('#pf'), err.message); });
       });
       if ($('#newcode')) $('#newcode').addEventListener('click', function () {
