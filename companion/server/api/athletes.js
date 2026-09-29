@@ -63,7 +63,7 @@ module.exports = function athletes(r, ctx) {
   function fields(body, level, current = {}) {
     const f = {
       name: body.name === undefined ? current.name : str(body.name, 'name', { required: true, max: 80 }),
-      hand: body.hand === undefined ? current.hand || '' : oneOf(body.hand, HANDS, 'hand', { allowEmpty: true }),
+      hand: body.hand === undefined || body.hand === current.hand ? current.hand || '' : oneOf(body.hand, HANDS, 'hand', { allowEmpty: true }),
       side: body.side === undefined ? current.side || '' : oneOf(body.side, SIDES, 'side', { allowEmpty: true }),
       rating: body.rating === undefined ? current.rating || '' : str(body.rating, 'rating', { max: 20 }),
       goals: body.goals === undefined ? current.goals || '' : str(body.goals, 'goals', { max: 2000 }),
@@ -106,14 +106,19 @@ module.exports = function athletes(r, ctx) {
     return withStatus(201, { ...profile(load(id), 'coach'), claim_code: code });
   });
 
-  r.get('/api/athletes/:id', ({ user, params }) => {
+  r.get('/api/athletes/:id', async ({ user, params }) => {
     const { a, level } = access(user, int(params.id, 'id', { min: 1, required: true }));
-    return profile(a, level);
+    const out=profile(a,level);
+    if(ctx.sharedProfile){try{const shared=await ctx.sharedProfile(a,a);if(shared){out.athlete={...out.athlete,...shared};out.shared_profile=true;}}catch(e){out.shared_profile_unavailable=true;}}
+    return out;
   });
 
-  r.put('/api/athletes/:id', ({ user, params, body }) => {
+  r.put('/api/athletes/:id', async ({ user, params, body }) => {
     const { a, level } = access(user, int(params.id, 'id', { min: 1, required: true }));
-    const f = fields(body, level, a);
+    const currentShared=ctx.sharedProfile?await ctx.sharedProfile(a,a):null;
+    const f = fields(body, level, currentShared?{...a,...currentShared}:a);
+    const shared=ctx.sharedProfile?await ctx.sharedProfile(a,f,true):null;
+    if(shared)Object.assign(f,shared);
     db.prepare('UPDATE athletes SET name = ?, hand = ?, side = ?, rating = ?, goals = ?, focus = ?, plan = ?, updated_at = ? WHERE id = ?')
       .run(f.name, f.hand, f.side, f.rating, f.goals, f.focus, f.plan, now(), a.id);
     return profile(load(a.id), level);

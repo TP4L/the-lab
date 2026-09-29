@@ -54,6 +54,7 @@ function createApp(opts = {}) {
 
   require('./api/account.js')(r, ctx);
   require('./api/site-bridge.js')(r, ctx);
+  require('./api/site-signin.js')(r, ctx);
   require('./api/training.js')(r, ctx);
   require('./api/athletes.js')(r, ctx);
   require('./api/publishing.js')(r, ctx);

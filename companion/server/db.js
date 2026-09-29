@@ -624,7 +624,23 @@ CREATE TABLE website_connections (
  token TEXT NOT NULL,
  connected_at TEXT NOT NULL
 );`;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION];
+const WEBSITE_IDENTITY = `
+CREATE TABLE website_identities (
+ user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ subject TEXT NOT NULL UNIQUE,
+ athlete_id TEXT NOT NULL UNIQUE
+);
+CREATE TABLE website_profile_originals (
+ athlete_id INTEGER PRIMARY KEY REFERENCES athletes(id) ON DELETE CASCADE,
+ data TEXT NOT NULL
+);
+CREATE TABLE website_signin_states (
+ state_hash TEXT PRIMARY KEY,
+ verifier TEXT NOT NULL,
+ user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+ expires_at INTEGER NOT NULL
+);`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

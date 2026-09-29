@@ -59,7 +59,7 @@
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
       '<div class="card stack demo-card" id="democard" hidden><p class="section-title">Try the demo</p><p class="small">Sample players, a live event on courts 4 and 5, a double-elimination bracket, interest checks, a coached session plan and Field Notes. Nothing is emailed, and everything resets daily.</p>' +
       '<div class="demo-btns"><button class="btn primary" type="button" data-demo="host">Host and coach<span>Brett: runs events, plans, publishing</span></button><button class="btn" type="button" data-demo="player">Player<span>Jordan: courts, scores, notes, recap</span></button><button class="btn ghost" type="button" data-demo="coach">Assistant coach<span>Austin: roster and training</span></button></div></div>' +
-      '<a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
+      '<a class="btn primary" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p><a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="field"><label class="flabel" for="pw">Password</label><input type="password" id="pw" autocomplete="current-password" required></div>' +
@@ -878,7 +878,7 @@
     var notes = pendingNotes(a.id).concat(p.notes);
     var coachNotes = notes.filter(function (n) { return n.kind === 'coach'; });
     var reflections = notes.filter(function (n) { return n.kind === 'reflection'; });
-    app.innerHTML = offlineNote(p) +
+    app.innerHTML = offlineNote(p) + (p.shared_profile?'<p class="small muted">Shared THE LAB profile · player details update on your website and app.</p>':p.shared_profile_unavailable?'<p role="status">Shared player details are temporarily unavailable. Showing saved app details; reconnect before editing.</p>':'') +
       '<div class="pcard">' + avatar(a) + '<div><p class="pid">' + playerId(a.id) + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
       '<span>Hand <b>' + h(HANDS[a.hand] || '—') + '</b></span><span>Side <b>' + h(SIDES[a.side] || '—') + '</b></span><span>Rating <b>' + h(a.rating || '—') + '</b></span></p></div></div>' +
       '<details class="more" id="qrbox"><summary>Check-in QR \u00b7 ' + playerId(a.id) + '</summary><div class="qr-wrap" id="qr"><p class="small muted">Loading\u2026</p></div></details>' +
@@ -889,7 +889,7 @@
       (a.plan ? '<div class="card"><p class="section-title">Development plan</p><div class="small">' + L.paras(a.plan) + '</div></div>' : '') +
       '<form class="card form" id="me-f" novalidate><p class="section-title">About me</p>' +
       '<div class="field"><label class="flabel" for="goals">Goals</label><textarea id="goals" maxlength="2000">' + h(a.goals) + '</textarea></div>' +
-      '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Playing hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + '</select></div>' +
+      '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Playing hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
       '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
       '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20" value="' + h(a.rating) + '" placeholder="e.g. 4.0"></div></div>' +
       '<div class="row"><button class="btn" type="submit">Save</button></div></form>' +
@@ -903,6 +903,7 @@
       '<p class="section-title">Session results</p>' + resultsHTML(p.results) +
       '</div></div>' + settingsHTML();
 
+    if(p.shared_profile_unavailable)$('#me-f').querySelectorAll('input,select,textarea,button').forEach(function(x){x.disabled=true;});
     $('#me-f').addEventListener('submit', function (e) {
       e.preventDefault();
       api.request('PUT', '/api/athletes/' + a.id, { goals: $('#goals').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value })
@@ -1097,7 +1098,7 @@
         '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" value="' + h(a.focus) + '"></div>' +
         '<div class="field"><label class="flabel" for="plan">Development plan</label><textarea id="plan" maxlength="4000">' + h(a.plan) + '</textarea></div>' +
         '<div class="field"><label class="flabel" for="goals">Athlete goals</label><textarea id="goals" maxlength="2000">' + h(a.goals) + '</textarea></div>' +
-        '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + '</select></div>' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
         '<div class="field"><label class="flabel" for="side">Side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
         '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20" value="' + h(a.rating) + '"></div></div>' +
         '<div class="row"><button class="btn" type="submit">Save</button></div></form>' +

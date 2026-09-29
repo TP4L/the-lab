@@ -2,7 +2,8 @@
 const { HttpError } = require('../http.js');
 const { limiter } = require('../auth.js');
 const SITE = 'https://transcending-performance-lab.brettadamstp.chatgpt.site';
-module.exports = function(r, {db, auth, config}) {
+module.exports = function(r, ctx) {
+  const {db,auth,config}=ctx;
   const attempts = limiter(10, 15 * 60 * 1000), busy = new Set();
   async function remote(body, token) {
     let res;
@@ -12,6 +13,16 @@ module.exports = function(r, {db, auth, config}) {
     if(!res.ok)throw new HttpError([400,401,403,409].includes(res.status)?res.status:503,data.error||'Website connection failed.');
     return data;
   }
+  ctx.sharedProfile=async(a,fields,save=false)=>{
+    if(!a.user_id)return null;
+    const c=db.prepare('SELECT token FROM website_connections WHERE user_id=?').get(a.user_id);if(!c)return null;
+    const data={name:fields.name,hand:fields.hand||'',rating:fields.rating||'',goals:fields.goals||'',side:fields.side||''};
+    const out=await remote({action:save?'profile-save':'profile-read',data},c.token);
+    if(!out.profile||typeof out.profile.name!=='string')throw new HttpError(503,'Shared player details are unavailable.');
+    const p=out.profile;
+    db.prepare('INSERT INTO website_profile_originals(athlete_id,data) VALUES(?,?) ON CONFLICT(athlete_id) DO NOTHING').run(a.id,JSON.stringify({name:a.name,hand:a.hand,rating:a.rating,goals:a.goals,side:a.side}));
+    return p;
+  };
   function connection(user){auth.require(user);const c=db.prepare('SELECT * FROM website_connections WHERE user_id=?').get(user.id);if(!c)throw new HttpError(409,'Connect your website profile first.');return c}
   r.get('/api/site-bridge/meta',()=>({protocol:1}));
   r.get('/api/site-bridge',({user})=>{auth.require(user);const c=db.prepare('SELECT athlete_id,athlete_name,connected_at FROM website_connections WHERE user_id=?').get(user.id);return {connected:!!c,athlete:c||null,website:SITE}});
