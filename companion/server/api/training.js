@@ -61,7 +61,7 @@ function athleteResults(db, athleteId) {
   });
 }
 
-module.exports = function training(r, { db, auth }) {
+module.exports = function training(r, { db, auth, notifier }) {
   function sessionAccess(user, id, { write = false } = {}) {
     auth.require(user);
     const s = db.prepare('SELECT * FROM training_sessions WHERE id = ?').get(id);
@@ -120,7 +120,12 @@ module.exports = function training(r, { db, auth }) {
       athleteIds.forEach((aid, i) => db.prepare('INSERT INTO training_athletes (session_id, athlete_id, slot) VALUES (?, ?, ?)').run(id, aid, i + 1));
       items.forEach((it, i) => db.prepare('INSERT INTO training_items (session_id, idx, name, measure, target, instructions) VALUES (?, ?, ?, ?, ?, ?)')
         .run(id, i, it.name, it.measure, it.target, it.instructions));
-      if (assignment) db.prepare("UPDATE assignments SET status = 'done', session_id = ?, completed_at = ? WHERE id = ?").run(id, now(), assignment.id);
+      if (assignment) {
+        db.prepare("UPDATE assignments SET status = 'done', session_id = ?, completed_at = ? WHERE id = ?").run(id, now(), assignment.id);
+        db.prepare("UPDATE development_blocks SET session_id = ?, status = CASE WHEN status = 'assigned' THEN 'in_progress' ELSE status END, updated_at = ? WHERE assignment_id = ?")
+          .run(id, now(), assignment.id);
+        db.prepare('UPDATE development_blocks SET retest_session_id = ?, updated_at = ? WHERE retest_assignment_id = ?').run(id, now(), assignment.id);
+      }
     });
     return withStatus(201, loadSession(db, id));
   });
@@ -168,7 +173,16 @@ module.exports = function training(r, { db, auth }) {
       }
       db.prepare('UPDATE training_sessions SET title = ?, status = ?, completed_at = ?, version = version + 1, updated_at = ? WHERE id = ?')
         .run(title, status, status === 'complete' ? (s.completed_at || now()) : null, now(), s.id);
+      if (status === 'complete' && s.status !== 'complete') {
+        db.prepare("UPDATE development_blocks SET status = 'coach_review', updated_at = ? WHERE retest_session_id = ?").run(now(), s.id);
+      }
     });
+    if (status === 'complete' && s.status !== 'complete') {
+      const initial = db.prepare('SELECT id, athlete_id, title FROM development_blocks WHERE session_id = ? AND retest_session_id IS NULL').all(s.id);
+      initial.forEach(b => notifier.notify(notifier.usersOfAthletes([b.athlete_id]), 'training', `Training complete: ${b.title}`, 'Add your reflection and evidence while the read is fresh.', `#/development/${b.id}`));
+      const retests = db.prepare('SELECT id, athlete_id, assigned_by, title FROM development_blocks WHERE retest_session_id = ?').all(s.id);
+      retests.forEach(b => notifier.notify([...new Set([b.assigned_by, user.id].filter(Boolean))], 'training', `Retest ready to review: ${b.title}`, 'Review the completed retest and decide the next stage.', `#/development/${b.id}`));
+    }
     return loadSession(db, s.id);
   });
 
