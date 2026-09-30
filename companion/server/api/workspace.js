@@ -13,8 +13,10 @@ module.exports=function(r,ctx){
   if(upstream.status===401||upstream.status===403){db.prepare('DELETE FROM website_staff_connections WHERE user_id=?').run(user.id);throw new HttpError(403,'Staff connection expired. Connect again.');}
   if(!upstream.ok)throw new HttpError(upstream.status,data.error||'Workspace unavailable.');
   if(body.action==='disconnect')db.prepare('DELETE FROM website_staff_connections WHERE user_id=?').run(user.id);
-  return data;
+  const rows=Array.isArray(data&&data.athletes)?data.athletes:[];
+  return {...data,athletes:rows.map(row=>{const link=db.prepare('SELECT athlete_id FROM website_athlete_links WHERE website_id=?').get(row.id);return {...row,app_id:link?.athlete_id||null};})};
  }
+ ctx.websiteWorkspace=call;
  function syncRoster(user,data){
   const rows=Array.isArray(data&&data.athletes)?data.athletes:[];
   tx(db,()=>rows.forEach(row=>{
@@ -40,4 +42,3 @@ module.exports=function(r,ctx){
   return body.action==='roster'?syncRoster(user,data):data;
  });
 };
-
