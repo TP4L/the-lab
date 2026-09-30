@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { HttpError, withStatus, str, oneOf, int, uuid, SECURITY_HEADERS } = require('../http.js');
+const { HttpError, withStatus, str, oneOf, int, uuid, isoTime, SECURITY_HEADERS } = require('../http.js');
 const { claimCode, normalizeCode, sha256, limiter } = require('../auth.js');
 const { tx, now } = require('../db.js');
 const { athleteResults } = require('./training.js');
@@ -65,13 +65,23 @@ module.exports = function athletes(r, ctx) {
       ${level === 'coach' ? '' : "AND visibility = 'shared'"} ORDER BY created_at DESC LIMIT 100`).all(athleteId);
   }
   function profile(a, level) {
-    return {
+    const membership = a.user_id ? db.prepare('SELECT plan,status,expires_at,source,note,updated_at FROM memberships WHERE user_id = ?').get(a.user_id) : null;
+    const active = !!(membership && membership.status === 'active' && (!membership.expires_at || membership.expires_at > now()));
+    const out = {
       athlete: publicAthlete(a, level), access: level,
       notes: notesFor(a.id, level),
       media: mediaFor(a.id, level),
       results: athleteResults(db, a.id).slice(0, 20),
       coaches: db.prepare('SELECT u.id, u.name FROM coach_athletes c JOIN users u ON u.id = c.coach_id WHERE c.athlete_id = ?').all(a.id)
     };
+    if (level === 'coach') {
+      out.membership = membership ? { ...membership, active, complimentary: membership.source === 'manual' && active } : null;
+      out.membership_eligible = !!a.user_id;
+      out.membership_access = db.prepare("SELECT id,title,slug FROM courses WHERE status = 'published' AND access = 'members' ORDER BY title").all();
+      out.membership_history = a.user_id ? db.prepare(`SELECT h.status,h.plan,h.expires_at,h.source,h.note,h.created_at,u.name AS changed_by
+        FROM membership_history h LEFT JOIN users u ON u.id = h.changed_by WHERE h.user_id = ? ORDER BY h.created_at DESC LIMIT 20`).all(a.user_id) : [];
+    }
+    return out;
   }
 
   function saveMeasurements(id, f) {
@@ -108,7 +118,31 @@ module.exports = function athletes(r, ctx) {
       FROM athletes a
       WHERE (${isAdmin ? '1' : 'EXISTS (SELECT 1 FROM coach_athletes c WHERE c.athlete_id = a.id AND c.coach_id = ?)'}) AND a.name LIKE ?
       ORDER BY a.name COLLATE NOCASE LIMIT 300`).all(...(isAdmin ? [q] : [user.id, q]));
-    return rows.map(a => ({ ...publicAthlete(a, 'coach'), last_session: a.last_session }));
+    return rows.map(a => {
+      const m = a.user_id ? db.prepare('SELECT plan,status,expires_at,source FROM memberships WHERE user_id = ?').get(a.user_id) : null;
+      const active = !!(m && m.status === 'active' && (!m.expires_at || m.expires_at > now()));
+      return { ...publicAthlete(a, 'coach'), last_session: a.last_session, membership: m ? { ...m, active, complimentary: m.source === 'manual' && active } : null };
+    });
+  });
+
+  r.put('/api/athletes/:id/membership', ({ user, params, body }) => {
+    auth.require(user, 'admin');
+    const a = load(int(params.id, 'id', { min: 1, required: true }));
+    if (!a.user_id) throw new HttpError(409, 'The athlete must claim their profile before membership can be assigned.');
+    const status = oneOf(body.status, ['active', 'cancelled', 'none'], 'status');
+    const plan = str(body.plan || 'essentials', 'plan', { max: 40 });
+    const expires = isoTime(body.expires_at, 'expires_at');
+    const note = str(body.note, 'note', { max: 300 });
+    tx(db, () => {
+      if (status === 'none') db.prepare('DELETE FROM memberships WHERE user_id = ?').run(a.user_id);
+      else db.prepare(`INSERT INTO memberships (user_id,plan,status,expires_at,source,note,granted_by,updated_at) VALUES (?,?,?,?, 'manual',?,?,?)
+        ON CONFLICT(user_id) DO UPDATE SET plan=excluded.plan,status=excluded.status,expires_at=excluded.expires_at,source='manual',note=excluded.note,granted_by=excluded.granted_by,updated_at=excluded.updated_at`)
+        .run(a.user_id, plan, status, expires, note, user.id, now());
+      db.prepare('INSERT INTO membership_history (user_id,status,plan,expires_at,source,note,changed_by) VALUES (?,?,?,?,?,?,?)')
+        .run(a.user_id, status, status === 'none' ? '' : plan, expires, 'manual', note, user.id);
+    });
+    notifier.notify([a.user_id], 'content', status === 'active' ? 'LAB Essentials access is active' : status === 'none' ? 'LAB Essentials access removed' : 'LAB Essentials access is no longer active', expires ? `Access through ${new Date(expires).toLocaleDateString()}.` : '', '#/membership');
+    return profile(load(a.id), 'coach');
   });
 
   r.post('/api/athletes', ({ user, body }) => {
