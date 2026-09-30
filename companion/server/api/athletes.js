@@ -75,6 +75,8 @@ module.exports = function athletes(r, ctx) {
   }
 
   function saveMeasurements(id, f) {
+    const prior=load(id);
+    ctx.saveMeasurementSnapshot?.(id,f,prior);
     db.prepare('UPDATE athletes SET sport = ?, dash_15_seconds = ?, dash_30_seconds = ?, vertical_inches = ?, weight_lbs = ?, height_inches = ?, l_drill_seconds = ? WHERE id = ?').run(f.sport, f.dash_15_seconds, f.dash_30_seconds, f.vertical_inches, f.weight_lbs, f.height_inches, f.l_drill_seconds, id);
   }
 
@@ -372,3 +374,4 @@ module.exports = function athletes(r, ctx) {
 
   return { mediaAccess };
 };
+

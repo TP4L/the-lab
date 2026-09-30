@@ -58,6 +58,10 @@ test('nightly backup: one per day, keeps 7, admin can list and download', async 
   const dl = await owner.get('/api/admin/backups/2026-09-09');
   assert.equal(dl.status, 200);
   assert.equal(dl.body.slice(0, 15).toString(), 'SQLite format 3');
+  const restored=path.join(dir,'restore-check.db');fs.writeFileSync(restored,dl.body);
+  const copy=new (require('node:sqlite').DatabaseSync)(restored);
+  assert.equal(copy.prepare('PRAGMA integrity_check').get().integrity_check,'ok');
+  assert.equal(copy.prepare('SELECT COUNT(*) n FROM users').get().n,s.app.db.prepare('SELECT COUNT(*) n FROM users').get().n);copy.close();
   assert.equal((await coach.get('/api/admin/backups')).status, 403);
   assert.equal((await owner.get('/api/admin/backups/..%2f..%2fetc')).status, 404);
 });
@@ -90,3 +94,4 @@ test('password reset uses the mailer when no hook is given', async (t) => {
   assert.match(sent[0].text, /http:\/\/lab\.test\/#\/reset\//);
   assert.equal((await (await staff(s)).owner.get('/api/admin/status')).body.email, true);
 });
+

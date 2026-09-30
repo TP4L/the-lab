@@ -13,7 +13,7 @@
     function mount(html) { const host = document.createElement('div'); host.className = 'journey'; host.innerHTML = html; root().replaceChildren(host); return host; }
     async function profile() { const me = await api.get('/api/me'); ctx.setMe(me); return me.athlete_id ? api.get('/api/athletes/' + me.athlete_id) : null; }
     function noteCard(n) {
-      return '<article class="journey-note"><div class="journey-meta"><span class="tag">' + (n.kind === 'coach' ? 'Coach note' : /^Question\n/.test(n.body) ? 'Question' : /^Feedback\n/.test(n.body) ? 'Feedback' : 'Reflection') + '</span><time>' + h(date(n.created_at)) + '</time></div><p class="journey-copy">' + h(n.body) + '</p>' + (n.media_id ? mediaCard({ id: n.media_id, mime: n.media_mime || 'image/jpeg', created_at: n.created_at }, 'Attached to this note') : '') + '<p class="small muted">' + h(n.author || 'Your coach') + '</p></article>';
+      return '<article class="journey-note"><div class="journey-meta"><span class="tag">' + (n.kind === 'coach' ? 'Coach note' : /^Question\n/.test(n.body) ? 'Question' : /^Feedback\n/.test(n.body) ? 'Feedback' : 'Reflection') + '</span><time>' + h(date(n.created_at)) + '</time></div><p class="journey-copy">' + h(n.body) + '</p>' + (n.media_id ? mediaCard({ id: n.media_id, mime: n.media_mime || 'image/jpeg', created_at: n.created_at }, 'Attached to this note') : '') + '<p class="small muted">' + (n.reply_to ? 'Coach reply · ' : n.kind === 'reflection' ? (n.reviewed_at ? 'Reviewed · ' : 'Awaiting coach review · ') : '') + h(n.author || 'Your coach') + '</p></article>';
     }
     function mediaCard(m, title) {
       const video = m.mime.startsWith('video/');
@@ -108,3 +108,4 @@
     }
   });
 })();
+

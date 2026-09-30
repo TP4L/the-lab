@@ -57,6 +57,7 @@ function createApp(opts = {}) {
   require('./api/site-signin.js')(r, ctx);
   require('./api/workspace.js')(r, ctx);
   require('./api/training.js')(r, ctx);
+  require('./api/progress.js')(r, ctx);
   require('./api/athletes.js')(r, ctx);
   require('./api/publishing.js')(r, ctx);
   require('./api/play.js')(r, ctx);
@@ -200,3 +201,4 @@ if (require.main === module) {
     setTimeout(() => process.exit(0), 24 * 3600e3).unref();
   });
 }
+

@@ -656,7 +656,16 @@ ALTER TABLE athletes ADD COLUMN weight_lbs REAL;
 ALTER TABLE athletes ADD COLUMN height_inches REAL;
 ALTER TABLE athletes ADD COLUMN l_drill_seconds REAL;
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS];
+const DEVELOPMENT_RECORDS = `
+CREATE TABLE athlete_measurements(id TEXT PRIMARY KEY,athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,data TEXT NOT NULL,recorded_at TEXT NOT NULL);
+CREATE INDEX athlete_measurements_date ON athlete_measurements(athlete_id,recorded_at);
+CREATE TABLE coach_followups(id TEXT PRIMARY KEY,athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,data TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL);
+CREATE INDEX coach_followups_athlete ON coach_followups(athlete_id);
+ALTER TABLE notes ADD COLUMN reviewed_at TEXT;
+ALTER TABLE notes ADD COLUMN reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE notes ADD COLUMN reply_to INTEGER REFERENCES notes(id) ON DELETE SET NULL;
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');
@@ -681,3 +690,4 @@ function tx(db, fn) {
 const now = () => new Date().toISOString();
 
 module.exports = { open, tx, now };
+
