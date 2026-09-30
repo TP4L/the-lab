@@ -674,7 +674,43 @@ CREATE TABLE padel_entries (
  updated_at TEXT NOT NULL,
  PRIMARY KEY(owner_id,id)
 );`;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL];
+/* Development Blocks connect learning to application: one athlete problem,
+   one lesson, one training assignment, evidence, reflection and a retest. */
+const DEVELOPMENT_BLOCKS = `
+CREATE TABLE development_blocks (
+  id INTEGER PRIMARY KEY,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  lesson_id INTEGER REFERENCES lessons(id) ON DELETE SET NULL,
+  template_id INTEGER REFERENCES training_templates(id) ON DELETE SET NULL,
+  assignment_id INTEGER REFERENCES assignments(id) ON DELETE SET NULL,
+  session_id TEXT REFERENCES training_sessions(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  problem TEXT NOT NULL DEFAULT '',
+  read_targets TEXT NOT NULL DEFAULT '[]',
+  start_state TEXT NOT NULL DEFAULT 'neutral' CHECK (start_state IN ('defensive','neutral','offensive')),
+  desired_state TEXT NOT NULL DEFAULT 'offensive' CHECK (desired_state IN ('defensive','neutral','offensive')),
+  scramble INTEGER NOT NULL DEFAULT 0,
+  error_layer TEXT NOT NULL DEFAULT 'decision' CHECK (error_layer IN ('perception','read','state','need','decision','movement','technique','execution','recovery')),
+  intensity TEXT NOT NULL DEFAULT 'training' CHECK (intensity IN ('practice','move','flow','training','sparring','dueling','competition','dealers_choice')),
+  constraint_text TEXT NOT NULL DEFAULT '',
+  expected_ball TEXT NOT NULL DEFAULT '',
+  success_evidence TEXT NOT NULL DEFAULT '',
+  reflection_prompt TEXT NOT NULL DEFAULT '',
+  athlete_reflection TEXT NOT NULL DEFAULT '',
+  evidence_media_id TEXT REFERENCES media(id) ON DELETE SET NULL,
+  confidence INTEGER CHECK (confidence IS NULL OR (confidence >= 1 AND confidence <= 5)),
+  coach_feedback TEXT NOT NULL DEFAULT '',
+  retest_notes TEXT NOT NULL DEFAULT '',
+  due_on TEXT,
+  status TEXT NOT NULL DEFAULT 'assigned' CHECK (status IN ('assigned','in_progress','evidence_submitted','coach_review','ready_retest','mastered')),
+  assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX development_blocks_athlete ON development_blocks(athlete_id, status, updated_at);
+CREATE INDEX development_blocks_lesson ON development_blocks(lesson_id);
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');
