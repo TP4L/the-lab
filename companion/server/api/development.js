@@ -43,6 +43,54 @@ module.exports = function development(r, { db, auth, notifier }) {
     if (templateId && !db.prepare('SELECT 1 FROM training_templates WHERE id = ?').get(templateId)) throw new HttpError(400, 'Training template not found.');
     return { lessonId, templateId };
   }
+  function libraryShape(row) {
+    if (!row) return row;
+    return { ...row, read_targets: JSON.parse(row.read_targets || '[]'), scramble: !!row.scramble };
+  }
+  function libraryFields(body, current = {}) {
+    const reads = body.read_targets === undefined ? JSON.parse(current.read_targets || '[]') : list(body.read_targets, 'read_targets', { max: 3, item: (x, f) => oneOf(x, READS, f) });
+    const refs = body.lesson_id === undefined && body.template_id === undefined
+      ? { lessonId: current.lesson_id || null, templateId: current.template_id || null } : references(body);
+    return {
+      name: body.name === undefined ? current.name : str(body.name, 'name', { required: true, max: 120 }),
+      title: body.title === undefined ? current.title : str(body.title, 'title', { required: true, max: 120 }),
+      problem: body.problem === undefined ? current.problem || '' : str(body.problem, 'problem', { max: 1000 }),
+      reads: [...new Set(reads)], start: body.start_state === undefined ? current.start_state || 'neutral' : oneOf(body.start_state, STATES, 'start_state'),
+      desired: body.desired_state === undefined ? current.desired_state || 'offensive' : oneOf(body.desired_state, STATES, 'desired_state'),
+      scramble: body.scramble === undefined ? !!current.scramble : !!body.scramble,
+      layer: body.error_layer === undefined ? current.error_layer || 'decision' : oneOf(body.error_layer, LAYERS, 'error_layer'),
+      intensity: body.intensity === undefined ? current.intensity || 'training' : oneOf(body.intensity, INTENSITIES, 'intensity'),
+      constraint: body.constraint_text === undefined ? current.constraint_text || '' : str(body.constraint_text, 'constraint_text', { max: 1000 }),
+      expected: body.expected_ball === undefined ? current.expected_ball || '' : str(body.expected_ball, 'expected_ball', { max: 1000 }),
+      evidence: body.success_evidence === undefined ? current.success_evidence || '' : str(body.success_evidence, 'success_evidence', { max: 1000 }),
+      reflection: body.reflection_prompt === undefined ? current.reflection_prompt || '' : str(body.reflection_prompt, 'reflection_prompt', { max: 1000 }),
+      lessonId: refs.lessonId, templateId: refs.templateId
+    };
+  }
+
+  r.get('/api/development-library', ({ user }) => {
+    auth.require(user, 'coach');
+    return db.prepare(`SELECT d.*, l.title AS lesson_title, t.name AS template_name, u.name AS coach
+      FROM development_library d LEFT JOIN lessons l ON l.id = d.lesson_id LEFT JOIN training_templates t ON t.id = d.template_id
+      LEFT JOIN users u ON u.id = d.created_by ORDER BY d.updated_at DESC`).all().map(libraryShape);
+  });
+  r.post('/api/development-library', ({ user, body }) => {
+    auth.require(user, 'coach');
+    const f = libraryFields(body);
+    const id = Number(db.prepare(`INSERT INTO development_library
+      (name,title,problem,read_targets,start_state,desired_state,scramble,error_layer,intensity,constraint_text,expected_ball,success_evidence,reflection_prompt,lesson_id,template_id,created_by)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(f.name, f.title, f.problem, JSON.stringify(f.reads), f.start, f.desired, f.scramble ? 1 : 0, f.layer, f.intensity, f.constraint, f.expected, f.evidence, f.reflection, f.lessonId, f.templateId, user.id).lastInsertRowid);
+    return withStatus(201, libraryShape(db.prepare('SELECT * FROM development_library WHERE id = ?').get(id)));
+  });
+  r.del('/api/development-library/:id', ({ user, params }) => {
+    auth.require(user, 'coach');
+    const id = int(params.id, 'id', { min: 1, required: true });
+    const row = db.prepare('SELECT created_by FROM development_library WHERE id = ?').get(id);
+    if (!row) throw new HttpError(404, 'Library pathway not found.');
+    if (row.created_by !== user.id && !auth.has(user, 'admin')) throw new HttpError(403, 'Only its creator or an admin can remove this pathway.');
+    db.prepare('DELETE FROM development_library WHERE id = ?').run(id);
+    return withStatus(204, null);
+  });
 
   r.get('/api/me/development-blocks', ({ user }) => {
     auth.require(user);
