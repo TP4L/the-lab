@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { start, staff } = require('./helpers.js');
+const { start, staff, uid } = require('./helpers.js');
 
 test('Development Blocks connect a lesson, training, athlete evidence and coach review', async (t) => {
   const s = await start(); t.after(s.close);
@@ -29,6 +29,12 @@ test('Development Blocks connect a lesson, training, athlete evidence and coach 
   const mine = (await athlete.get('/api/me/development-blocks')).body;
   assert.equal(mine.length, 1);
   assert.equal(mine[0].status, 'assigned');
+  const sessionId = uid();
+  await coach.post('/api/training/sessions', { id: sessionId, title: 'Transition application', athletes: [aid], items: template.items, assignment_id: response.body.assignment_id });
+  let linked = (await athlete.get(`/api/development-blocks/${mine[0].id}`)).body;
+  assert.deepEqual([linked.session_id, linked.status], [sessionId, 'in_progress']);
+  await coach.put(`/api/training/sessions/${sessionId}`, { version: 1, status: 'complete' });
+  assert.ok((await athlete.get('/api/notifications')).body.items.some(n => n.title.startsWith('Training complete:')));
   assert.equal((await athlete.put(`/api/development-blocks/${mine[0].id}`, { status: 'ready_retest' })).status, 403);
   const evidence = (await athlete.put(`/api/development-blocks/${mine[0].id}`, { status: 'evidence_submitted', athlete_reflection: 'I waited for balance.', confidence: 4 })).body;
   assert.equal(evidence.status, 'evidence_submitted');
@@ -38,6 +44,12 @@ test('Development Blocks connect a lesson, training, athlete evidence and coach 
 
   const reviewed = (await coach.put(`/api/development-blocks/${mine[0].id}`, { status: 'ready_retest', coach_feedback: 'The read is earlier now.', retest_notes: 'Sparring with consequence.' })).body;
   assert.equal(reviewed.status, 'ready_retest');
+  assert.ok(reviewed.retest_assignment_id, 'ready to retest creates the next assignment');
   assert.equal(reviewed.coach_feedback, 'The read is earlier now.');
+  const retestSession = uid();
+  await coach.post('/api/training/sessions', { id: retestSession, title: 'Transition retest', athletes: [aid], items: template.items, assignment_id: reviewed.retest_assignment_id });
+  await coach.put(`/api/training/sessions/${retestSession}`, { version: 1, status: 'complete' });
+  const afterRetest = (await coach.get(`/api/development-blocks/${mine[0].id}`)).body;
+  assert.deepEqual([afterRetest.retest_session_id, afterRetest.status], [retestSession, 'coach_review']);
   assert.ok((await athlete.get('/api/notifications')).body.items.some(n => n.link === `#/development/${mine[0].id}`));
 });
