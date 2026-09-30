@@ -714,7 +714,40 @@ const DEVELOPMENT_BLOCK_AUTOMATION = `
 ALTER TABLE development_blocks ADD COLUMN retest_assignment_id INTEGER REFERENCES assignments(id) ON DELETE SET NULL;
 ALTER TABLE development_blocks ADD COLUMN retest_session_id TEXT REFERENCES training_sessions(id) ON DELETE SET NULL;
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION];
+const DEVELOPMENT_LIBRARY_AND_BILLING = `
+CREATE TABLE development_library (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  title TEXT NOT NULL,
+  problem TEXT NOT NULL DEFAULT '',
+  read_targets TEXT NOT NULL DEFAULT '[]',
+  start_state TEXT NOT NULL DEFAULT 'neutral',
+  desired_state TEXT NOT NULL DEFAULT 'offensive',
+  scramble INTEGER NOT NULL DEFAULT 0,
+  error_layer TEXT NOT NULL DEFAULT 'decision',
+  intensity TEXT NOT NULL DEFAULT 'training',
+  constraint_text TEXT NOT NULL DEFAULT '',
+  expected_ball TEXT NOT NULL DEFAULT '',
+  success_evidence TEXT NOT NULL DEFAULT '',
+  reflection_prompt TEXT NOT NULL DEFAULT '',
+  lesson_id INTEGER REFERENCES lessons(id) ON DELETE SET NULL,
+  template_id INTEGER REFERENCES training_templates(id) ON DELETE SET NULL,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX development_library_updated ON development_library(updated_at);
+ALTER TABLE memberships ADD COLUMN stripe_customer_id TEXT;
+ALTER TABLE memberships ADD COLUMN stripe_subscription_id TEXT;
+CREATE UNIQUE INDEX memberships_stripe_customer ON memberships(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+CREATE UNIQUE INDEX memberships_stripe_subscription ON memberships(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
+CREATE TABLE billing_events (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');
