@@ -13,7 +13,7 @@ const PREFS = {
   reminders: 'Reminders before events',
   content: 'New Field Notes'
 };
-const SETTINGS = { leaderboard: 'Show me on leaderboards' };
+const SETTINGS = { email_notifications: 'Email me coach notes, training and event updates', leaderboard: 'Show me on leaderboards' };
 
 function prefsOf(row) {
   let p = {};
@@ -25,17 +25,24 @@ function prefsOf(row) {
 
 /* notify(userIds, kind, title, body, link): respects each person's prefs.
    `link` is an in-app route like "#/play/events/3", used as a deep link. */
-function createNotifier(db, push) {
+function createNotifier(db, push, mailer, publicUrl = '') {
   const ins = db.prepare('INSERT INTO notifications (user_id, kind, title, body, link) VALUES (?, ?, ?, ?, ?)');
+  const esc = v => String(v || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   function notify(userIds, kind, title, body = '', link = '') {
     const ids = [...new Set(userIds.filter(Boolean))];
     if (!ids.length) return 0;
     let n = 0;
     ids.forEach(uid => {
-      const u = db.prepare('SELECT prefs FROM users WHERE id = ?').get(uid);
+      const u = db.prepare('SELECT email, prefs FROM users WHERE id = ?').get(uid);
       if (!u || prefsOf(u)[kind] === false) return;
-      ins.run(uid, kind, title, body, link); n++;
+      const notificationId = Number(ins.run(uid, kind, title, body, link).lastInsertRowid); n++;
       if (push) push.toUser(uid, { title, body, link });
+      if (mailer && mailer.enabled && prefsOf(u).email_notifications && kind !== 'content') {
+        const url = publicUrl && link ? `${publicUrl}/${link}` : publicUrl;
+        mailer.sendSoon({ to: u.email, subject: title, text: `${body}${url ? `\n\nOpen THE LAB: ${url}` : ''}\n\nYou can turn email notifications off in Profile > Notifications and privacy.`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#171b23"><p style="font-size:12px;letter-spacing:.12em;color:#d64336;font-weight:700">THE LAB</p><h1 style="font-size:24px">${esc(title)}</h1><p style="line-height:1.6">${esc(body)}</p>${url ? `<p><a href="${esc(url)}" style="display:inline-block;background:#171b23;color:white;padding:12px 18px;text-decoration:none;border-radius:6px">Open THE LAB</a></p>` : ''}<p style="font-size:12px;color:#667085">Manage email notifications in Profile &gt; Notifications and privacy.</p></div>`,
+          idempotencyKey: `lab-notification-${notificationId}` });
+      }
     });
     return n;
   }
@@ -44,7 +51,7 @@ function createNotifier(db, push) {
     if (!athleteIds.length) return [];
     return db.prepare(`SELECT user_id FROM athletes WHERE id IN (${athleteIds.map(() => '?').join(',')}) AND user_id IS NOT NULL`).all(...athleteIds).map(r => r.user_id);
   }
-  return { notify, usersOfAthletes };
+  return { notify, usersOfAthletes, emailEnabled: !!(mailer && mailer.enabled) };
 }
 
 function routes(r, ctx) {
