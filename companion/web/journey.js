@@ -8,7 +8,7 @@
     const date = value => { const d = new Date(value); return value && !isNaN(d) ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date to be confirmed'; };
     const link = (url, label, cls = '') => '<a class="btn ' + cls + '" href="' + h(url) + '">' + h(label) + '</a>';
     const empty = (title, body, action = '') => '<div class="journey-empty"><span class="journey-mark" aria-hidden="true">↗</span><h3>' + h(title) + '</h3><p>' + h(body) + '</p>' + action + '</div>';
-    const tabs = active => '<nav class="journey-tabs" aria-label="Your development">' + [['overview', 'Overview'], ['sessions', 'Sessions'], ['videos', 'Videos'], ['notes', 'Notes'], ['feedback', 'Ask & reflect']].map(([key, label]) => '<a href="' + (key === 'overview' ? '#/' : '#/journey/' + key) + '"' + (active === key ? ' aria-current="page"' : '') + '>' + label + '</a>').join('') + '</nav>';
+    const tabs = active => '<nav class="journey-tabs" aria-label="Your development">' + [['timeline', 'Timeline'], ['overview', 'Overview'], ['sessions', 'Sessions'], ['videos', 'Videos'], ['notes', 'Notes'], ['feedback', 'Ask & reflect']].map(([key, label]) => '<a href="' + (key === 'overview' ? '#/' : key === 'timeline' ? '#/timeline' : '#/journey/' + key) + '"' + (active === key ? ' aria-current="page"' : '') + '>' + label + '</a>').join('') + '</nav>';
     const heading = (title, body, action = '') => '<div class="journey-heading"><div><p class="eyebrow">Your player space</p><h1>' + h(title) + '</h1><p>' + h(body) + '</p></div>' + action + '</div>';
     function mount(html) { const host = document.createElement('div'); host.className = 'journey'; host.innerHTML = html; root().replaceChildren(host); return host; }
     async function profile() { const me = await api.get('/api/me'); ctx.setMe(me); return me.athlete_id ? api.get('/api/athletes/' + me.athlete_id) : null; }
@@ -108,4 +108,5 @@
     }
   });
 })();
+
 
