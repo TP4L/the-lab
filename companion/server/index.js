@@ -64,6 +64,7 @@ function createApp(opts = {}) {
   require('./api/play.js')(r, ctx);
   require('./api/learn.js')(r, ctx);
   require('./api/coaching.js')(r, ctx);
+  require('./api/development.js')(r, ctx);
   require('./api/planning.js')(r, ctx);
   require('./demo.js').routes(r, ctx);
   require('./api/notify.js').routes(r, ctx);
@@ -205,5 +206,4 @@ if (require.main === module) {
     setTimeout(() => process.exit(0), 24 * 3600e3).unref();
   });
 }
-
 
