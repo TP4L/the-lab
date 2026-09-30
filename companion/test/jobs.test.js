@@ -95,3 +95,17 @@ test('password reset uses the mailer when no hook is given', async (t) => {
   assert.equal((await (await staff(s)).owner.get('/api/admin/status')).body.email, true);
 });
 
+test('shared coach notes email athletes once and respect email preferences', async (t) => {
+  const sent = [], mailer = { enabled: true, send: async () => {}, sendSoon: msg => sent.push(msg) };
+  const s = await start({ mailer }); t.after(s.close);
+  const { coach } = await staff(s);
+  const made = (await coach.post('/api/athletes', { name: 'Email Athlete', claim_email: 'athlete@lab.test' })).body;
+  const athlete = s.client(); await athlete.signup('Email Athlete', 'athlete@lab.test'); await athlete.post('/api/claim', { code: made.claim_code });
+  await coach.post(`/api/athletes/${made.athlete.id}/notes`, { body: 'Your reset shape was calmer.', visibility: 'private' });
+  assert.equal(sent.length, 0, 'private notes never send');
+  await coach.post(`/api/athletes/${made.athlete.id}/notes`, { body: 'Your reset shape was calmer.', visibility: 'shared' });
+  assert.equal(sent.length, 1); assert.equal(sent[0].to, 'athlete@lab.test'); assert.match(sent[0].subject, /New feedback/); assert.match(sent[0].idempotencyKey, /^lab-notification-/);
+  await athlete.put('/api/me/prefs', { email_notifications: false });
+  await coach.post(`/api/athletes/${made.athlete.id}/notes`, { body: 'Second shared note.', visibility: 'shared' });
+  assert.equal(sent.length, 1, 'email opt-out keeps the in-app note but stops email');
+});
