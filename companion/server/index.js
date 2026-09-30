@@ -148,7 +148,7 @@ function createApp(opts = {}) {
         catch (e) {
           if (e.status !== 401) return send(res, e.status || 403, { error: 'This is B.Adams’ private padel board.' });
           res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY' });
-          return res.end('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Padel Board</title><body style="font:18px/1.6 system-ui;max-width:480px;margin:12vh auto;padding:24px;background:#f5f3e9;color:#294d3b"><h1>My padel board</h1><p>Sign in with your THE LAB account. Then open <strong>My Padel Board</strong> from your home screen.</p><p><a href="/api/site-bridge/signin/start?workspace=1">Continue with THE LAB</a></p><p><a href="/#/signin">Use existing app login</a></p></body></html>');
+          return res.end('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Padel Board</title><body style="font:18px/1.6 system-ui;max-width:480px;margin:12vh auto;padding:24px;background:#f5f3e9;color:#294d3b"><h1>My padel board</h1><p>Sign in with your THE LAB account. After signing in, return to <strong>/padel</strong> to open your board.</p><p><a href="/api/site-bridge/signin/start?workspace=1">Continue with THE LAB</a></p><p><a href="/#/signin">Use existing app login</a></p></body></html>');
         }
         return serveStatic(WEB_ROOT, req, res, assetPath === '/padel' || assetPath === '/padel/' ? '/padel/index.html' : assetPath);
       }
