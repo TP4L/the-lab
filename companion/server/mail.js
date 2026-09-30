@@ -4,11 +4,11 @@
    in Resend). Without a key, messages are logged instead of sent. */
 function createMailer({ apiKey, from, fetchImpl = globalThis.fetch, log = console.log } = {}) {
   const enabled = !!(apiKey && from);
-  async function send({ to, subject, text, html }) {
+  async function send({ to, subject, text, html, idempotencyKey }) {
     if (!enabled) { log(`[mail disabled] to=${to} subject=${subject}\n${text}`); return { sent: false }; }
     const res = await fetchImpl('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
       body: JSON.stringify({ from, to: [to], subject, text, html })
     });
     if (!res.ok) { const body = await res.text().catch(() => ''); throw new Error(`Email failed (${res.status}): ${body.slice(0, 200)}`); }
