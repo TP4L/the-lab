@@ -710,7 +710,11 @@ CREATE TABLE development_blocks (
 CREATE INDEX development_blocks_athlete ON development_blocks(athlete_id, status, updated_at);
 CREATE INDEX development_blocks_lesson ON development_blocks(lesson_id);
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS];
+const DEVELOPMENT_BLOCK_AUTOMATION = `
+ALTER TABLE development_blocks ADD COLUMN retest_assignment_id INTEGER REFERENCES assignments(id) ON DELETE SET NULL;
+ALTER TABLE development_blocks ADD COLUMN retest_session_id TEXT REFERENCES training_sessions(id) ON DELETE SET NULL;
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');
@@ -735,4 +739,3 @@ function tx(db, fn) {
 const now = () => new Date().toISOString();
 
 module.exports = { open, tx, now };
-
