@@ -1203,6 +1203,10 @@
   }
 
   /* ================= COACH WORKSPACE ================= */
+  function membershipBadge(m) {
+    if (!m || !m.active) return '<span class="tag">Not a member</span>';
+    return '<span class="tag ok">' + (m.complimentary ? 'Complimentary' : 'Active member') + '</span>';
+  }
   views.coach = function () {
     if (!has('coach')) return forbidden('Coach Workspace is for coaches.');
     return api.get('/api/athletes').then(function (list) {
@@ -1210,7 +1214,7 @@
         '<input type="search" id="q" placeholder="Search athletes" aria-label="Search athletes">' +
         '<div class="list" id="roster">' + (list.length ? list.map(function (a) {
           return '<a class="li" href="#/coach/' + a.id + '" data-name="' + h(a.name.toLowerCase()) + '"><span class="who">' + avatar(a, 'sm') + '<span class="main-col"><span class="t">' + h(a.name) + '</span><span class="d">' + h(a.focus || 'No focus set') + '</span></span></span>' +
-            '<span class="side">' + (a.claimed ? '<span class="tag ok">Claimed</span>' : '<span class="tag">Not claimed</span>') + (a.last_session ? '<span>' + h(L.when(a.last_session)) + '</span>' : '') + '</span></a>';
+            '<span class="side">' + membershipBadge(a.membership) + (a.claimed ? '<span class="tag ok">Claimed</span>' : '<span class="tag">Not claimed</span>') + (a.last_session ? '<span>' + h(L.when(a.last_session)) + '</span>' : '') + '</span></a>';
         }).join('') : '<p class="empty">No athletes yet. Create a profile and give the athlete the claim code.</p>') + '</div>';
       $('#q').addEventListener('input', function () { var q = this.value.toLowerCase(); $$('#roster .li').forEach(function (l) { l.hidden = l.getAttribute('data-name').indexOf(q) < 0; }); });
     });
@@ -1274,6 +1278,13 @@
     return api.get('/api/athletes/' + id).then(function (p) {
       var a = p.athlete;
       var notes = pendingNotes(a.id).concat(p.notes);
+      var m = p.membership;
+      var membershipPanel = '<section class="card membership-admin"><div class="membership-admin-head"><div><p class="section-title">Access & Membership</p><h2>' + (m && m.active ? (m.complimentary ? 'Complimentary access' : 'Active membership') : 'No active membership') + '</h2></div>' + membershipBadge(m) + '</div>' +
+        (!p.membership_eligible ? '<p class="small muted">Membership can be assigned after this athlete claims the profile and connects their login.</p>' :
+          '<div class="access-preview"><b>Athlete access check</b><p>' + (m && m.active ? 'This athlete can open all ' + p.membership_access.length + ' published member course' + (p.membership_access.length === 1 ? '' : 's') + '.' : 'This athlete can see public material and previews, but full member lessons remain locked.') + '</p>' +
+          (p.membership_access.length ? '<details><summary>Member content (' + p.membership_access.length + ')</summary><ul>' + p.membership_access.map(function (c) { return '<li>' + h(c.title) + '</li>'; }).join('') + '</ul></details>' : '') + '</div>' +
+          (has('admin') ? '<form class="form" id="membershipForm" novalidate><div class="form-grid"><div class="field"><label class="flabel" for="membershipStatus">Access</label><select id="membershipStatus"><option value="none"' + (!m ? ' selected' : '') + '>No membership</option><option value="active"' + (m && m.active ? ' selected' : '') + '>Complimentary access</option><option value="cancelled"' + (m && !m.active ? ' selected' : '') + '>Lapsed</option></select></div><div class="field"><label class="flabel" for="membershipExpires">Expires <span class="hint">optional</span></label><input type="date" id="membershipExpires" value="' + h(m && m.expires_at ? m.expires_at.slice(0, 10) : '') + '"></div></div><div class="field"><label class="flabel" for="membershipNote">Internal note</label><input id="membershipNote" maxlength="300" value="' + h(m ? m.note : '') + '" placeholder="Reason or access arrangement"></div><div class="row"><button class="btn" type="submit">Save membership access</button></div></form>' : '<p class="small muted">Membership status is visible to coaches. Only an administrator can change access.</p>')) +
+        (p.membership_history.length ? '<details class="membership-history"><summary>Membership history</summary><div class="list">' + p.membership_history.map(function (x) { return '<div class="li"><span class="main-col"><span class="t small">' + h(x.status === 'active' ? 'Access activated' : x.status === 'none' ? 'Access removed' : 'Access lapsed') + '</span><span class="d">' + h(x.changed_by || (x.source === 'stripe' ? 'Stripe' : 'Administrator')) + (x.note ? ' · ' + h(x.note) : '') + '</span></span><span class="side">' + h(L.when(x.created_at)) + '</span></div>'; }).join('') + '</div></details>' : '') + '</section>';
       app.innerHTML = '<a class="back" href="#/coach">← Athletes</a>' + offlineNote(p) +
         '<div class="pcard">' + avatar(a) + '<div><p class="pid">' + playerId(a.id) + (a.claimed ? ' · claimed' : ' · not claimed yet') + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
         '<span>Hand <b>' + h(HANDS[a.hand] || '—') + '</b></span><span>Side <b>' + h(SIDES[a.side] || '—') + '</b></span><span>Rating <b>' + h(a.rating || '—') + '</b></span></p></div></div>' +
@@ -1294,6 +1305,7 @@
         '<div class="stack" id="devlist"></div><div class="stack" id="asglist"></div>' +
         '<p class="section-title">Notes and reflections</p>' + notesHTML(notes, true) +
         '</div><div class="stack">' +
+        membershipPanel +
         '<form class="card form" id="pf" novalidate><p class="section-title">Development</p>' +
         '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" value="' + h(a.focus) + '"></div>' +
         '<div class="field"><label class="flabel" for="plan">Development plan</label><textarea id="plan" maxlength="4000">' + h(a.plan) + '</textarea></div>' +
@@ -1318,6 +1330,11 @@
         if (!bs.length || !$('#devlist')) return;
         $('#devlist').innerHTML = '<p class="section-title">Development Blocks</p>' + developmentList(bs);
       }, function () {});
+      if ($('#membershipForm')) $('#membershipForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        api.request('PUT', '/api/athletes/' + a.id + '/membership', { status: $('#membershipStatus').value, plan: 'essentials', expires_at: $('#membershipExpires').value || null, note: $('#membershipNote').value })
+          .then(function () { L.toast('Membership access updated'); route(); }, function (err) { L.formError($('#membershipForm'), err.message); });
+      });
       $('#af').addEventListener('submit', function (e) {
         e.preventDefault();
         api.request('POST', '/api/athletes/' + a.id + '/assignments', { template_id: $('#atpl').value || undefined, title: $('#atitle').value, due_on: $('#adue').value || undefined, note: $('#anote').value })
