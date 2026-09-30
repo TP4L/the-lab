@@ -44,7 +44,7 @@ function createApp(opts = {}) {
   const r = createRouter();
   const push = opts.push || require('./push.js').createPush(db, { publicKey: opts.vapidPublic, privateKey: opts.vapidPrivate, subject: opts.vapidSubject, fetchImpl: opts.fetchImpl });
   config.pushEnabled = push.enabled;
-  const notifier = require('./api/notify.js').createNotifier(db, push);
+  const notifier = require('./api/notify.js').createNotifier(db, push, mailer, config.publicUrl);
   const ctx = { db, auth, config, notifier, mailer, push, stripeClient: opts.stripeClient };
   ctx.jobsFirst = key => Number(db.prepare('INSERT OR IGNORE INTO job_log (key) VALUES (?)').run(key).changes) === 1;
   const jobs = require('./jobs.js').createJobs(ctx);
