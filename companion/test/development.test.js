@@ -33,6 +33,8 @@ test('Development Blocks connect a lesson, training, athlete evidence and coach 
   const evidence = (await athlete.put(`/api/development-blocks/${mine[0].id}`, { status: 'evidence_submitted', athlete_reflection: 'I waited for balance.', confidence: 4 })).body;
   assert.equal(evidence.status, 'evidence_submitted');
   assert.equal(evidence.confidence, 4);
+  const dashboard = (await coach.get('/api/coach/dashboard')).body;
+  assert.ok(dashboard.items.some(x => x.kind === 'development' && x.recordId === mine[0].id && x.priority === 'review'), 'submitted evidence reaches the coach queue');
 
   const reviewed = (await coach.put(`/api/development-blocks/${mine[0].id}`, { status: 'ready_retest', coach_feedback: 'The read is earlier now.', retest_notes: 'Sparring with consequence.' })).body;
   assert.equal(reviewed.status, 'ready_retest');
