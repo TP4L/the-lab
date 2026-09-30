@@ -23,6 +23,7 @@
    if(item.source==='app'){
     if(item.kind==='event')return '#/play/events/'+item.recordId;
     if(item.kind==='session')return '#/train/'+item.recordId;
+    if(item.kind==='development')return '#/development/'+item.recordId;
     return item.athleteId?'#/coach/'+item.athleteId:'#/coach/today';
    }
    if(item.kind==='review'&&String(item.title).startsWith('Review training response'))return 'https://transcending-performance-lab.brettadamstp.chatgpt.site/coach-review';
@@ -32,7 +33,7 @@
   ctx.views.coachToday=async function(){
    if(!ctx.has('coach')&&!ctx.me()?.user?.workspace){location.hash='#/';return;}
    const host=document.createElement('div');host.className='journey coach-today';root().replaceChildren(host);
-   host.innerHTML='<header class="coach-command"><div><p class="eyebrow">COACHING COMMAND CENTER</p><h1>Today in THE LAB</h1><p>Review what changed. Handle what is due. Give every athlete a clear next step.</p></div><button class="btn" id="coach-refresh">Refresh</button></header><nav class="coach-actions" aria-label="Coach shortcuts"><a href="#/workspace">Athletes</a><a href="#/followups">Set follow-up</a><a href="#/train/new">Start session</a><a href="#/coach/desk">Events desk</a></nav><div id="coach-load" role="status">Checking both coaching systems…</div>';
+   host.innerHTML='<header class="coach-command"><div><p class="eyebrow">COACHING COMMAND CENTER</p><h1>Today in THE LAB</h1><p>Review what changed. Handle what is due. Give every athlete a clear next step.</p></div><button class="btn" id="coach-refresh">Refresh</button></header><nav class="coach-actions" aria-label="Coach shortcuts"><a class="assign" href="#/coach/development/new">Assign Development</a><a href="#/workspace">Athletes</a><a href="#/followups">Set follow-up</a><a href="#/train/new">Start session</a><a href="#/coach/desk">Events desk</a></nav><div id="coach-load" role="status">Checking both coaching systems…</div>';
    const load=async()=>{
     host.querySelector('#coach-refresh').disabled=true;host.querySelector('#coach-load').textContent='Checking both coaching systems…';
     const results=await Promise.allSettled([api.request('GET','/api/coach/dashboard'),ws({action:'followups'})]);if(!host.isConnected)return;
