@@ -109,8 +109,11 @@ module.exports = function athletes(r, ctx) {
   }
 
   /* ---------- roster (coach) ---------- */
-  r.get('/api/athletes', ({ user, query }) => {
+  r.get('/api/athletes', async ({ user, query }) => {
     auth.require(user, 'coach');
+    // Connected staff see one durable roster everywhere in the app. A website
+    // outage never hides already-synced athletes or blocks local coaching work.
+    if (user.workspace && ctx.syncWebsiteRoster) try { await ctx.syncWebsiteRoster(user); } catch {}
     const q = '%' + (query.get('q') || '').trim() + '%';
     const isAdmin = user.roles.includes('admin') || user.workspace;
     const rows = db.prepare(`SELECT a.*,
@@ -121,7 +124,8 @@ module.exports = function athletes(r, ctx) {
     return rows.map(a => {
       const m = a.user_id ? db.prepare('SELECT plan,status,expires_at,source FROM memberships WHERE user_id = ?').get(a.user_id) : null;
       const active = !!(m && m.status === 'active' && (!m.expires_at || m.expires_at > now()));
-      return { ...publicAthlete(a, 'coach'), last_session: a.last_session, membership: m ? { ...m, active, complimentary: m.source === 'manual' && active } : null };
+      const website = db.prepare('SELECT website_id FROM website_athlete_links WHERE athlete_id = ?').get(a.id);
+      return { ...publicAthlete(a, 'coach'), last_session: a.last_session, website_id: website ? website.website_id : null, membership: m ? { ...m, active, complimentary: m.source === 'manual' && active } : null };
     });
   });
 
@@ -408,4 +412,3 @@ module.exports = function athletes(r, ctx) {
 
   return { mediaAccess };
 };
-
