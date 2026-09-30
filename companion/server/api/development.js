@@ -1,4 +1,5 @@
 'use strict';
+const crypto = require('node:crypto');
 const { HttpError, withStatus, str, oneOf, int, list } = require('../http.js');
 const { tx, now } = require('../db.js');
 
@@ -8,19 +9,24 @@ const LAYERS = ['perception', 'read', 'state', 'need', 'decision', 'movement', '
 const INTENSITIES = ['practice', 'move', 'flow', 'training', 'sparring', 'dueling', 'competition', 'dealers_choice'];
 const STATUSES = ['assigned', 'in_progress', 'evidence_submitted', 'coach_review', 'ready_retest', 'mastered'];
 
-module.exports = function development(r, { db, auth, notifier }) {
+module.exports = function development(r, ctx) {
+  const { db, auth, notifier } = ctx;
   function shape(row) {
     if (!row) return row;
     return { ...row, read_targets: JSON.parse(row.read_targets || '[]'), scramble: !!row.scramble,
-      template_items: row.template_items ? JSON.parse(row.template_items) : null };
+      template_items: row.template_items ? JSON.parse(row.template_items) : null,
+      delivery: { app: row.athlete_user_id ? 'delivered' : 'needs_connection', website: row.website_id ? (row.website_delivery_status || 'pending') : 'not_linked', website_error: row.website_delivery_error || '', website_attempts: row.website_delivery_attempts || 0 } };
   }
   function select(where) {
     return `SELECT b.*, l.title AS lesson_title, c.title AS course_title, c.slug AS course_slug, m.mime AS evidence_mime,
-      t.name AS template_name, t.items AS template_items, u.name AS coach
+      t.name AS template_name, t.items AS template_items, u.name AS coach, a.user_id AS athlete_user_id, w.website_id,
+      dd.status AS website_delivery_status, dd.error AS website_delivery_error, dd.attempts AS website_delivery_attempts
       FROM development_blocks b
       LEFT JOIN lessons l ON l.id = b.lesson_id LEFT JOIN courses c ON c.id = l.course_id
       LEFT JOIN media m ON m.id = b.evidence_media_id
       LEFT JOIN training_templates t ON t.id = b.template_id LEFT JOIN users u ON u.id = b.assigned_by
+      JOIN athletes a ON a.id = b.athlete_id LEFT JOIN website_athlete_links w ON w.athlete_id = b.athlete_id
+      LEFT JOIN development_deliveries dd ON dd.block_id = b.id AND dd.destination = 'website'
       ${where}`;
   }
   function block(user, id) {
@@ -42,6 +48,33 @@ module.exports = function development(r, { db, auth, notifier }) {
     if (lessonId && !db.prepare('SELECT 1 FROM lessons WHERE id = ?').get(lessonId)) throw new HttpError(400, 'Lesson not found.');
     if (templateId && !db.prepare('SELECT 1 FROM training_templates WHERE id = ?').get(templateId)) throw new HttpError(400, 'Training template not found.');
     return { lessonId, templateId };
+  }
+  function deliveryPayload(row) {
+    const reads = JSON.parse(row.read_targets || '[]').map(x => x.toUpperCase()).join(' · ');
+    return { action: 'assign', id: crypto.randomUUID(), data: {
+      athleteId: row.website_id, title: row.title,
+      why: [row.problem, reads && `Read ${reads}`, `${row.start_state} to ${row.desired_state}`, `Error layer ${row.error_layer}`].filter(Boolean).join('\n'),
+      practice: [row.constraint_text, row.expected_ball && `Expected ball: ${row.expected_ball}`, `Intensity: ${row.intensity}`].filter(Boolean).join('\n'),
+      test: [row.success_evidence, row.reflection_prompt && `Reflection: ${row.reflection_prompt}`].filter(Boolean).join('\n'),
+      due: row.due_on || '', resource: ''
+    }};
+  }
+  async function deliverWebsite(user, blockId) {
+    const row = db.prepare(select('WHERE b.id = ?')).get(blockId);
+    if (!row || !row.website_id) return row;
+    const payload = deliveryPayload(row);
+    const prior = db.prepare("SELECT payload FROM development_deliveries WHERE block_id=? AND destination='website'").get(blockId);
+    if (prior) try { const saved = JSON.parse(prior.payload); if (saved.id) payload.id = saved.id; } catch {}
+    db.prepare(`INSERT INTO development_deliveries(block_id,destination,status,payload,attempts,last_attempt_at) VALUES (?,'website','pending',?,1,?)
+      ON CONFLICT(block_id,destination) DO UPDATE SET status='pending',payload=excluded.payload,error='',attempts=development_deliveries.attempts+1,last_attempt_at=excluded.last_attempt_at`).run(blockId, JSON.stringify(payload), now());
+    try {
+      if (!ctx.websiteWorkspace) throw new Error('Website workspace is not connected.');
+      await ctx.websiteWorkspace(user, payload);
+      db.prepare("UPDATE development_deliveries SET status='delivered',error='',delivered_at=? WHERE block_id=? AND destination='website'").run(now(), blockId);
+    } catch (e) {
+      db.prepare("UPDATE development_deliveries SET status='failed',error=? WHERE block_id=? AND destination='website'").run(String(e.message || 'Delivery failed.').slice(0, 500), blockId);
+    }
+    return db.prepare(select('WHERE b.id = ?')).get(blockId);
   }
   function libraryShape(row) {
     if (!row) return row;
@@ -105,7 +138,7 @@ module.exports = function development(r, { db, auth, notifier }) {
   });
   r.get('/api/development-blocks/:id', ({ user, params }) => shape(block(user, params.id).row));
 
-  r.post('/api/athletes/:id/development-blocks', ({ user, params, body }) => {
+  r.post('/api/athletes/:id/development-blocks', async ({ user, params, body }) => {
     auth.require(user, 'coach');
     const aid = int(params.id, 'id', { min: 1, required: true });
     if (!auth.coachesAthlete(user, aid)) throw new HttpError(404, 'Athlete not found.');
@@ -130,7 +163,17 @@ module.exports = function development(r, { db, auth, notifier }) {
           f.layer, f.intensity, f.constraint, f.expected, f.evidence, f.reflection, f.due, user.id).lastInsertRowid);
     });
     notifier.notify(notifier.usersOfAthletes([aid]), 'training', `New Development Block from ${user.name}: ${title}`, f.due ? `Due ${f.due}.` : 'Your learning and training are connected in one path.', `#/development/${blockId}`);
+    await deliverWebsite(user, blockId);
     return withStatus(201, shape(db.prepare(select('WHERE b.id = ?')).get(blockId)));
+  });
+
+  r.post('/api/development-blocks/:id/deliver', async ({ user, params }) => {
+    auth.require(user, 'coach');
+    const { row, level } = block(user, params.id);
+    if (level !== 'coach') throw new HttpError(403, 'Only a coach can resend this assignment.');
+    if (!row.website_id) throw new HttpError(409, 'This athlete does not have a connected website profile.');
+    await deliverWebsite(user, row.id);
+    return shape(db.prepare(select('WHERE b.id = ?')).get(row.id));
   });
 
   r.put('/api/development-blocks/:id', ({ user, params, body }) => {
