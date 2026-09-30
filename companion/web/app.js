@@ -268,16 +268,18 @@
 
   views.developmentNew = function (athleteId) {
     if (!has('coach')) return forbidden('Only coaches can create Development Blocks.');
-    return Promise.all([api.get('/api/athletes/' + athleteId), api.get('/api/templates'), api.get('/api/courses')]).then(function (res) {
-      var athlete = res[0].athlete, templates = res[1], courses = res[2];
+    var athleteReq = athleteId ? api.get('/api/athletes/' + athleteId).then(function (p) { return [p.athlete]; }) : api.get('/api/athletes');
+    return Promise.all([athleteReq, api.get('/api/templates'), api.get('/api/courses')]).then(function (res) {
+      var athletes = res[0], athlete = athletes[0], templates = res[1], courses = res[2];
       return Promise.all(courses.map(function (c) { return api.get('/api/courses/' + c.slug); })).then(function (fullCourses) {
         var lessonOptions = fullCourses.map(function (c) {
           var lessons = []; c.modules.forEach(function (m) { m.lessons.forEach(function (l) { lessons.push('<option value="' + l.id + '">' + h(c.title + ' · ' + l.title) + '</option>'); }); });
           return lessons.length ? '<optgroup label="' + h(c.title) + '">' + lessons.join('') + '</optgroup>' : '';
         }).join('');
-        app.innerHTML = '<a class="back" href="#/coach/' + athlete.id + '">← ' + h(athlete.name) + '</a>' +
-          head('Development Block', 'Connect learning to pressure', 'Build one clear path from what ' + h(athlete.name.split(' ')[0]) + ' needs to understand to what they must prove on court.') +
+        app.innerHTML = '<a class="back" href="' + (athleteId ? '#/coach/' + athlete.id : '#/coach/today') + '">← ' + (athleteId ? h(athlete.name) : 'Coaching Dashboard') + '</a>' +
+          head('Development Block', 'Assign the complete pathway', athleteId ? 'Build one clear path from what ' + h(athlete.name.split(' ')[0]) + ' needs to understand to what they must prove on court.' : 'Choose one athlete or a group, then connect what they learn to what they must prove on court.') +
           '<form class="card form" id="dbf" novalidate>' +
+          (!athleteId ? '<fieldset class="field"><legend class="flabel">Athletes</legend><div class="athlete-pick">' + athletes.map(function (a) { return '<label><input type="checkbox" name="dbathlete" value="' + a.id + '"><span><b>' + h(a.name) + '</b><small>' + h(a.focus || a.sport || 'Ready for a development focus') + '</small></span></label>'; }).join('') + '</div></fieldset>' : '') +
           '<div class="field"><label class="flabel" for="dbtitle">Block title</label><input id="dbtitle" maxlength="120" placeholder="Creating Time in Transition"></div>' +
           '<div class="field"><label class="flabel" for="dbproblem">Player problem</label><textarea id="dbproblem" maxlength="1000" placeholder="Attacking before balance and time are available"></textarea></div>' +
           '<fieldset class="field"><legend class="flabel">Read target</legend><div class="check-row"><label><input type="checkbox" name="read" value="height"> Height</label><label><input type="checkbox" name="read" value="time"> Time</label><label><input type="checkbox" name="read" value="balance"> Balance</label></div></fieldset>' +
@@ -296,13 +298,20 @@
           '<div class="row"><button class="btn primary" type="submit">Assign Development Block</button></div></form>';
         $('#dbf').addEventListener('submit', function (e) {
           e.preventDefault();
+          var athleteIds = athleteId ? [Number(athleteId)] : $$('input[name="dbathlete"]:checked', $('#dbf')).map(function (x) { return Number(x.value); });
+          if (!athleteIds.length) return L.formError($('#dbf'), 'Choose at least one athlete.');
           var reads = $$('input[name="read"]:checked', $('#dbf')).map(function (x) { return x.value; });
-          api.request('POST', '/api/athletes/' + athlete.id + '/development-blocks', {
+          var payload = {
             title: $('#dbtitle').value, problem: $('#dbproblem').value, read_targets: reads, start_state: $('#dbstart').value, desired_state: $('#dbdesired').value,
             scramble: $('#dbscramble').checked, error_layer: $('#dblayer').value, intensity: $('#dbintensity').value, lesson_id: $('#dblesson').value || undefined,
             template_id: $('#dbtemplate').value || undefined, due_on: $('#dbdue').value || undefined, constraint_text: $('#dbconstraint').value,
             expected_ball: $('#dbexpected').value, success_evidence: $('#dbevidence').value, reflection_prompt: $('#dbreflection').value
-          }).then(function (b) { L.toast('Development Block assigned'); location.hash = '#/development/' + b.id; }, function (err) { L.formError($('#dbf'), err.message); });
+          };
+          var submit = $('#dbf button[type="submit"]'); submit.disabled = true; submit.textContent = athleteIds.length > 1 ? 'Assigning to ' + athleteIds.length + ' athletes…' : 'Assigning…';
+          Promise.all(athleteIds.map(function (id) { return api.request('POST', '/api/athletes/' + id + '/development-blocks', payload); })).then(function (blocks) {
+            L.toast('Development Block assigned to ' + athleteIds.length + ' athlete' + (athleteIds.length === 1 ? '' : 's'));
+            location.hash = athleteId ? '#/development/' + blocks[0].id : '#/coach/today';
+          }, function (err) { submit.disabled = false; submit.textContent = 'Assign Development Block'; L.formError($('#dbf'), err.message); });
         });
       });
     });
@@ -1980,7 +1989,7 @@
     [/^\/play\/leaderboard$/, 'leaderboard', 'play'], [/^\/notifications$/, 'notifications', ''],
     [/^\/learn$/, 'learn', 'learn', true], [/^\/learn\/courses$/, 'learnCourses', 'learn', true], [/^\/learn\/course\/([\w-]+)$/, 'course', 'learn', true], [/^\/learn\/course\/([\w-]+)\/(\d+)$/, 'lesson', 'learn', true], [/^\/learn\/engine$/, 'engine', 'learn', true], [/^\/learn\/([\w-]+)$/, 'post', 'learn', true],
     [/^\/profile$/, 'profile', 'profile'],
-    [/^\/coach$/, 'coach', 'home'], [/^\/coach\/new$/, 'coachNew', 'home'], [/^\/coach\/templates$/, 'templates', 'home'], [/^\/coach\/templates\/(new|\d+)$/, 'templateEdit', 'home'], [/^\/coach\/(\d+)$/, 'coachAthlete', 'home'], [/^\/coach\/(\d+)\/code$/, 'coachCode', 'home'], [/^\/coach\/(\d+)\/development\/new$/, 'developmentNew', 'home'],
+    [/^\/coach$/, 'coach', 'home'], [/^\/coach\/new$/, 'coachNew', 'home'], [/^\/coach\/development\/new$/, 'developmentNew', 'home'], [/^\/coach\/templates$/, 'templates', 'home'], [/^\/coach\/templates\/(new|\d+)$/, 'templateEdit', 'home'], [/^\/coach\/(\d+)$/, 'coachAthlete', 'home'], [/^\/coach\/(\d+)\/code$/, 'coachCode', 'home'], [/^\/coach\/(\d+)\/development\/new$/, 'developmentNew', 'home'],
     [/^\/studio\/courses$/, 'studioCourses', 'home'], [/^\/studio\/course\/(\d+)$/, 'courseEdit', 'home'], [/^\/studio\/lesson\/(\d+)$/, 'lessonEdit', 'home'],
     [/^\/cohorts$/, 'cohorts', 'learn'], [/^\/cohorts\/(\d+)$/, 'cohort', 'learn'],
     [/^\/studio$/, 'studio', 'home'], [/^\/studio\/([\w-]+)$/, 'studioEdit', 'home'],
