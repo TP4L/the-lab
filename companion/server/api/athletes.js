@@ -129,6 +129,19 @@ module.exports = function athletes(r, ctx) {
     });
   });
 
+  r.get('/api/coach/roster-health', async ({ user }) => {
+    auth.require(user, 'coach');
+    if (user.workspace && ctx.syncWebsiteRoster) try { await ctx.syncWebsiteRoster(user); } catch {}
+    const rows = db.prepare(`SELECT a.id,a.name,a.user_id,w.website_id,
+      (SELECT MAX(updated_at) FROM development_blocks WHERE athlete_id=a.id) AS last_assignment
+      FROM athletes a LEFT JOIN website_athlete_links w ON w.athlete_id=a.id ORDER BY a.name COLLATE NOCASE`).all();
+    const athletes = rows.filter(a => auth.coachesAthlete(user, a.id)).map(a => ({ ...a,
+      connection: a.user_id && a.website_id ? 'both' : a.website_id ? 'website' : a.user_id ? 'app' : 'needs_setup' }));
+    return { athletes, counts: { total: athletes.length, both: athletes.filter(a => a.connection === 'both').length,
+      website: athletes.filter(a => a.connection === 'website').length, app: athletes.filter(a => a.connection === 'app').length,
+      needs_setup: athletes.filter(a => a.connection === 'needs_setup').length } };
+  });
+
   r.put('/api/athletes/:id/membership', ({ user, params, body }) => {
     auth.require(user, 'admin');
     const a = load(int(params.id, 'id', { min: 1, required: true }));
