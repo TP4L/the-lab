@@ -19,3 +19,19 @@ test('connected staff roster is mirrored into app athletes without duplicates',a
   assert.equal(s.app.db.prepare('SELECT COUNT(*) n FROM website_athlete_links').get().n,1);
  }finally{await s.close()}
 });
+
+test('Development Blocks deliver once to the website and reuse their id on retry',async()=>{
+ const token='d'.repeat(64),websiteId='22222222-2222-4222-8222-222222222222',assignments=[];let fail=true;
+ const s=await start({fetchImpl:async(url,opts)=>{const b=JSON.parse(opts.body);if(b.action==='roster')return Response.json({name:'THE LAB',email:'brettadamstp@gmail.com',athletes:[{id:websiteId,name:'Connected Athlete',focus:'Decision timing'}]});if(b.action==='assign'){assignments.push(b);if(fail){fail=false;return Response.json({error:'Temporary website outage'},{status:503});}return Response.json({ok:true});}throw Error('Unexpected action '+b.action);}});
+ try{
+  const brett=s.client(),signed=(await brett.signup('Brett Adams','brettadamstp@gmail.com')).body;
+  s.app.db.prepare('INSERT INTO website_staff_connections(user_id,subject,email,token,expires_at) VALUES(?,?,?,?,?)').run(signed.user.id,'staff-brett','brettadamstp@gmail.com',token,Date.now()+86400000);
+  const athlete=(await brett.get('/api/athletes')).body[0];
+  const created=await brett.post(`/api/athletes/${athlete.id}/development-blocks`,{title:'See time sooner',problem:'Late read',read_targets:['time'],constraint_text:'Call the read before contact',success_evidence:'8 of 10 early calls'});
+  assert.equal(created.status,201);assert.equal(created.body.delivery.website,'failed');assert.equal(assignments.length,1);
+  const retried=await brett.post(`/api/development-blocks/${created.body.id}/deliver`,{});
+  assert.equal(retried.status,200);assert.equal(retried.body.delivery.website,'delivered');assert.equal(assignments.length,2);
+  assert.equal(assignments[0].id,assignments[1].id,'retry keeps a stable id to prevent duplicate website records');
+  assert.equal(assignments[1].data.athleteId,websiteId);
+ }finally{await s.close()}
+});
