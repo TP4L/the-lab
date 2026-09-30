@@ -1190,7 +1190,7 @@
     $('#prefs').addEventListener('toggle', function once() {
       $('#prefs').removeEventListener('toggle', once);
       api.get('/api/me/prefs').then(function (d) {
-        $('#prefbox').innerHTML = '<div id="pushbox"></div><p class="small muted">Choose what you\u2019re told about. These apply to the bell and to phone notifications.</p>' + Object.keys(d.labels).map(function (k) {
+        $('#prefbox').innerHTML = '<div id="pushbox"></div><p class="small muted">Choose what you\u2019re told about. Email delivery applies to coach notes, training, matches, events and reminders. Private coach notes are never sent.</p>' + Object.keys(d.labels).map(function (k) {
           return '<label class="tog" for="pf-' + k + '"><input type="checkbox" id="pf-' + k + '" data-pref="' + k + '"' + (d.prefs[k] ? ' checked' : '') + '><div><b>' + h(d.labels[k]) + '</b></div></label>';
         }).join('');
         $('#prefbox').addEventListener('change', function (e) {
