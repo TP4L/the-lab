@@ -51,6 +51,9 @@ module.exports=function(r,ctx){
   const assignments=db.prepare("SELECT x.*,a.name FROM assignments x JOIN athletes a ON a.id=x.athlete_id WHERE x.status='open' ORDER BY COALESCE(x.due_on,'9999'),x.id").all().filter(x=>ids.has(x.athlete_id)).map(x=>({
    id:'assignment:'+x.id,recordId:x.id,athleteId:x.athlete_id,name:x.name,title:x.title,detail:x.note,due:x.due_on||'',at:x.created_at,kind:'assignment',priority:!x.due_on?'open':x.due_on<today()?'overdue':x.due_on===today()?'today':x.due_on<=through?'soon':'later',source:'app'
   }));
+  const development=db.prepare("SELECT b.*,a.name FROM development_blocks b JOIN athletes a ON a.id=b.athlete_id WHERE b.status!='mastered' ORDER BY b.updated_at DESC").all().filter(x=>ids.has(x.athlete_id)).filter(x=>x.status==='evidence_submitted'||x.status==='coach_review'||!x.assignment_id).map(x=>({
+   id:'development:'+x.id,recordId:x.id,athleteId:x.athlete_id,name:x.name,title:x.status==='evidence_submitted'?'Review Development Block: '+x.title:x.title,detail:x.status==='evidence_submitted'?(x.athlete_reflection||'Athlete submitted evidence.'):(x.problem||'Development Block'),due:x.due_on||'',at:x.updated_at,kind:'development',priority:['evidence_submitted','coach_review'].includes(x.status)?'review':!x.due_on?'open':x.due_on<today()?'overdue':x.due_on===today()?'today':x.due_on<=through?'soon':'later',source:'app'
+  }));
   const tasks=db.prepare('SELECT * FROM coach_followups ORDER BY updated_at DESC LIMIT 1000').all().filter(x=>ids.has(x.athlete_id)).map(x=>({...JSON.parse(x.data),revision:x.revision,updatedAt:x.updated_at})).filter(x=>x.status==='open').map(x=>({
    id:'task:'+x.id,recordId:x.id,athleteId:x.athleteId,name:names.get(x.athleteId),title:x.title,detail:'Coach follow-up',due:x.due||'',at:x.updatedAt,kind:'task',priority:!x.due?'open':x.due<today()?'overdue':x.due===today()?'today':x.due<=through?'soon':'later',assignee:x.assignee,revision:x.revision,task:x,source:'app'
   }));
@@ -64,7 +67,7 @@ module.exports=function(r,ctx){
    id:'event:'+e.id,recordId:e.id,name:'Event',title:e.title,detail:e.location||'Location to be confirmed',due:e.starts_at,at:e.starts_at,kind:'event',priority:e.status==='live'||e.starts_at.slice(0,10)===today()?'today':'soon',source:'app'
   }));
   const coaches=db.prepare('SELECT id,name,email,roles FROM users ORDER BY name').all().map(u=>auth.userRow(u)).filter(u=>u.roles.includes('coach')).map(u=>({id:u.id,name:u.name,email:u.email}));
-  return {viewer:{id:user.id,name:user.name,email:user.email},athletes,coaches,items:[...notes,...assignments,...tasks,...retests,...sessions,...events],checkedAt:now(),window:{today:today(),through}};
+  return {viewer:{id:user.id,name:user.name,email:user.email},athletes,coaches,items:[...notes,...development,...assignments,...tasks,...retests,...sessions,...events],checkedAt:now(),window:{today:today(),through}};
  });
  r.get('/api/coach/followups',({user})=>{
   auth.require(user,'coach');
