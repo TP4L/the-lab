@@ -68,6 +68,12 @@ Open the Development Block and look at Delivery check.
 
 Never recreate the Development Block after a delivery error. Use Retry website delivery so the same delivery ID is reused.
 
+## Email notifications
+
+When email delivery is configured, athletes receive transactional email for shared coach notes, Development Blocks, training updates, matches, events, and reminders. Private coach notes and public Field Note announcements are not emailed through this channel.
+
+Athletes can open Profile, expand Notifications and privacy, and switch Email notifications on or off. Category switches such as Coach feedback or Training also apply. Every email links back to the relevant place in THE LAB, and repeated requests reuse an idempotency key so the same notification is not sent twice.
+
 ## Athlete learning and evidence
 
 The Development Block follows Learn, Train, Evidence, Review, and Retest. The athlete opens linked lessons and assigned training, completes the work, then uploads an optional photo or video with a reflection and confidence score. The submission enters the coach review queue.
