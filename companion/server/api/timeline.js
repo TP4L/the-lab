@@ -22,7 +22,7 @@ module.exports=function(r,{db,auth,config}){
   return {a,website:c?.athlete_id,token:c?.token,staff:false};
  }
  async function remote(w,body){
-  return config.fetchImpl(SITE+(w.staff?'/api/app-workspace':'/api/app-bridge'),{method:'POST',redirect:'error',headers:{'Content-Type':'application/json',Authorization:'Bearer '+w.token},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
+  return config.fetchImpl(SITE+(w.staff?'/api/app-workspace':'/api/app-bridge'),{method:'POST',redirect:'error',headers:{'Content-Type':'application/json',Authorization:'Bearer '+w.token},body:JSON.stringify(body),signal:AbortSignal.timeout(body.action==='timeline-media'?120000:15000)});
  }
  function local(a,before){
   const parts=[
