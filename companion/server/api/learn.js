@@ -248,13 +248,22 @@ module.exports = function learn(r, ctx) {
     const id = int(params.id, 'id', { min: 1, required: true });
     if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(id)) throw new HttpError(404, 'User not found.');
     const status = oneOf(body.status, ['active', 'cancelled', 'none'], 'status');
-    if (status === 'none') { db.prepare('DELETE FROM memberships WHERE user_id = ?').run(id); return { membership: null }; }
+    if (status === 'none') {
+      tx(db, () => {
+        db.prepare('DELETE FROM memberships WHERE user_id = ?').run(id);
+        db.prepare("INSERT INTO membership_history (user_id,status,source,changed_by) VALUES (?,'none','manual',?)").run(id, user.id);
+      });
+      return { membership: null };
+    }
     const plan = str(body.plan || 'member', 'plan', { max: 40 });
     const expires = isoTime(body.expires_at, 'expires_at');
     const note = str(body.note, 'note', { max: 300 });
-    db.prepare(`INSERT INTO memberships (user_id, plan, status, expires_at, note, granted_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan, status = excluded.status, expires_at = excluded.expires_at, note = excluded.note, granted_by = excluded.granted_by, updated_at = excluded.updated_at`)
-      .run(id, plan, status, expires, note, user.id, now());
+    tx(db, () => {
+      db.prepare(`INSERT INTO memberships (user_id, plan, status, expires_at, note, granted_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan, status = excluded.status, expires_at = excluded.expires_at, note = excluded.note, granted_by = excluded.granted_by, updated_at = excluded.updated_at`)
+        .run(id, plan, status, expires, note, user.id, now());
+      db.prepare('INSERT INTO membership_history (user_id,status,plan,expires_at,source,note,changed_by) VALUES (?,?,?,?,?,?,?)').run(id, status, plan, expires, 'manual', note, user.id);
+    });
     const m = membership({ id });
     return { membership: { plan: m.plan, status: m.status, active: m.active, expires_at: m.expires_at } };
   });
