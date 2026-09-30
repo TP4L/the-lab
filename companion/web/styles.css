@@ -483,6 +483,14 @@ input[type=datetime-local],input[type=email],input[type=search]{width:100%;font:
 .member-includes span{font-family:var(--mono);font-size:11px;color:var(--accent);}
 .member-includes h2{font-size:20px;margin:18px 0 5px;}
 .member-boundary{max-width:800px;}
+.membership-admin{display:flex;flex-direction:column;gap:16px;}
+.membership-admin-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.membership-admin-head h2{font-size:22px;margin:3px 0 0;}
+.access-preview{padding:14px;border:1px solid var(--rule);border-radius:5px;background:var(--surface-2);}
+.access-preview p{font-size:14px;color:var(--ink-soft);margin:4px 0;}
+.access-preview summary,.membership-history summary{cursor:pointer;font-size:13px;font-weight:600;margin-top:8px;}
+.access-preview ul{font-size:13px;margin:8px 0 0;padding-left:20px;}
+.membership-history{border-top:1px solid var(--rule);padding-top:8px;}
 @media(max-width:700px){.member-ribbon,.membership-hero{align-items:flex-start;flex-direction:column}.membership-price{justify-content:flex-start}.member-includes{grid-template-columns:1fr}.dev-library dl div{grid-template-columns:1fr}}
 
 /* ---------- custom scoreboard ---------- */
