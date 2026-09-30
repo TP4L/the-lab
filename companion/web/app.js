@@ -640,7 +640,7 @@
 
 
   /* ================= LEARN ================= */
-  var learnLane = '', learnTab = 'notes';
+  var learnLane = '', learnTab = '';
   function progressBar(done, total) { var pc = total ? Math.round(done / total * 100) : 0; return '<div class="progress" role="progressbar" aria-valuenow="' + pc + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + done + ' of ' + total + ' lessons done"><i style="width:' + pc + '%"></i></div>'; }
   function courseCard(c) {
     return '<a class="course-card" href="#/learn/course/' + h(c.slug) + '"><div class="cover">' + (c.cover_media_id ? '<img alt="" loading="lazy" src="/api/media/' + h(c.cover_media_id) + '">' : '<span>' + h(initials(c.title)) + '</span>') + '</div>' +
@@ -648,10 +648,48 @@
       '<p class="d">' + c.lessons + ' lesson' + (c.lessons === 1 ? '' : 's') + (c.minutes ? ' · ' + c.minutes + ' min' : '') + (c.completed ? ' · ' + c.completed + ' done' : '') + '</p>' +
       (c.completed ? progressBar(c.completed, c.lessons) : '') + '</div></a>';
   }
+  function nextDevelopmentAction(b) {
+    if (b.status === 'assigned' && b.lesson_id) return { label: 'Start the lesson', href: '#/learn/course/' + b.course_slug + '/' + b.lesson_id, step: 'Learn' };
+    if (b.status === 'assigned') return { label: 'Open your training', href: '#/development/' + b.id, step: 'Train' };
+    if (b.status === 'in_progress' && b.session_id) return { label: 'Add reflection and evidence', href: '#/development/' + b.id, step: 'Evidence' };
+    if (b.status === 'in_progress') return { label: 'Complete the training', href: '#/development/' + b.id, step: 'Train' };
+    if (b.status === 'evidence_submitted' || b.status === 'coach_review') return { label: 'View submitted evidence', href: '#/development/' + b.id, step: 'Coach review' };
+    if (b.status === 'ready_retest') return { label: 'Open your retest', href: '#/development/' + b.id, step: 'Retest' };
+    return { label: 'Review the block', href: '#/development/' + b.id, step: 'Complete' };
+  }
+  function learningPath() {
+    return Promise.all([api.get('/api/me/development-blocks'), api.get('/api/me/learning-room'), api.get('/api/courses')]).then(function (res) {
+      var blocks = res[0], room = res[1], courses = res[2].filter(function (c) { return c.status !== 'draft'; });
+      var active = blocks.filter(function (b) { return b.status !== 'mastered'; });
+      var current = active[0] || null, action = current ? nextDevelopmentAction(current) : null;
+      var awaiting = active.filter(function (b) { return b.status === 'evidence_submitted' || b.status === 'coach_review'; });
+      var retests = active.filter(function (b) { return b.status === 'ready_retest'; });
+      var mastered = blocks.filter(function (b) { return b.status === 'mastered'; });
+      var continuing = courses.filter(function (c) { return c.completed > 0 && c.completed < c.lessons; });
+      var core = courses.filter(function (c) { return c.completed === 0 && c.unlocked; }).slice(0, 4);
+      var focus = current ? '<section class="path-focus"><div><span class="path-label">CURRENT FOCUS · ' + h(action.step) + '</span><h2>' + h(current.title) + '</h2><p>' + h(current.problem || 'Your next development priority is ready.') + '</p><div class="path-reads">' + (current.read_targets || []).map(function (x) { return '<b>' + h(x.toUpperCase()) + '</b>'; }).join('') + '<span>' + h(DEV_INTENSITY[current.intensity] || current.intensity) + '</span></div></div><a class="btn primary" href="' + h(action.href) + '">' + h(action.label) + '</a></section>' : '<section class="path-focus empty-focus"><div><span class="path-label">YOU ARE CAUGHT UP</span><h2>No active Development Block</h2><p>Your completed work is saved. Your coach can assign the next problem when it is ready.</p></div><a class="btn" href="#/learn/courses">Explore courses</a></section>';
+      var today = current ? '<div class="path-sequence">' + [
+        ['Learn', !!current.lesson_id, current.lesson_title || 'Understand the concept'],
+        ['Train', !!current.session_id, current.template_name || 'Apply the situation'],
+        ['Evidence', !!(current.evidence_media_id || current.athlete_reflection), current.reflection_prompt || 'Explain what changed'],
+        ['Review', ['coach_review','ready_retest','mastered'].includes(current.status), current.coach_feedback || 'Coach feedback'],
+        ['Retest', !!current.retest_session_id || current.status === 'mastered', current.retest_notes || 'Prove it under pressure']
+      ].map(function (x, i) { return '<a class="path-step ' + (x[1] ? 'done' : action && action.step === x[0] ? 'current' : '') + '" href="#/development/' + current.id + '"><span>' + (x[1] ? '✓' : i + 1) + '</span><div><b>' + h(x[0]) + '</b><small>' + h(x[2]) + '</small></div></a>'; }).join('') + '</div>' : '';
+      return focus + (today ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">Today’s work</p><h2>One clear next step</h2></div></div>' + today + '</section>' : '') +
+        (awaiting.length || retests.length ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">In motion</p><h2>What happens next</h2></div></div><div class="path-mini-grid">' + awaiting.map(function (b) { return '<a href="#/development/' + b.id + '"><span class="path-label">COACH REVIEW</span><b>' + h(b.title) + '</b><small>Your evidence has been submitted.</small></a>'; }).join('') + retests.map(function (b) { return '<a href="#/development/' + b.id + '"><span class="path-label">READY TO RETEST</span><b>' + h(b.title) + '</b><small>' + h(b.retest_notes || 'Test the solution under pressure.') + '</small></a>'; }).join('') + '</div></section>' : '') +
+        (continuing.length ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">Continue learning</p><h2>Pick up where you stopped</h2></div><a href="#/learn/courses">All courses</a></div><div class="course-grid">' + continuing.slice(0, 3).map(courseCard).join('') + '</div></section>' : '') +
+        (core.length ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">Core LAB concepts</p><h2>Build the way you read</h2></div><a href="#/learn/courses">Browse library</a></div><div class="course-grid">' + core.map(courseCard).join('') + '</div></section>' : '') +
+        '<section class="path-stats"><div><strong>' + mastered.length + '</strong><span>Mastered for now</span></div><div><strong>' + active.length + '</strong><span>Active blocks</span></div><div><strong>' + (room.courses || []).length + '</strong><span>Courses started</span></div></section>' +
+        (mastered.length ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">Evidence of progress</p><h2>Completed Development Blocks</h2></div></div>' + developmentList(mastered.slice(0, 4)) + '</section>' : '');
+    });
+  }
   views.learn = function () {
-    var tabs = '<div class="chips" id="ltabs">' + [['notes', 'Field Notes'], ['courses', 'Courses'], ['saved', 'Saved']].filter(function (t) { return ME || t[0] !== 'saved'; }).map(function (t) { return '<button class="chip" type="button" data-v="' + t[0] + '" aria-pressed="' + (learnTab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
+    if (!learnTab) learnTab = ME && ME.athlete_id ? 'path' : 'notes';
+    var tabs = '<div class="chips" id="ltabs">' + [['path', 'Your Path'], ['notes', 'Field Notes'], ['courses', 'Courses'], ['saved', 'Saved']].filter(function (t) { return (t[0] !== 'path' || (ME && ME.athlete_id)) && (ME || t[0] !== 'saved'); }).map(function (t) { return '<button class="chip" type="button" data-v="' + t[0] + '" aria-pressed="' + (learnTab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>';
     var body;
-    if (learnTab === 'courses') {
+    if (learnTab === 'path') {
+      body = learningPath();
+    } else if (learnTab === 'courses') {
       body = api.get('/api/courses').then(function (cs) {
         return offlineNote(cs) + (cs.length ? '<div class="course-grid">' + cs.map(courseCard).join('') + '</div>' : '<div class="list"><p class="empty">No courses published yet.</p></div>');
       });
@@ -663,7 +701,7 @@
       });
     }
     return body.then(function (html) {
-      app.innerHTML = head('Learn', learnTab === 'courses' ? 'Courses' : learnTab === 'saved' ? 'Saved' : 'Field Notes', learnTab === 'notes' ? 'Quick Reads, The Work and Field Studies from THE LAB.' : '', ME ? '' : '<a class="btn primary" href="#/signin">Sign in</a>') +
+      app.innerHTML = head('Learn', learnTab === 'path' ? 'Your Learning Path' : learnTab === 'courses' ? 'Courses' : learnTab === 'saved' ? 'Saved' : 'Field Notes', learnTab === 'path' ? 'Understand it. Train it. Prove it under pressure.' : learnTab === 'notes' ? 'Quick Reads, The Work and Field Studies from THE LAB.' : '', ME ? '' : '<a class="btn primary" href="#/signin">Sign in</a>') +
         tabs + html + '<div class="stack"><p class="section-title">Tools</p><div class="quick"><a href="#/learn/engine">Decision engine</a></div></div>';
       $('#ltabs').addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) { learnTab = c.getAttribute('data-v'); route(); } });
       if ($('#lanes')) $('#lanes').addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) { learnLane = c.getAttribute('data-v'); route(); } });
