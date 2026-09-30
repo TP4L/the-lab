@@ -24,6 +24,10 @@ function createApp(opts = {}) {
     trustProxy: !!opts.trustProxy,
     secureCookies: !!opts.secureCookies,
     publicUrl: (opts.publicUrl || '').replace(/\/$/, ''),
+    stripeKey: opts.stripeKey || '',
+    stripeWebhookSecret: opts.stripeWebhookSecret || '',
+    stripePriceEssentials: opts.stripePriceEssentials || '',
+    stripeIntegrationIdentifier: opts.stripeIntegrationIdentifier || 'the_lab_essentials',
     mediaDir,
     backupDir: opts.backupDir === undefined ? (opts.file && opts.file !== ':memory:' ? path.join(path.dirname(opts.file), 'backups') : null) : opts.backupDir,
     removeFiles: files => files.forEach(f => fs.rm(path.join(mediaDir, f), { force: true }, () => {}))
@@ -41,7 +45,7 @@ function createApp(opts = {}) {
   const push = opts.push || require('./push.js').createPush(db, { publicKey: opts.vapidPublic, privateKey: opts.vapidPrivate, subject: opts.vapidSubject, fetchImpl: opts.fetchImpl });
   config.pushEnabled = push.enabled;
   const notifier = require('./api/notify.js').createNotifier(db, push);
-  const ctx = { db, auth, config, notifier, mailer, push };
+  const ctx = { db, auth, config, notifier, mailer, push, stripeClient: opts.stripeClient };
   ctx.jobsFirst = key => Number(db.prepare('INSERT OR IGNORE INTO job_log (key) VALUES (?)').run(key).changes) === 1;
   const jobs = require('./jobs.js').createJobs(ctx);
   if (opts.jobs !== false) jobs.start();
@@ -63,6 +67,7 @@ function createApp(opts = {}) {
   require('./api/publishing.js')(r, ctx);
   require('./api/play.js')(r, ctx);
   require('./api/learn.js')(r, ctx);
+  require('./api/billing.js')(r, ctx);
   require('./api/coaching.js')(r, ctx);
   require('./api/development.js')(r, ctx);
   require('./api/planning.js')(r, ctx);
@@ -196,6 +201,10 @@ if (require.main === module) {
     vapidSubject: process.env.VAPID_SUBJECT || '',
     googleClientId: demo ? '' : process.env.GOOGLE_CLIENT_ID || '',
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    stripeKey: demo ? '' : process.env.STRIPE_RESTRICTED_KEY || process.env.STRIPE_SECRET_KEY || '',
+    stripeWebhookSecret: demo ? '' : process.env.STRIPE_WEBHOOK_SECRET || '',
+    stripePriceEssentials: demo ? '' : process.env.STRIPE_PRICE_ESSENTIALS || '',
+    stripeIntegrationIdentifier: process.env.STRIPE_INTEGRATION_IDENTIFIER || 'the_lab_essentials',
     trustProxy: process.env.TRUST_PROXY === '1'
   });
   server.listen(port, () => {
@@ -206,4 +215,3 @@ if (require.main === module) {
     setTimeout(() => process.exit(0), 24 * 3600e3).unref();
   });
 }
-
