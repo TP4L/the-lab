@@ -15,10 +15,11 @@ module.exports = function development(r, { db, auth, notifier }) {
       template_items: row.template_items ? JSON.parse(row.template_items) : null };
   }
   function select(where) {
-    return `SELECT b.*, l.title AS lesson_title, c.title AS course_title, c.slug AS course_slug,
+    return `SELECT b.*, l.title AS lesson_title, c.title AS course_title, c.slug AS course_slug, m.mime AS evidence_mime,
       t.name AS template_name, t.items AS template_items, u.name AS coach
       FROM development_blocks b
       LEFT JOIN lessons l ON l.id = b.lesson_id LEFT JOIN courses c ON c.id = l.course_id
+      LEFT JOIN media m ON m.id = b.evidence_media_id
       LEFT JOIN training_templates t ON t.id = b.template_id LEFT JOIN users u ON u.id = b.assigned_by
       ${where}`;
   }
@@ -103,8 +104,16 @@ module.exports = function development(r, { db, auth, notifier }) {
       }
     }
     if (!isCoach && status === 'assigned' && (reflection || confidence)) status = 'in_progress';
-    db.prepare('UPDATE development_blocks SET athlete_reflection = ?, confidence = ?, coach_feedback = ?, retest_notes = ?, session_id = ?, evidence_media_id = ?, status = ?, updated_at = ? WHERE id = ?')
-      .run(reflection, confidence, feedback, retest, sessionId, evidenceId, status, now(), row.id);
+    let retestAssignmentId = row.retest_assignment_id;
+    tx(db, () => {
+      if (isCoach && status === 'ready_retest' && row.template_id && !retestAssignmentId) {
+        retestAssignmentId = Number(db.prepare('INSERT INTO assignments (athlete_id, template_id, title, note, assigned_by) VALUES (?, ?, ?, ?, ?)')
+          .run(row.athlete_id, row.template_id, `Retest · ${row.title}`, retest || row.success_evidence, user.id).lastInsertRowid);
+      }
+      db.prepare('UPDATE development_blocks SET athlete_reflection = ?, confidence = ?, coach_feedback = ?, retest_notes = ?, session_id = ?, evidence_media_id = ?, retest_assignment_id = ?, status = ?, updated_at = ? WHERE id = ?')
+        .run(reflection, confidence, feedback, retest, sessionId, evidenceId, retestAssignmentId, status, now(), row.id);
+    });
+    if (isCoach && status === 'ready_retest' && retestAssignmentId && !row.retest_assignment_id) notifier.notify(notifier.usersOfAthletes([row.athlete_id]), 'training', `Retest ready: ${row.title}`, retest || row.success_evidence, '#/train');
     if (isCoach && body.status && body.status !== row.status) notifier.notify(notifier.usersOfAthletes([row.athlete_id]), 'training', `${row.title}: ${body.status.replaceAll('_', ' ')}`, feedback, `#/development/${row.id}`);
     return shape(db.prepare(select('WHERE b.id = ?')).get(row.id));
   });
