@@ -53,6 +53,7 @@ function createApp(opts = {}) {
   r.get('/api/meta', () => ({ lanes: LANES, version: 4, google: !!config.googleEnabled, push: !!config.pushEnabled, email: !!config.mailEnabled, demo: !!config.demo, modes: MODES, scoring: SCORING, round_end: ROUND_END, interest_kinds: KINDS }));
 
   require('./api/account.js')(r, ctx);
+  require('./api/padel.js')(r, ctx);
   require('./api/site-bridge.js')(r, ctx);
   require('./api/site-signin.js')(r, ctx);
   require('./api/workspace.js')(r, ctx);
@@ -108,7 +109,7 @@ function createApp(opts = {}) {
     const unread = db.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL').get(user.id).n;
     const toConfirm = athleteId ? db.prepare(`SELECT COUNT(*) AS n FROM matches m JOIN match_players mp ON mp.match_id = m.id
       WHERE mp.athlete_id = ? AND m.status = 'recorded' AND m.recorded_by != ?`).get(athleteId, user.id).n : 0;
-    const out = { athlete, sessions, shared_notes: sharedNotes, posts, events, open_events: open, unread, to_confirm: toConfirm };
+    const out = { padel_board: !!config.adminEmail && user.email.toLowerCase() === config.adminEmail.toLowerCase() && auth.has(user, 'admin'), athlete, sessions, shared_notes: sharedNotes, posts, events, open_events: open, unread, to_confirm: toConfirm };
     if (auth.has(user, 'coach')) {
       out.coach = {
         athletes: user.roles.includes('admin') ? db.prepare('SELECT COUNT(*) AS n FROM athletes').get().n
@@ -139,6 +140,18 @@ function createApp(opts = {}) {
     const { pathname } = url;
     if (!pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed.' });
+      let assetPath;
+      try { assetPath = path.posix.normalize(decodeURIComponent(pathname)); } catch { return send(res, 400, {error:'Bad path.'}); }
+      if (assetPath === '/padel' || assetPath.startsWith('/padel/')) {
+        const user = auth.currentUser(req);
+        try { require('./api/padel.js').requireOwner(auth, user, config); }
+        catch (e) {
+          if (e.status !== 401) return send(res, e.status || 403, { error: 'This is B.Adams’ private padel board.' });
+          res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY' });
+          return res.end('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Padel Board</title><body style="font:18px/1.6 system-ui;max-width:480px;margin:12vh auto;padding:24px;background:#f5f3e9;color:#294d3b"><h1>My padel board</h1><p>Sign in with your THE LAB account. After signing in, return to <strong>/padel</strong> to open your board.</p><p><a href="/api/site-bridge/signin/start?workspace=1">Continue with THE LAB</a></p><p><a href="/#/signin">Use existing app login</a></p></body></html>');
+        }
+        return serveStatic(WEB_ROOT, req, res, assetPath === '/padel' || assetPath === '/padel/' ? '/padel/index.html' : assetPath);
+      }
       return serveStatic(WEB_ROOT, req, res, pathname);
     }
     try {
