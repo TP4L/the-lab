@@ -18,7 +18,7 @@ module.exports = function learn(r, ctx) {
     const active = m.status === 'active' && (!m.expires_at || m.expires_at > now());
     return { ...m, active };
   }
-  const staff = user => auth.has(user, 'editor');
+  const staff = user => auth.has(user, 'coach', 'editor');
   function inCohortFor(user, courseId) {
     return !!user && !!db.prepare('SELECT 1 FROM cohort_members cm JOIN cohorts c ON c.id = cm.cohort_id WHERE cm.user_id = ? AND c.course_id = ?').get(user.id, courseId);
   }
