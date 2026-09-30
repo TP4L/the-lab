@@ -266,11 +266,11 @@
     }).join('') + '</div>';
   }
 
-  views.developmentNew = function (athleteId) {
+  views.developmentNew = function (athleteId, query) {
     if (!has('coach')) return forbidden('Only coaches can create Development Blocks.');
     var athleteReq = athleteId ? api.get('/api/athletes/' + athleteId).then(function (p) { return [p.athlete]; }) : api.get('/api/athletes');
-    return Promise.all([athleteReq, api.get('/api/templates'), api.get('/api/courses')]).then(function (res) {
-      var athletes = res[0], athlete = athletes[0], templates = res[1], courses = res[2];
+    return Promise.all([athleteReq, api.get('/api/templates'), api.get('/api/courses'), api.get('/api/development-library')]).then(function (res) {
+      var athletes = res[0], athlete = athletes[0], templates = res[1], courses = res[2], library = res[3];
       return Promise.all(courses.map(function (c) { return api.get('/api/courses/' + c.slug); })).then(function (fullCourses) {
         var lessonOptions = fullCourses.map(function (c) {
           var lessons = []; c.modules.forEach(function (m) { m.lessons.forEach(function (l) { lessons.push('<option value="' + l.id + '">' + h(c.title + ' · ' + l.title) + '</option>'); }); });
@@ -279,6 +279,7 @@
         app.innerHTML = '<a class="back" href="' + (athleteId ? '#/coach/' + athlete.id : '#/coach/today') + '">← ' + (athleteId ? h(athlete.name) : 'Coaching Dashboard') + '</a>' +
           head('Development Block', 'Assign the complete pathway', athleteId ? 'Build one clear path from what ' + h(athlete.name.split(' ')[0]) + ' needs to understand to what they must prove on court.' : 'Choose one athlete or a group, then connect what they learn to what they must prove on court.') +
           '<form class="card form" id="dbf" novalidate>' +
+          (library.length ? '<div class="field library-picker"><label class="flabel" for="dblibrary">Start from the Development Library</label><div class="row"><select id="dblibrary"><option value="">Build from scratch</option>' + library.map(function (x) { return '<option value="' + x.id + '">' + h(x.name) + '</option>'; }).join('') + '</select><a class="btn ghost" href="#/coach/development/library">View library</a></div></div>' : '<p class="small"><a href="#/coach/development/library">Create your first reusable pathway →</a></p>') +
           (!athleteId ? '<fieldset class="field"><legend class="flabel">Athletes</legend><div class="athlete-pick">' + athletes.map(function (a) { return '<label><input type="checkbox" name="dbathlete" value="' + a.id + '"><span><b>' + h(a.name) + '</b><small>' + h(a.focus || a.sport || 'Ready for a development focus') + '</small></span></label>'; }).join('') + '</div></fieldset>' : '') +
           '<div class="field"><label class="flabel" for="dbtitle">Block title</label><input id="dbtitle" maxlength="120" placeholder="Creating Time in Transition"></div>' +
           '<div class="field"><label class="flabel" for="dbproblem">Player problem</label><textarea id="dbproblem" maxlength="1000" placeholder="Attacking before balance and time are available"></textarea></div>' +
@@ -295,7 +296,20 @@
           '<div class="field"><label class="flabel" for="dbexpected">Expected ball</label><input id="dbexpected" maxlength="1000" placeholder="A shorter, attackable reply after the reset"></div>' +
           '<div class="field"><label class="flabel" for="dbevidence">Success evidence</label><input id="dbevidence" maxlength="1000" placeholder="Correct decision on 7 of 10 balls"></div>' +
           '<div class="field"><label class="flabel" for="dbreflection">Reflection question</label><input id="dbreflection" maxlength="1000" placeholder="What told you it was safe to attack?"></div>' +
+          '<label class="check-line"><input type="checkbox" id="dbsave"> Save this complete pathway to the coach library</label>' +
           '<div class="row"><button class="btn primary" type="submit">Assign Development Block</button></div></form>';
+        function loadPathway(x) {
+          if (!x) return;
+          $('#dbtitle').value = x.title || ''; $('#dbproblem').value = x.problem || ''; $('#dbstart').value = x.start_state; $('#dbdesired').value = x.desired_state;
+          $('#dbscramble').checked = !!x.scramble; $('#dblayer').value = x.error_layer; $('#dbintensity').value = x.intensity; $('#dblesson').value = x.lesson_id || '';
+          $('#dbtemplate').value = x.template_id || ''; $('#dbconstraint').value = x.constraint_text || ''; $('#dbexpected').value = x.expected_ball || '';
+          $('#dbevidence').value = x.success_evidence || ''; $('#dbreflection').value = x.reflection_prompt || '';
+          $$('input[name="read"]', $('#dbf')).forEach(function (box) { box.checked = (x.read_targets || []).indexOf(box.value) >= 0; });
+        }
+        if ($('#dblibrary')) {
+          $('#dblibrary').addEventListener('change', function () { loadPathway(library.find(function (x) { return String(x.id) === $('#dblibrary').value; })); });
+          if (query && query.library) { $('#dblibrary').value = query.library; loadPathway(library.find(function (x) { return String(x.id) === String(query.library); })); }
+        }
         $('#dbf').addEventListener('submit', function (e) {
           e.preventDefault();
           var athleteIds = athleteId ? [Number(athleteId)] : $$('input[name="dbathlete"]:checked', $('#dbf')).map(function (x) { return Number(x.value); });
@@ -308,12 +322,23 @@
             expected_ball: $('#dbexpected').value, success_evidence: $('#dbevidence').value, reflection_prompt: $('#dbreflection').value
           };
           var submit = $('#dbf button[type="submit"]'); submit.disabled = true; submit.textContent = athleteIds.length > 1 ? 'Assigning to ' + athleteIds.length + ' athletes…' : 'Assigning…';
-          Promise.all(athleteIds.map(function (id) { return api.request('POST', '/api/athletes/' + id + '/development-blocks', payload); })).then(function (blocks) {
+          var save = $('#dbsave').checked ? api.request('POST', '/api/development-library', Object.assign({ name: payload.title }, payload)) : Promise.resolve();
+          save.then(function () { return Promise.all(athleteIds.map(function (id) { return api.request('POST', '/api/athletes/' + id + '/development-blocks', payload); })); }).then(function (blocks) {
             L.toast('Development Block assigned to ' + athleteIds.length + ' athlete' + (athleteIds.length === 1 ? '' : 's'));
             location.hash = athleteId ? '#/development/' + blocks[0].id : '#/coach/today';
           }, function (err) { submit.disabled = false; submit.textContent = 'Assign Development Block'; L.formError($('#dbf'), err.message); });
         });
       });
+    });
+  };
+
+  views.developmentLibrary = function () {
+    if (!has('coach')) return forbidden('Only coaches can use the Development Library.');
+    return api.get('/api/development-library').then(function (items) {
+      app.innerHTML = '<a class="back" href="#/coach/today">← Coaching Dashboard</a>' +
+        head('Coach Development Library', 'Build once. Assign with context.', 'Reusable pathways connect the player problem, read, lesson, training situation, evidence and retest standard.', '<a class="btn primary" href="#/coach/development/new">Create while assigning</a>') +
+        (items.length ? '<div class="dev-library">' + items.map(function (x) { return '<article class="card"><div><span class="dev-kicker">' + h((x.read_targets || []).join(' · ').toUpperCase() || 'COMPLETE PATHWAY') + '</span><h2>' + h(x.name) + '</h2><p>' + h(x.problem || x.title) + '</p></div><dl><div><dt>Development block</dt><dd>' + h(x.title) + '</dd></div><div><dt>Learning</dt><dd>' + h(x.lesson_title || 'Add when assigning') + '</dd></div><div><dt>Training</dt><dd>' + h(x.template_name || 'Add when assigning') + '</dd></div><div><dt>Proof</dt><dd>' + h(x.success_evidence || 'Coach-defined evidence') + '</dd></div></dl><div class="row"><a class="btn primary" href="#/coach/development/new?library=' + x.id + '">Use pathway</a>' + ((ME.user.id === x.created_by || has('admin')) ? '<button class="btn ghost" type="button" data-libdel="' + x.id + '">Remove</button>' : '') + '</div></article>'; }).join('') + '</div>' : '<div class="coming"><p class="eyebrow">Your shared playbook starts here</p><h2>No saved pathways yet</h2><p>Create a Development Block and choose “Save this complete pathway.” Brett and Austin will then be able to reuse it.</p><a class="btn primary" href="#/coach/development/new">Create the first pathway</a></div>');
+      $$('[data-libdel]').forEach(function (b) { L.armed(b, 'Tap again to remove', function () { api.request('DELETE', '/api/development-library/' + b.getAttribute('data-libdel')).then(function () { L.toast('Pathway removed'); route(); }, function (err) { L.toast(err.message); }); }); });
     });
   };
 
@@ -658,8 +683,8 @@
     return { label: 'Review the block', href: '#/development/' + b.id, step: 'Complete' };
   }
   function learningPath() {
-    return Promise.all([api.get('/api/me/development-blocks'), api.get('/api/me/learning-room'), api.get('/api/courses')]).then(function (res) {
-      var blocks = res[0], room = res[1], courses = res[2].filter(function (c) { return c.status !== 'draft'; });
+    return Promise.all([api.get('/api/me/development-blocks'), api.get('/api/me/learning-room'), api.get('/api/courses'), api.get('/api/membership')]).then(function (res) {
+      var blocks = res[0], room = res[1], courses = res[2].filter(function (c) { return c.status !== 'draft'; }), member = res[3];
       var active = blocks.filter(function (b) { return b.status !== 'mastered'; });
       var current = active[0] || null, action = current ? nextDevelopmentAction(current) : null;
       var awaiting = active.filter(function (b) { return b.status === 'evidence_submitted' || b.status === 'coach_review'; });
@@ -675,7 +700,7 @@
         ['Review', ['coach_review','ready_retest','mastered'].includes(current.status), current.coach_feedback || 'Coach feedback'],
         ['Retest', !!current.retest_session_id || current.status === 'mastered', current.retest_notes || 'Prove it under pressure']
       ].map(function (x, i) { return '<a class="path-step ' + (x[1] ? 'done' : action && action.step === x[0] ? 'current' : '') + '" href="#/development/' + current.id + '"><span>' + (x[1] ? '✓' : i + 1) + '</span><div><b>' + h(x[0]) + '</b><small>' + h(x[2]) + '</small></div></a>'; }).join('') + '</div>' : '';
-      return focus + (today ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">Today’s work</p><h2>One clear next step</h2></div></div>' + today + '</section>' : '') +
+      return (!member.active && courses.some(function (c) { return c.access === 'members'; }) ? '<section class="member-ribbon"><div><span class="path-label">LAB ESSENTIALS</span><h2>Unlock the full learning library</h2><p>Member courses and the monthly development focus for $8/month.</p></div><a class="btn primary" href="#/membership">See membership</a></section>' : '') + focus + (today ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">Today’s work</p><h2>One clear next step</h2></div></div>' + today + '</section>' : '') +
         (awaiting.length || retests.length ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">In motion</p><h2>What happens next</h2></div></div><div class="path-mini-grid">' + awaiting.map(function (b) { return '<a href="#/development/' + b.id + '"><span class="path-label">COACH REVIEW</span><b>' + h(b.title) + '</b><small>Your evidence has been submitted.</small></a>'; }).join('') + retests.map(function (b) { return '<a href="#/development/' + b.id + '"><span class="path-label">READY TO RETEST</span><b>' + h(b.title) + '</b><small>' + h(b.retest_notes || 'Test the solution under pressure.') + '</small></a>'; }).join('') + '</div></section>' : '') +
         (continuing.length ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">Continue learning</p><h2>Pick up where you stopped</h2></div><a href="#/learn/courses">All courses</a></div><div class="course-grid">' + continuing.slice(0, 3).map(courseCard).join('') + '</div></section>' : '') +
         (core.length ? '<section class="path-section"><div class="path-heading"><div><p class="section-title">Core LAB concepts</p><h2>Build the way you read</h2></div><a href="#/learn/courses">Browse library</a></div><div class="course-grid">' + core.map(courseCard).join('') + '</div></section>' : '') +
@@ -748,7 +773,7 @@
         (c.cover_media_id ? '<img class="hero" alt="" src="/api/media/' + h(c.cover_media_id) + '">' : '') +
         head(c.access_label + (c.status === 'draft' ? ' · Draft' : ''), c.title, c.summary, has('editor') ? '<a class="btn ghost" href="#/studio/course/' + c.id + '">Edit course</a>' : '') +
         '<div class="stack-sm"><p class="small mono">' + c.completed + ' of ' + c.lessons + ' lessons done' + (c.minutes ? ' · ' + c.minutes + ' min total' : '') + '</p>' + progressBar(c.completed, c.lessons) + '</div>' +
-        (c.locked_reason ? '<div class="banner"><span>' + h(c.locked_reason) + ' Lessons marked Preview are open to everyone. To get access, speak to your coach or THE LAB team.</span>' + (ME ? '' : '<a class="btn sm primary" href="#/signin">Sign in</a>') + '</div>' : '') +
+        (c.locked_reason ? '<div class="banner"><span>' + h(c.locked_reason) + ' Lessons marked Preview are open to everyone.</span>' + (c.access === 'members' ? '<a class="btn sm primary" href="#/membership">Unlock for $8/month</a>' : (ME ? '' : '<a class="btn sm primary" href="#/signin">Sign in</a>')) + '</div>' : '') +
         (next ? '<div class="row"><a class="btn primary" href="#/learn/course/' + h(c.slug) + '/' + next.id + '">' + (c.completed ? 'Continue: ' : 'Start: ') + h(next.title) + '</a></div>' : '') +
         c.modules.map(function (m) {
           return '<div class="stack"><p class="section-title">' + h(m.title || 'Lessons') + '</p><div class="list">' + m.lessons.map(function (l) {
@@ -780,10 +805,24 @@
       }, function () {});
     }, function (err) {
       if (err.status === 403 && err.data.locked) {
-        app.innerHTML = '<a class="back" href="#/learn/course/' + h(slug) + '">← Course</a>' + head('Locked', 'This lesson is locked', err.message + ' Speak to your coach or THE LAB team about access.') + (ME ? '' : '<div class="row"><a class="btn primary" href="#/signin">Sign in</a></div>');
+        app.innerHTML = '<a class="back" href="#/learn/course/' + h(slug) + '">← Course</a>' + head('Locked', 'This lesson is locked', err.message) + '<div class="row"><a class="btn primary" href="' + (ME ? '#/membership' : '#/signin') + '">' + (ME ? 'Unlock with LAB Essentials' : 'Sign in') + '</a></div>';
         return;
       }
       throw err;
+    });
+  };
+
+  views.membership = function (_, query) {
+    var data = ME ? api.get('/api/membership') : Promise.resolve({ plan: { name: 'LAB Essentials', price: 8 }, active: false, checkout_enabled: false });
+    return data.then(function (m) {
+      var side = m.active ? '<button class="btn" type="button" id="manageMembership">Manage membership</button>' : (ME ? '<button class="btn primary" type="button" id="startMembership"' + (m.checkout_enabled ? '' : ' disabled') + '>Start for $8/month</button>' : '<a class="btn primary" href="#/signin">Sign in to join</a>');
+      app.innerHTML = '<a class="back" href="#/learn">← Learn</a><section class="membership-hero"><div><span class="path-label">' + (m.active ? 'ACTIVE MEMBER' : 'LAB ESSENTIALS') + '</span><h1>Your development library, always moving forward.</h1><p>Learn the concept, train the read, save the evidence and know what comes next.</p></div><div class="membership-price"><strong>$8</strong><span>/ month</span>' + side + '</div></section>' +
+        (query && query.checkout === 'success' ? '<div class="banner"><span>Payment received. Your membership will unlock as soon as the secure confirmation arrives.</span></div>' : '') +
+        '<section class="member-includes"><article><span>01</span><h2>Monthly focus</h2><p>A clear LAB concept to build into your game.</p></article><article><span>02</span><h2>Member library</h2><p>Full courses, videos, diagrams and practice cards.</p></article><article><span>03</span><h2>Your learning path</h2><p>Continue where you stopped and see your completed work.</p></article></section>' +
+        '<div class="card member-boundary"><h2>What membership is—and is not</h2><p>LAB Essentials is self-guided learning access. Individual programming, private coaching and cohort work stay separate so every offer remains clear.</p>' + (!m.checkout_enabled && ME && !m.active ? '<p class="small muted">Online checkout is being connected. Your coach can still activate membership manually.</p>' : '') + '</div>';
+      function redirect(path) { api.request('POST', path, {}).then(function (x) { location.href = x.url; }, function (err) { L.toast(err.message); }); }
+      if ($('#startMembership')) $('#startMembership').addEventListener('click', function () { redirect('/api/billing/checkout'); });
+      if ($('#manageMembership')) $('#manageMembership').addEventListener('click', function () { redirect('/api/billing/portal'); });
     });
   };
 
@@ -2028,9 +2067,9 @@
     [/^\/play$/, 'play', 'play'], [/^\/play\/match\/new$/, 'matchNew', 'play'], [/^\/play\/match\/([0-9a-f-]{36})$/, 'match', 'play'],
     [/^\/play\/events$/, 'events', 'play'], [/^\/play\/events\/new$/, 'eventForm', 'play'], [/^\/play\/events\/(\d+)$/, 'event', 'play'], [/^\/play\/events\/(\d+)\/edit$/, 'eventForm', 'play'],
     [/^\/play\/leaderboard$/, 'leaderboard', 'play'], [/^\/notifications$/, 'notifications', ''],
-    [/^\/learn$/, 'learn', 'learn', true], [/^\/learn\/courses$/, 'learnCourses', 'learn', true], [/^\/learn\/course\/([\w-]+)$/, 'course', 'learn', true], [/^\/learn\/course\/([\w-]+)\/(\d+)$/, 'lesson', 'learn', true], [/^\/learn\/engine$/, 'engine', 'learn', true], [/^\/learn\/([\w-]+)$/, 'post', 'learn', true],
+    [/^\/learn$/, 'learn', 'learn', true], [/^\/learn\/courses$/, 'learnCourses', 'learn', true], [/^\/learn\/course\/([\w-]+)$/, 'course', 'learn', true], [/^\/learn\/course\/([\w-]+)\/(\d+)$/, 'lesson', 'learn', true], [/^\/learn\/engine$/, 'engine', 'learn', true], [/^\/membership$/, 'membership', 'learn', true], [/^\/learn\/([\w-]+)$/, 'post', 'learn', true],
     [/^\/profile$/, 'profile', 'profile'],
-    [/^\/coach$/, 'coach', 'home'], [/^\/coach\/new$/, 'coachNew', 'home'], [/^\/coach\/development\/new$/, 'developmentNew', 'home'], [/^\/coach\/templates$/, 'templates', 'home'], [/^\/coach\/templates\/(new|\d+)$/, 'templateEdit', 'home'], [/^\/coach\/(\d+)$/, 'coachAthlete', 'home'], [/^\/coach\/(\d+)\/code$/, 'coachCode', 'home'], [/^\/coach\/(\d+)\/development\/new$/, 'developmentNew', 'home'],
+    [/^\/coach$/, 'coach', 'home'], [/^\/coach\/new$/, 'coachNew', 'home'], [/^\/coach\/development\/new$/, 'developmentNew', 'home'], [/^\/coach\/development\/library$/, 'developmentLibrary', 'home'], [/^\/coach\/templates$/, 'templates', 'home'], [/^\/coach\/templates\/(new|\d+)$/, 'templateEdit', 'home'], [/^\/coach\/(\d+)$/, 'coachAthlete', 'home'], [/^\/coach\/(\d+)\/code$/, 'coachCode', 'home'], [/^\/coach\/(\d+)\/development\/new$/, 'developmentNew', 'home'],
     [/^\/studio\/courses$/, 'studioCourses', 'home'], [/^\/studio\/course\/(\d+)$/, 'courseEdit', 'home'], [/^\/studio\/lesson\/(\d+)$/, 'lessonEdit', 'home'],
     [/^\/cohorts$/, 'cohorts', 'learn'], [/^\/cohorts\/(\d+)$/, 'cohort', 'learn'],
     [/^\/studio$/, 'studio', 'home'], [/^\/studio\/([\w-]+)$/, 'studioEdit', 'home'],
