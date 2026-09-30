@@ -53,3 +53,19 @@ test('Development Blocks connect a lesson, training, athlete evidence and coach 
   assert.deepEqual([afterRetest.retest_session_id, afterRetest.status], [retestSession, 'coach_review']);
   assert.ok((await athlete.get('/api/notifications')).body.items.some(n => n.link === `#/development/${mine[0].id}`));
 });
+
+test('coaches share complete pathways through the Development Library', async (t) => {
+  const s = await start(); t.after(s.close);
+  const { coach, coach2 } = await staff(s);
+  const saved = await coach.post('/api/development-library', {
+    name: 'Transition patience', title: 'Create time before attacking', problem: 'Player attacks before balance is available',
+    read_targets: ['time', 'balance'], start_state: 'neutral', desired_state: 'offensive', intensity: 'sparring',
+    constraint_text: 'Earn balance first', success_evidence: '7 of 10 correct decisions', reflection_prompt: 'What made the ball attackable?'
+  });
+  assert.equal(saved.status, 201);
+  const shared = (await coach2.get('/api/development-library')).body;
+  assert.equal(shared.length, 1);
+  assert.deepEqual(shared[0].read_targets, ['time', 'balance']);
+  assert.equal((await coach2.del(`/api/development-library/${saved.body.id}`)).status, 403);
+  assert.equal((await coach.del(`/api/development-library/${saved.body.id}`)).status, 204);
+});
