@@ -40,6 +40,32 @@ module.exports=function(r,ctx){
   });
   return {ok:true};
  });
+ r.get('/api/coach/dashboard',({user})=>{
+  auth.require(user,'coach');
+  const athletes=db.prepare('SELECT id,name FROM athletes ORDER BY name').all().filter(a=>auth.coachesAthlete(user,a.id));
+  const ids=new Set(athletes.map(a=>a.id)),names=new Map(athletes.map(a=>[a.id,a.name]));
+  const end=new Date(today()+'T12:00:00Z');end.setUTCDate(end.getUTCDate()+7);const through=end.toISOString().slice(0,10);
+  const notes=db.prepare("SELECT n.id,n.athlete_id,n.body,n.created_at,n.media_id,a.name FROM notes n JOIN athletes a ON a.id=n.athlete_id WHERE n.kind='reflection' AND n.reviewed_at IS NULL ORDER BY n.created_at").all().filter(n=>ids.has(n.athlete_id)).map(n=>({
+   id:'note:'+n.id,recordId:n.id,athleteId:n.athlete_id,name:n.name,title:/^Video review\n/.test(n.body)?'Video needs review':/^Question\n/.test(n.body)?'Athlete question':'Athlete reflection',detail:n.body,at:n.created_at,kind:'review',priority:'review',hasMedia:!!n.media_id,source:'app'
+  }));
+  const assignments=db.prepare("SELECT x.*,a.name FROM assignments x JOIN athletes a ON a.id=x.athlete_id WHERE x.status='open' ORDER BY COALESCE(x.due_on,'9999'),x.id").all().filter(x=>ids.has(x.athlete_id)).map(x=>({
+   id:'assignment:'+x.id,recordId:x.id,athleteId:x.athlete_id,name:x.name,title:x.title,detail:x.note,due:x.due_on||'',at:x.created_at,kind:'assignment',priority:!x.due_on?'open':x.due_on<today()?'overdue':x.due_on===today()?'today':x.due_on<=through?'soon':'later',source:'app'
+  }));
+  const tasks=db.prepare('SELECT * FROM coach_followups ORDER BY updated_at DESC LIMIT 1000').all().filter(x=>ids.has(x.athlete_id)).map(x=>({...JSON.parse(x.data),revision:x.revision,updatedAt:x.updated_at})).filter(x=>x.status==='open').map(x=>({
+   id:'task:'+x.id,recordId:x.id,athleteId:x.athleteId,name:names.get(x.athleteId),title:x.title,detail:'Coach follow-up',due:x.due||'',at:x.updatedAt,kind:'task',priority:!x.due?'open':x.due<today()?'overdue':x.due===today()?'today':x.due<=through?'soon':'later',assignee:x.assignee,revision:x.revision,task:x,source:'app'
+  }));
+  const retests=db.prepare("SELECT m.athlete_id,m.data,m.recorded_at FROM athlete_measurements m WHERE NOT EXISTS(SELECT 1 FROM athlete_measurements n WHERE n.athlete_id=m.athlete_id AND (n.recorded_at>m.recorded_at OR (n.recorded_at=m.recorded_at AND n.id>m.id)))").all().filter(x=>ids.has(x.athlete_id)).map(x=>({...x,test:JSON.parse(x.data)})).filter(x=>x.test.retestOn).map(x=>({
+   id:'retest:'+x.athlete_id,recordId:x.test.id,athleteId:x.athlete_id,name:names.get(x.athlete_id),title:'Retest '+Object.keys(x.test.values||{}).filter(k=>k!=='sport').map(k=>k.replaceAll('_',' ')).join(', '),detail:x.test.notes||'Repeat the latest test conditions.',due:x.test.retestOn,at:x.recorded_at,kind:'retest',priority:x.test.retestOn<today()?'overdue':x.test.retestOn===today()?'today':x.test.retestOn<=through?'soon':'later',source:'app'
+  }));
+  const sessions=db.prepare("SELECT DISTINCT s.id,s.title,s.started_at FROM training_sessions s JOIN training_athletes ta ON ta.session_id=s.id WHERE s.status='live' ORDER BY s.started_at DESC").all().filter(s=>db.prepare('SELECT athlete_id FROM training_athletes WHERE session_id=?').all(s.id).some(a=>ids.has(a.athlete_id))).map(s=>({
+   id:'session:'+s.id,recordId:s.id,name:'Live training',title:s.title,detail:'Session is still running.',at:s.started_at,kind:'session',priority:'today',source:'app'
+  }));
+  const events=db.prepare("SELECT id,title,starts_at,location,status FROM events WHERE status IN ('published','live') AND substr(starts_at,1,10)<=? ORDER BY starts_at LIMIT 50").all(through).filter(e=>e.status==='live'||e.starts_at.slice(0,10)>=today()).map(e=>({
+   id:'event:'+e.id,recordId:e.id,name:'Event',title:e.title,detail:e.location||'Location to be confirmed',due:e.starts_at,at:e.starts_at,kind:'event',priority:e.status==='live'||e.starts_at.slice(0,10)===today()?'today':'soon',source:'app'
+  }));
+  const coaches=db.prepare('SELECT id,name,email,roles FROM users ORDER BY name').all().map(u=>auth.userRow(u)).filter(u=>u.roles.includes('coach')).map(u=>({id:u.id,name:u.name,email:u.email}));
+  return {viewer:{id:user.id,name:user.name,email:user.email},athletes,coaches,items:[...notes,...assignments,...tasks,...retests,...sessions,...events],checkedAt:now(),window:{today:today(),through}};
+ });
  r.get('/api/coach/followups',({user})=>{
   auth.require(user,'coach');
   const athletes=db.prepare('SELECT id,name FROM athletes ORDER BY name').all().filter(a=>auth.coachesAthlete(user,a.id));

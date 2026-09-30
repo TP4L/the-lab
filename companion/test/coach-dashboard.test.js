@@ -1,0 +1,25 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {start,staff,uid}=require('./helpers');
+test('coach today scopes athletes and returns reviews, overdue work, retests and tasks without private notes',async t=>{
+ const s=await start();t.after(s.close);const {coach,coach2}=await staff(s);
+ const made=(await coach.post('/api/athletes',{name:'Priority Player'})).body,aid=made.athlete.id;
+ const other=(await coach2.post('/api/athletes',{name:'Other Coach Player'})).body.athlete.id;
+ const player=s.client();await player.signup('Priority Player','priority@lab.test');await player.post('/api/claim',{code:made.claim_code});
+ await player.post('/api/athletes/'+aid+'/notes',{body:'Question\nCan you review my reset?',client_id:uid()});
+ await coach.post('/api/athletes/'+aid+'/notes',{body:'PRIVATE DASHBOARD SECRET',visibility:'private',client_id:uid()});
+ await coach.post('/api/athletes/'+aid+'/assignments',{title:'Pressure reset work',note:'Five clean reps',due_on:'2020-01-02'});
+ await player.post('/api/athletes/'+aid+'/progress',{id:uid(),date:'2020-01-01',values:{sport:'Pickleball',vertical_inches:20},notes:'Repeat setup',retestOn:'2020-01-03'});
+ const task={id:uid(),athleteId:aid,title:'Send the session recap',due:'',assignee:'',status:'open',revision:0};
+ await coach.post('/api/coach/followups',task);
+ let d=(await coach.get('/api/coach/dashboard')).body;
+ assert.equal(d.viewer.name,'Coach Kim');assert.equal(d.window.today.length,10);
+ assert(d.items.some(x=>x.kind==='review'&&x.athleteId===aid));
+ assert(d.items.some(x=>x.kind==='assignment'&&x.priority==='overdue'));
+ assert(d.items.some(x=>x.kind==='retest'&&x.priority==='overdue'));
+ assert(d.items.some(x=>x.kind==='task'&&x.assignee===null));
+ assert(!d.athletes.some(a=>a.id===other));assert(!JSON.stringify(d).includes('PRIVATE DASHBOARD SECRET'));
+ assert.equal((await player.get('/api/coach/dashboard')).status,403);
+ await coach.post('/api/coach/followups',{...task,status:'done',revision:1});
+ d=(await coach.get('/api/coach/dashboard')).body;assert(!d.items.some(x=>x.id==='task:'+task.id));
+});
