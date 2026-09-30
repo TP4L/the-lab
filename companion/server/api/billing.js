@@ -82,6 +82,8 @@ module.exports = function billing(r, { db, auth, config, stripeClient: supplied 
       expires_at=COALESCE(excluded.expires_at,memberships.expires_at), source='stripe', note=excluded.note,
       stripe_customer_id=COALESCE(excluded.stripe_customer_id,memberships.stripe_customer_id), stripe_subscription_id=COALESCE(excluded.stripe_subscription_id,memberships.stripe_subscription_id), updated_at=excluded.updated_at`)
       .run(userId.user_id, active ? 'active' : 'cancelled', expires, event.type, customer || null, sub || null, now());
+    db.prepare('INSERT INTO membership_history (user_id,status,plan,expires_at,source,note) VALUES (?,?,?,?,?,?)')
+      .run(userId.user_id, active ? 'active' : 'cancelled', 'essentials', expires, 'stripe', event.type);
   }
 
   r.post('/api/billing/webhook', async ({ req }) => {
