@@ -70,7 +70,7 @@ Never recreate the Development Block after a delivery error. Use Retry website d
 
 ## Email notifications
 
-When email delivery is configured, athletes receive transactional email for shared coach notes, Development Blocks, training updates, matches, events, and reminders. Private coach notes and public Field Note announcements are not emailed through this channel.
+When email delivery is configured, every new in-app notification can also be emailed: shared coach notes, Development Blocks, training updates, matches, events, reminders, and new Field Notes. Private coach notes are not emailed because they never create an athlete notification.
 
 Athletes can open Profile, expand Notifications and privacy, and switch Email notifications on or off. Category switches such as Coach feedback or Training also apply. Every email links back to the relevant place in THE LAB, and repeated requests reuse an idempotency key so the same notification is not sent twice.
 
