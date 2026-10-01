@@ -37,7 +37,7 @@ function createNotifier(db, push, mailer, publicUrl = '') {
       if (!u || prefsOf(u)[kind] === false) return;
       const notificationId = Number(ins.run(uid, kind, title, body, link).lastInsertRowid); n++;
       if (push) push.toUser(uid, { title, body, link });
-      if (mailer && mailer.enabled && prefsOf(u).email_notifications && kind !== 'content') {
+      if (mailer && mailer.enabled && prefsOf(u).email_notifications) {
         const url = publicUrl && link ? `${publicUrl}/${link}` : publicUrl;
         mailer.sendSoon({ to: u.email, subject: title, text: `${body}${url ? `\n\nOpen THE LAB: ${url}` : ''}\n\nYou can turn email notifications off in Profile > Notifications and privacy.`,
           html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#171b23"><p style="font-size:12px;letter-spacing:.12em;color:#d64336;font-weight:700">THE LAB</p><h1 style="font-size:24px">${esc(title)}</h1><p style="line-height:1.6">${esc(body)}</p>${url ? `<p><a href="${esc(url)}" style="display:inline-block;background:#171b23;color:white;padding:12px 18px;text-decoration:none;border-radius:6px">Open THE LAB</a></p>` : ''}<p style="font-size:12px;color:#667085">Manage email notifications in Profile &gt; Notifications and privacy.</p></div>`,
