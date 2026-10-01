@@ -10,7 +10,7 @@ const { LANES } = require('./api/publishing.js');
    - cleanup of expired sign-in sessions and reset links
    Each notice is recorded in job_log so it is sent once, even across restarts. */
 function createJobs(ctx) {
-  const { db, notifier, config } = ctx;
+  const { db, notifier, config, mailer } = ctx;
   const once = db.prepare('INSERT OR IGNORE INTO job_log (key) VALUES (?)');
   const first = key => Number(once.run(key).changes) === 1;
 
@@ -59,10 +59,34 @@ function createJobs(ctx) {
     db.prepare('DELETE FROM password_resets WHERE expires_at < ?').run(t);
   }
 
+  function dailyDigests(now) {
+    if (!mailer || !mailer.enabled) return 0;
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+    const val = type => parts.find(x => x.type === type).value;
+    const day = `${val('year')}-${val('month')}-${val('day')}`;
+    if (Number(val('hour')) < 17) return 0;
+    const users = db.prepare("SELECT DISTINCT user_id FROM notifications WHERE email_state = 'pending'").all();
+    let sent = 0;
+    users.forEach(({ user_id }) => {
+      if (!first(`digest:${user_id}:${day}`)) return;
+      const u = db.prepare('SELECT email FROM users WHERE id = ?').get(user_id);
+      const items = db.prepare("SELECT id, title, body FROM notifications WHERE user_id = ? AND email_state = 'pending' ORDER BY id DESC LIMIT 25").all(user_id);
+      if (!u || !items.length) return;
+      const url = config.publicUrl ? `${config.publicUrl}/#/notifications` : '';
+      const list = items.map(x => `- ${x.title}${x.body ? `: ${x.body}` : ''}`).join('\n');
+      const summary = `${items.length} update${items.length === 1 ? '' : 's'} are waiting in THE LAB.\n\n${list}`;
+      mailer.sendSoon({ to: u.email, subject: `THE LAB daily update · ${items.length} new`, text: `${summary}${url ? `\n\nOpen THE LAB: ${url}` : ''}\n\nManage email delivery in Profile > Notifications and privacy.`, html: notifier.emailHtml('Your daily LAB update', summary, url, 'Manage email delivery in Profile > Notifications and privacy.'), idempotencyKey: `lab-digest-${user_id}-${day}` });
+      db.prepare(`UPDATE notifications SET email_state = 'sent' WHERE id IN (${items.map(() => '?').join(',')})`).run(...items.map(x => x.id));
+      sent++;
+    });
+    return sent;
+  }
+
   function runOnce(now = new Date()) {
-    const out = { reminders: 0, posts: 0, backup: null };
+    const out = { reminders: 0, posts: 0, digests: 0, backup: null };
     try { out.reminders = eventReminders(now); } catch (e) { console.error('[jobs] reminders', e); }
     try { out.posts = scheduledPosts(now); } catch (e) { console.error('[jobs] posts', e); }
+    try { out.digests = dailyDigests(now); } catch (e) { console.error('[jobs] digests', e); }
     try { out.backup = backup(now); } catch (e) { console.error('[jobs] backup', e); }
     try { cleanup(now); } catch (e) { console.error('[jobs] cleanup', e); }
     return out;

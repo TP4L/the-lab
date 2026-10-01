@@ -101,6 +101,7 @@ test('every new notification can email once and respects email preferences', asy
   const { coach, editor } = await staff(s);
   const made = (await coach.post('/api/athletes', { name: 'Email Athlete', claim_email: 'athlete@lab.test' })).body;
   const athlete = s.client(); await athlete.signup('Email Athlete', 'athlete@lab.test'); await athlete.post('/api/claim', { code: made.claim_code });
+  await athlete.put('/api/me/prefs', { email_mode: 'all' });
   await coach.post(`/api/athletes/${made.athlete.id}/notes`, { body: 'Your reset shape was calmer.', visibility: 'private' });
   assert.equal(sent.length, 0, 'private notes never send');
   await coach.post(`/api/athletes/${made.athlete.id}/notes`, { body: 'Your reset shape was calmer.', visibility: 'shared' });
@@ -113,4 +114,27 @@ test('every new notification can email once and respects email preferences', asy
   const beforeOptOut = sent.length;
   await coach.post(`/api/athletes/${made.athlete.id}/notes`, { body: 'Second shared note.', visibility: 'shared' });
   assert.equal(sent.length, beforeOptOut, 'email opt-out keeps the in-app note but stops email');
+});
+
+test('notification control routes important email now and routine email to one daily digest', async (t) => {
+  const sent = [], mailer = { enabled: true, send: async () => {}, sendSoon: msg => sent.push(msg) };
+  const s = await start({ mailer }); t.after(s.close);
+  const { coach, editor } = await staff(s);
+  const made = (await coach.post('/api/athletes', { name: 'Control Athlete' })).body;
+  const athlete = s.client(); await athlete.signup('Control Athlete', 'control@lab.test'); await athlete.post('/api/claim', { code: made.claim_code });
+
+  const prefs = (await athlete.get('/api/me/prefs')).body;
+  assert.equal(prefs.prefs.email_mode, 'important');
+  await coach.post(`/api/athletes/${made.athlete.id}/notes`, { body: 'Important shared feedback.', visibility: 'shared' });
+  assert.equal(sent.length, 1, 'important feedback sends now');
+  const post = (await editor.post('/api/studio/posts', { title: 'Routine read', lane: 'quick_read' })).body;
+  await editor.post(`/api/studio/posts/${post.id}/publish`, {});
+  assert.equal(sent.length, 1, 'routine content waits');
+  const evening = new Date('2026-10-01T23:00:00Z');
+  assert.ok(s.app.jobs.runOnce(evening).digests >= 1);
+  const digest = sent.find(x => x.to === 'control@lab.test' && /daily update/.test(x.subject));
+  assert.ok(digest);
+  assert.match(digest.html, /<!doctype html>/i);
+  assert.equal(s.app.jobs.runOnce(new Date(evening.getTime() + 60000)).digests, 0, 'one digest per day');
+  assert.equal((await athlete.put('/api/me/prefs', { email_mode: 'loud' })).status, 400);
 });

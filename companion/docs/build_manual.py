@@ -8,7 +8,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parents[2] / 'output' / 'pdf' / 'THE_LAB_App_Manual_v1_3_2026-09-30.pdf'
+OUT = Path(__file__).resolve().parents[2] / 'output' / 'pdf' / 'THE_LAB_App_Manual_v1_4_2026-09-30.pdf'
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 INK = colors.HexColor('#171B23')
@@ -34,7 +34,7 @@ def footer(canvas, doc):
     canvas.saveState()
     canvas.setFillColor(INK); canvas.rect(0, 0, letter[0], 0.32*inch, fill=1, stroke=0)
     canvas.setFillColor(WHITE); canvas.setFont('Inter', 7)
-    canvas.drawString(0.55*inch, 0.12*inch, 'THE LAB APP MANUAL  |  VERSION 1.3')
+    canvas.drawString(0.55*inch, 0.12*inch, 'THE LAB APP MANUAL  |  VERSION 1.4')
     canvas.drawRightString(letter[0]-0.55*inch, 0.12*inch, str(doc.page))
     canvas.restoreState()
 
@@ -54,7 +54,7 @@ story=[]
 story += [Spacer(1,0.55*inch), P('TRANSCENDING PERFORMANCE','LabLabel'), P('THE <font color="#FF6B61">LAB</font>','LabTitle'), Spacer(1,0.12*inch)]
 hero=Table([[P('APP MANUAL','LabWhiteTitle'),P('COACHES<br/>ATHLETES<br/>ADMIN','LabWhite')]],colWidths=[4.6*inch,2.0*inch])
 hero.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),INK),('BOX',(0,0),(-1,-1),1,INK),('VALIGN',(0,0),(-1,-1),'BOTTOM'),('LEFTPADDING',(0,0),(-1,-1),20),('RIGHTPADDING',(0,0),(-1,-1),20),('TOPPADDING',(0,0),(-1,-1),28),('BOTTOMPADDING',(0,0),(-1,-1),28)]))
-story += [hero, Spacer(1,0.35*inch), P('A practical guide to connected athlete profiles, pre-session check-ins, Development Blocks, training, evidence, events, and staff workflow.'), Spacer(1,0.15*inch), P('<b>Version 1.3</b>  |  September 30, 2026'), P('Live app: https://the-lab-8w5d.onrender.com','LabSmall'), Spacer(1,1.25*inch), P('This handout is versioned with the app. Keep the newest copy and replace older copies after each meaningful update.','LabSmall'), PageBreak()]
+story += [hero, Spacer(1,0.35*inch), P('A practical guide to connected athlete profiles, pre-session check-ins, Development Blocks, training, evidence, events, and staff workflow.'), Spacer(1,0.15*inch), P('<b>Version 1.4</b>  |  September 30, 2026'), P('Live app: https://the-lab-8w5d.onrender.com','LabSmall'), Spacer(1,1.25*inch), P('This handout is versioned with the app. Keep the newest copy and replace older copies after each meaningful update.','LabSmall'), PageBreak()]
 
 story += page('Start here','01 / System map','THE LAB connects the website athlete record to the app training experience without erasing either system.')
 story += [status_table([('Website','Original athlete profiles, coaching history, shared and private notes.'),('App','Development Blocks, lessons, training sessions, evidence, feedback, and events.'),('Connected workflow','Coaches assign once. THE LAB delivers to every available destination and reports the result.')]), P('The most important rule','LabH2')]
@@ -80,7 +80,7 @@ story += [P('Retries reuse the original delivery ID. This prevents a second webs
 
 story += page('Email notifications','06 / Communication','Shared coaching updates can reach the athlete by email as well as inside THE LAB.')
 story += [status_table([('Shared coach note','Emails the athlete and links back to their profile.'),('Development Block','Emails the title, next step, and a direct link to the block.'),('Training and retest','Emails meaningful stage changes and review prompts.'),('Events and reminders','Emails registration, schedule, and reminder updates.'),('Field Notes','New-content notifications can also be emailed.'),('Private coach note','Never emailed and never shown to the athlete.')]), P('Athlete control','LabH2')]
-story += bullets(['Open Profile and expand Notifications and privacy.', 'Use Email notifications to turn the email channel on or off.', 'Use each category switch to control coach feedback, training, matches, events, and reminders.', 'The in-app record remains available even when email is turned off.'])
+story += bullets(['Open Profile and expand Notifications and privacy.', 'Choose <b>Important only</b> for immediate personal/action emails plus a daily routine digest.', 'Choose <b>Daily digest</b> for one email summary after 5 PM Central.', 'Choose <b>Every update</b> only if you want each alert emailed immediately, or <b>No email</b> to keep everything in the app.', 'Use each topic switch to control coach feedback, training, matches, events, reminders, courts, and Field Notes.', 'The in-app record remains available when email is off. Phone alerts remain controlled per device.'])
 story += [P('Each message uses a stable idempotency key so a repeated request cannot send the same notification twice.','LabSmall'), PageBreak()]
 
 story += page('Athlete learning loop','07 / Player experience','Every assignment moves through a visible five-part development loop.')
@@ -111,13 +111,12 @@ story += page('Membership and troubleshooting','11 / Access support','Membership
 story += [status_table([('Only one athlete appears','Open Your workspace, confirm staff access, then Refresh athletes.'),('Website roster will not load','Reconnect with Brett or Austin staff access.'),('Athlete cannot see app work','Check Roster health. Website only means the app profile still needs to be claimed.'),('Website delivery failed','Open the block and use Retry website delivery.'),('Possible duplicate','Do not delete either record. Compare identity, notes, sessions, and links first.'),('Upload failed','Keep the page open and retry; the reflection remains in the form.')]), PageBreak()]
 
 story += page('Release notes','12 / Version control','Give staff and athletes the newest manual whenever a meaningful app update changes their workflow.')
+story += [P('Version 1.4 - September 30, 2026','LabH2')]
+story += bullets(['Added the Notification Control Center with Important only, Daily digest, Every update, and No email.', 'Classified alerts as urgent, important, or routine so routine content does not create immediate-email noise.', 'Added one daily digest after 5 PM Central with stable duplicate-send protection.', 'Kept topic switches, phone alerts, in-app history, and private-note protections independent.'])
 story += [P('Version 1.3 - September 30, 2026','LabH2')]
 story += bullets(['Added the three-question athlete pre-session check-in.', 'Added optional check-in photo or video.', 'Added a permission-scoped coach check-in queue and preparation card.', 'Added one-click conversion from a check-in to a runnable session plan.', 'Added coach and athlete notifications at the correct handoff points.'])
-story += [P('Version 1.2 - September 30, 2026','LabH2')]
-story += bullets(['Expanded email delivery to every new in-app notification, including new Field Notes.', 'Kept the master email switch and category-level preferences.', 'Private coach notes remain excluded because they never create athlete notifications.'])
-story += [P('Version 1.1 - September 30, 2026','LabH2'), P('Added athlete-controlled email delivery, privacy safeguards, and duplicate-send protection.')]
-story += [P('Version 1.0 - September 30, 2026','LabH2'), P('Connected the website and app roster, Development Block delivery, delivery receipts, and inactive membership controls.')]
-story += [Spacer(1,8), P('Update rule','LabH2'), P('Every meaningful release receives a refreshed PDF, an incremented version, and a release-note entry describing what changed and who needs to know.'), Spacer(1,8), P('Live app','LabH2'), P('https://the-lab-8w5d.onrender.com'), P('THE LAB - Transcending Performance','LabSmall')]
+story += [P('Versions 1.0-1.2','LabH2'), P('Connected the website and app roster, Development Blocks, delivery receipts, membership controls, and athlete email notifications with privacy safeguards.')]
+story += [Spacer(1,6), P('Update rule','LabH2'), P('Every meaningful release receives a refreshed PDF, an incremented version, and a release-note entry describing what changed and who needs to know.'), Spacer(1,6), P('Live app','LabH2'), P('https://the-lab-8w5d.onrender.com'), P('THE LAB - Transcending Performance','LabSmall')]
 
 doc=SimpleDocTemplate(str(OUT),pagesize=letter,rightMargin=0.65*inch,leftMargin=0.65*inch,topMargin=0.62*inch,bottomMargin=0.55*inch,title='THE LAB App Manual',author='Transcending Performance')
 doc.build(story,onFirstPage=footer,onLaterPages=footer)
