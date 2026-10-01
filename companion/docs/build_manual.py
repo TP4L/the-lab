@@ -8,7 +8,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parents[2] / 'output' / 'pdf' / 'THE_LAB_App_Manual_v1_2_2026-09-30.pdf'
+OUT = Path(__file__).resolve().parents[2] / 'output' / 'pdf' / 'THE_LAB_App_Manual_v1_3_2026-09-30.pdf'
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 INK = colors.HexColor('#171B23')
@@ -34,7 +34,7 @@ def footer(canvas, doc):
     canvas.saveState()
     canvas.setFillColor(INK); canvas.rect(0, 0, letter[0], 0.32*inch, fill=1, stroke=0)
     canvas.setFillColor(WHITE); canvas.setFont('Inter', 7)
-    canvas.drawString(0.55*inch, 0.12*inch, 'THE LAB APP MANUAL  |  VERSION 1.2')
+    canvas.drawString(0.55*inch, 0.12*inch, 'THE LAB APP MANUAL  |  VERSION 1.3')
     canvas.drawRightString(letter[0]-0.55*inch, 0.12*inch, str(doc.page))
     canvas.restoreState()
 
@@ -54,7 +54,7 @@ story=[]
 story += [Spacer(1,0.55*inch), P('TRANSCENDING PERFORMANCE','LabLabel'), P('THE <font color="#FF6B61">LAB</font>','LabTitle'), Spacer(1,0.12*inch)]
 hero=Table([[P('APP MANUAL','LabWhiteTitle'),P('COACHES<br/>ATHLETES<br/>ADMIN','LabWhite')]],colWidths=[4.6*inch,2.0*inch])
 hero.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),INK),('BOX',(0,0),(-1,-1),1,INK),('VALIGN',(0,0),(-1,-1),'BOTTOM'),('LEFTPADDING',(0,0),(-1,-1),20),('RIGHTPADDING',(0,0),(-1,-1),20),('TOPPADDING',(0,0),(-1,-1),28),('BOTTOMPADDING',(0,0),(-1,-1),28)]))
-story += [hero, Spacer(1,0.35*inch), P('A practical guide to connected athlete profiles, Development Blocks, training, evidence, events, and staff workflow.'), Spacer(1,0.15*inch), P('<b>Version 1.2</b>  |  September 30, 2026'), P('Live app: https://the-lab-8w5d.onrender.com','LabSmall'), Spacer(1,1.25*inch), P('This handout is versioned with the app. Keep the newest copy and replace older copies after each meaningful update.','LabSmall'), PageBreak()]
+story += [hero, Spacer(1,0.35*inch), P('A practical guide to connected athlete profiles, pre-session check-ins, Development Blocks, training, evidence, events, and staff workflow.'), Spacer(1,0.15*inch), P('<b>Version 1.3</b>  |  September 30, 2026'), P('Live app: https://the-lab-8w5d.onrender.com','LabSmall'), Spacer(1,1.25*inch), P('This handout is versioned with the app. Keep the newest copy and replace older copies after each meaningful update.','LabSmall'), PageBreak()]
 
 story += page('Start here','01 / System map','THE LAB connects the website athlete record to the app training experience without erasing either system.')
 story += [status_table([('Website','Original athlete profiles, coaching history, shared and private notes.'),('App','Development Blocks, lessons, training sessions, evidence, feedback, and events.'),('Connected workflow','Coaches assign once. THE LAB delivers to every available destination and reports the result.')]), P('The most important rule','LabH2')]
@@ -90,27 +90,34 @@ story += [loop, Spacer(1,14)]
 story += bullets(['Open the linked lesson and assigned training.', 'Complete the work and submit a reflection plus confidence score.', 'Upload an optional photo or video as evidence.', 'Read coach feedback and the retest plan.', 'Complete the retest; the block returns to coach review.'])
 story += [PageBreak()]
 
-story += page('Profiles, notes, and media','08 / Athlete record','Your workspace is the connected roster. Open an athlete to view the record and act from one place.')
+story += page('Pre-session check-in','08 / Prepare before arrival','Athletes answer three short questions before training. Coaches receive the exact answers in a private preparation queue and can turn them into a runnable session plan.')
+story += [P('Athlete','LabH2')]
+story += bullets(['From Home, choose <b>Pre-session check-in</b>.', 'Answer: What is working? What is not working? What do you want to focus on?', 'Optionally attach one photo or video.', 'Choose <b>Send to my coach</b>. The response remains visible in Recent check-ins.'])
+story += [P('Coach','LabH2')]
+story += bullets(['Open Coach Workspace and choose <b>Check-ins</b>.', 'Open a response to read the athlete&#39;s words and optional media.', 'Complete the preparation card: working hypothesis, starting state, likely error layer, first test, training constraint, proof of progress, and athlete note.', 'Choose <b>Save preparation</b> to keep drafting, or <b>Create session plan</b> to publish the plan and notify the athlete.', 'Choose <b>Run session plan</b> when training begins.'])
+story += [P('Access rule','LabH2'), P('Only coaches assigned to that athlete can open the response. The athlete sees the check-in and plan status, while the coach preparation fields stay in the coaching workflow.'), PageBreak()]
+
+story += page('Profiles, notes, and media','09 / Athlete record','Your workspace is the connected roster. Open an athlete to view the record and act from one place.')
 story += [status_table([('Overview','Current training focuses, snapshot, and session plans.'),('Assign training','Publishes the next step to the athlete record.'),('Notes','Choose Private for coaches only or Shared with athlete.'),('Reflections','Review athlete answers and leave feedback.'),('App profile','App sessions, assignments, measurements, media, and Development Blocks.')]), P('Media and questions','LabH2'), P('Athletes can upload photos or video with evidence. Keep feedback tied to the Development Block so the question, response, and next action stay together.'), PageBreak()]
 
-story += page('Sessions and events','09 / Live operations','Training sessions capture reps, scores, notes, and completion. Events desk handles live event operations.')
+story += page('Sessions and events','10 / Live operations','Training sessions capture reps, scores, notes, and completion. Events desk handles live event operations.')
 story += [P('Training session','LabH2')]
 story += bullets(['Choose Start session.', 'Select athletes and a saved template or custom drills.', 'Score the work and complete the session.', 'Linked Development Blocks advance when an assigned session or retest is completed.'])
 story += [P('Events desk','LabH2')]
 story += bullets(['Set up registration, format, courts, schedule, and participant list.', 'Review brackets before starting the event.', 'Start, pause, resume, or stop the timer.', 'Add eligible players after the event has started.', 'Record results and publish the recap.'])
 story += [PageBreak()]
 
-story += page('Membership and troubleshooting','10 / Access support','Membership controls are present but the general paywall remains inactive until THE LAB is ready to turn billing on.')
+story += page('Membership and troubleshooting','11 / Access support','Membership controls are present but the general paywall remains inactive until THE LAB is ready to turn billing on.')
 story += [status_table([('Only one athlete appears','Open Your workspace, confirm staff access, then Refresh athletes.'),('Website roster will not load','Reconnect with Brett or Austin staff access.'),('Athlete cannot see app work','Check Roster health. Website only means the app profile still needs to be claimed.'),('Website delivery failed','Open the block and use Retry website delivery.'),('Possible duplicate','Do not delete either record. Compare identity, notes, sessions, and links first.'),('Upload failed','Keep the page open and retry; the reflection remains in the form.')]), PageBreak()]
 
-story += page('Release notes','11 / Version control','Give staff and athletes the newest manual whenever a meaningful app update changes their workflow.')
+story += page('Release notes','12 / Version control','Give staff and athletes the newest manual whenever a meaningful app update changes their workflow.')
+story += [P('Version 1.3 - September 30, 2026','LabH2')]
+story += bullets(['Added the three-question athlete pre-session check-in.', 'Added optional check-in photo or video.', 'Added a permission-scoped coach check-in queue and preparation card.', 'Added one-click conversion from a check-in to a runnable session plan.', 'Added coach and athlete notifications at the correct handoff points.'])
 story += [P('Version 1.2 - September 30, 2026','LabH2')]
 story += bullets(['Expanded email delivery to every new in-app notification, including new Field Notes.', 'Kept the master email switch and category-level preferences.', 'Private coach notes remain excluded because they never create athlete notifications.'])
-story += [P('Version 1.1 - September 30, 2026','LabH2')]
-story += bullets(['Added athlete email delivery for shared coach notes and transactional app updates.', 'Added an athlete-controlled email notification switch.', 'Private coach notes remain private and are never emailed.', 'Added idempotency protection to prevent duplicate notification emails.'])
-story += [P('Version 1.0 - September 30, 2026','LabH2')]
-story += bullets(['Added one roster view for website and app athletes.', 'Added Roster health and connection labels.', 'Added dual Development Block delivery to website and app.', 'Added delivery receipts, retry, and stable IDs to prevent duplicate website delivery.', 'Preserved private coaching notes and original website history.', 'Kept membership controls available but inactive.'])
-story += [Spacer(1,18), P('Update rule','LabH2'), P('Every meaningful release receives a refreshed PDF, an incremented version, and a release-note entry describing what changed and who needs to know.'), Spacer(1,18), P('Live app','LabH2'), P('https://the-lab-8w5d.onrender.com'), P('THE LAB - Transcending Performance','LabSmall')]
+story += [P('Version 1.1 - September 30, 2026','LabH2'), P('Added athlete-controlled email delivery, privacy safeguards, and duplicate-send protection.')]
+story += [P('Version 1.0 - September 30, 2026','LabH2'), P('Connected the website and app roster, Development Block delivery, delivery receipts, and inactive membership controls.')]
+story += [Spacer(1,8), P('Update rule','LabH2'), P('Every meaningful release receives a refreshed PDF, an incremented version, and a release-note entry describing what changed and who needs to know.'), Spacer(1,8), P('Live app','LabH2'), P('https://the-lab-8w5d.onrender.com'), P('THE LAB - Transcending Performance','LabSmall')]
 
 doc=SimpleDocTemplate(str(OUT),pagesize=letter,rightMargin=0.65*inch,leftMargin=0.65*inch,topMargin=0.62*inch,bottomMargin=0.55*inch,title='THE LAB App Manual',author='Transcending Performance')
 doc.build(story,onFirstPage=footer,onLaterPages=footer)

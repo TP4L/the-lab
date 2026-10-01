@@ -70,6 +70,7 @@ function createApp(opts = {}) {
   require('./api/billing.js')(r, ctx);
   require('./api/coaching.js')(r, ctx);
   require('./api/development.js')(r, ctx);
+  require('./api/checkins.js')(r, ctx);
   require('./api/planning.js')(r, ctx);
   require('./demo.js').routes(r, ctx);
   require('./api/notify.js').routes(r, ctx);
