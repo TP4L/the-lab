@@ -230,6 +230,34 @@
       if (e.mode !== 'fallout') { if (e.round_end !== 'all') bits.push(ROUND_END[e.round_end].toLowerCase()); if (e.round_minutes) bits.push(e.round_minutes + '-minute rounds'); if (e.round_limit) bits.push(e.round_limit + ' rounds'); }
       return bits.join(' · ');
     }
+    /* A projected event board appears as soon as the first player registers.
+       It is intentionally not a draw: real court assignments still come from
+       the event engine when the host starts play. */
+    function eventBoardPreview(e) {
+      if (!e.counts || e.counts.registered < 1 || e.rounds.length || e.bracket) return '';
+      var perCourt = e.mode === 'draft3' ? 6 : 4;
+      var courts = e.court_numbers && e.court_numbers.length ? e.court_numbers : Array.apply(null, { length: e.courts || 1 }).map(function (_, i) { return i + 1; });
+      var courtSpots = courts.length * perCourt;
+      var total = Math.max(e.counts.registered, e.capacity || courtSpots);
+      var shown = Math.min(total, Math.max(courtSpots, 48));
+      var names = (e.people || []).filter(function (p) { return p.state === 'registered'; });
+      var slots = Array.apply(null, { length: shown }).map(function (_, i) {
+        var filled = i < e.counts.registered;
+        var person = names[i];
+        return '<div class="vision-slot ' + (filled ? 'filled' : 'open') + '"><span class="vision-num">' + (i + 1) + '</span><span><b>' + (person ? h(person.name) : filled ? 'Registered player' : 'Open spot') + '</b><small>' + (filled ? 'Registered' : 'Available') + '</small></span></div>';
+      });
+      var courtCards = courts.map(function (court, i) {
+        var start = i * perCourt;
+        return '<section class="vision-court"><div class="vision-court-head"><span>Court ' + h(court) + '</span><small>' + perCourt + '-player ' + (perCourt === 6 ? '3v3' : 'doubles') + ' layout</small></div><div class="vision-slots">' + slots.slice(start, start + perCourt).join('') + '</div></section>';
+      }).join('');
+      var rotation = slots.slice(courtSpots);
+      var hidden = total - shown;
+      var formatNote = e.mode === 'fallout' ? 'Teams and the bracket lock when the host starts the event.' : e.partner_mode === 'fixed' ? 'Partners and final matchups are confirmed before play starts.' : 'Partners, opponents and court assignments are generated when play starts.';
+      return '<section class="event-vision" aria-label="Projected event board"><div class="vision-head"><div><p class="section-title">Event board preview</p><h2>See the event taking shape</h2></div><div class="vision-count"><strong>' + e.counts.registered + '</strong><span>registered' + (e.capacity ? ' · ' + Math.max(0, e.capacity - e.counts.registered) + ' open' : '') + '</span></div></div>' +
+        '<p class="small muted">This is the projected layout, not the final draw. ' + h(formatNote) + '</p><div class="vision-courts">' + courtCards + '</div>' +
+        (rotation.length ? '<div class="vision-rotation"><p class="section-title">Rotation / waiting deck</p><div class="vision-slots">' + rotation.join('') + '</div></div>' : '') +
+        (hidden > 0 ? '<p class="small muted">Plus ' + hidden + ' additional open spot' + (hidden === 1 ? '' : 's') + '.</p>' : '') + '</section>';
+    }
     function csvFor(e, which) {
       if (which === 'standings') {
         if (TEAM_MODES.indexOf(e.mode) >= 0 && e.team_standings.length) return csv([['Rank', 'Team', 'Wins', 'Losses', 'Games won', 'Point diff']].concat(e.team_standings.map(function (s, i) { return [i + 1, s.label, s.wins, s.losses, s.games_won, s.diff]; })));
@@ -375,7 +403,7 @@
             (e.started && ['complete', 'cancelled'].indexOf(e.status) < 0 ? '<p class="small muted">' + (e.locked ? 'Play has started and the teams are locked.' : e.late_join ? 'Play has started. Late joining is open: new players are added from the next round.' : 'Play has started. Late joining is closed.') + '</p>' : '') +
             (e.me && e.me.state !== 'withdrawn' ? '<p class="small">You’re <b>' + h(e.me.state) + '</b>' + (e.me.number ? ' as player #' + e.me.number : '') + (e.me.checked_in ? ', checked in.' : '. Show the QR on your Profile at check-in.') + '</p>' : '') +
             (!me || !me.athlete_id ? '<p class="small muted">Set up your athlete profile to register.</p>' : '') +
-            '<div class="row">' + calendarButton() + '</div></div>';
+            '<div class="row">' + calendarButton() + '</div></div>' + eventBoardPreview(e);
         }
         function courts() { return (org ? hostControls() : '') + courtsHTML(e, { mine: mine, org: org, link: true }) + (e.rounds.length ? '<div class="row"><button class="btn sm ghost" type="button" data-csv="matches">Download results (CSV)</button></div>' : ''); }
         /* Courts & round timing: the timer, round length, which courts, late joining. */
@@ -605,6 +633,7 @@
           (saved ? '<div class="banner"><span>You’re signed up on this device as player #' + h(saved.number) + '.</span><a class="btn sm primary" href="#/g/' + h(saved.token) + '">Open your player page</a></div>' : '') +
           '<div class="card stack">' + (e.description ? '<div class="small">' + L.paras(e.description) + '</div>' : '') +
           '<p class="small muted">' + h(formatLine(e)) + '</p><p class="small">' + (e.capacity ? e.counts.registered + ' of ' + e.capacity + ' spots taken' : e.counts.registered + ' signed up') + (e.counts.waitlist ? ' · ' + e.counts.waitlist + ' waiting' : '') + '</p><div class="row">' + calendarButton() + '</div></div>' +
+          eventBoardPreview(e) +
           (e.status === 'cancelled' ? '<p class="flag">This event was cancelled.</p>' : e.status === 'complete' ? '<p class="flag">This event has finished.</p>' :
             !e.registration.open ? '<p class="flag">Registration is closed. Ask the host if you’d like to play.</p>' :
             e.me && e.me.state !== 'withdrawn' ? '<div class="banner"><span>You’re ' + h(e.me.state) + ' with your account.</span><a class="btn sm primary" href="#/play/events/' + e.id + '">Open event</a></div>' :
@@ -643,6 +672,7 @@
           var round = ev.rounds[ev.rounds.length - 1];
           app.innerHTML = head(ev.status === 'live' ? 'Live now' : ev.status === 'complete' ? 'Final results' : 'Spectator view', ev.title, fmtWhen(ev.starts_at) + (ev.location ? ' · ' + ev.location : '')) +
             '<p class="small muted">' + h(formatLine(ev)) + '</p>' +
+            eventBoardPreview(ev) +
             (ev.bracket && ev.bracket.champion ? '' : ev.race && ev.race.finished ? '<div class="focus-card"><p class="eyebrow">Winner</p><p class="big">' + h(ev.race.leader.name) + '</p></div>' : '') +
             (ev.bracket ? '<div class="stack"><p class="section-title">Bracket</p>' + bracketHTML(ev, false) + '</div>' : '') +
             (ev.mode !== 'fallout' ? '<div class="stack"><p class="section-title">Standings</p>' + standingsHTML(ev) + '</div>' : '') +

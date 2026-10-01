@@ -1,6 +1,6 @@
 # THE LAB App Manual
 
-Version 1.0 · September 30, 2026
+Version 1.1 · October 1, 2026
 
 Live app: https://the-lab-8w5d.onrender.com
 
@@ -94,6 +94,8 @@ Choose Start session, select athletes, use a template or add drills, and begin s
 
 Events desk supports event setup, registration, brackets, court assignments, timer controls, results, and recaps. Brackets can be reviewed before the event starts. A host can start, pause, resume, and stop the timer, and can add eligible players after an event has started.
 
+As soon as the first person registers, the event page displays an Event Board Preview. Registered players fill the numbered positions and the remaining positions appear as Open spots. The preview uses the selected courts, event capacity, and format; players beyond the active court positions appear in the Rotation / waiting deck. It is a visualization only—not a final draw. Real partners, opponents, courts, and brackets are generated or confirmed when the host starts the event.
+
 ## Membership
 
 Membership and paywall controls are built in but not activated for general use. Current access should remain complimentary until the business is ready to turn billing on. Admins can view an athlete’s membership state without charging them.
@@ -108,6 +110,13 @@ Membership and paywall controls are built in but not activated for general use. 
 - Upload fails: keep the page open and retry. The reflection text stays in the form.
 
 ## Release notes
+
+### Version 1.1 · October 1, 2026
+
+- Added an Event Board Preview that appears after the first registration.
+- Added visible open spots so players can picture the event before it fills.
+- Added court-by-court layouts and a Rotation / waiting deck for larger groups.
+- Kept projected positions separate from the final draw and live assignments.
 
 ### Version 1.0 · September 30, 2026
 
