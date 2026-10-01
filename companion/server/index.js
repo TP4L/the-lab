@@ -2,7 +2,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { HttpError, STATUS, createRouter, readJson, send, serveStatic } = require('./http.js');
+const { HttpError, STATUS, createRouter, readJson, send, serveStatic, SECURITY_HEADERS } = require('./http.js');
 const { open } = require('./db.js');
 const { createAuth } = require('./auth.js');
 const { LANES } = require('./api/publishing.js');
@@ -147,6 +147,10 @@ function createApp(opts = {}) {
     const { pathname } = url;
     if (!pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed.' });
+      if (pathname === '/timeline' || pathname.startsWith('/timeline/')) {
+        res.writeHead(302, { Location: '/#' + pathname, ...SECURITY_HEADERS, 'Cache-Control': 'no-store' });
+        return res.end();
+      }
       let assetPath;
       try { assetPath = path.posix.normalize(decodeURIComponent(pathname)); } catch { return send(res, 400, {error:'Bad path.'}); }
       if (assetPath === '/padel' || assetPath.startsWith('/padel/')) return send(res, 404, { error: 'This page is no longer hosted here.' });
