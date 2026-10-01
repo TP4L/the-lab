@@ -8,7 +8,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parents[2] / 'output' / 'pdf' / 'THE_LAB_App_Manual_v1_1_2026-09-30.pdf'
+OUT = Path(__file__).resolve().parents[2] / 'output' / 'pdf' / 'THE_LAB_App_Manual_v1_2_2026-09-30.pdf'
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 INK = colors.HexColor('#171B23')
@@ -34,7 +34,7 @@ def footer(canvas, doc):
     canvas.saveState()
     canvas.setFillColor(INK); canvas.rect(0, 0, letter[0], 0.32*inch, fill=1, stroke=0)
     canvas.setFillColor(WHITE); canvas.setFont('Inter', 7)
-    canvas.drawString(0.55*inch, 0.12*inch, 'THE LAB APP MANUAL  |  VERSION 1.1')
+    canvas.drawString(0.55*inch, 0.12*inch, 'THE LAB APP MANUAL  |  VERSION 1.2')
     canvas.drawRightString(letter[0]-0.55*inch, 0.12*inch, str(doc.page))
     canvas.restoreState()
 
@@ -54,7 +54,7 @@ story=[]
 story += [Spacer(1,0.55*inch), P('TRANSCENDING PERFORMANCE','LabLabel'), P('THE <font color="#FF6B61">LAB</font>','LabTitle'), Spacer(1,0.12*inch)]
 hero=Table([[P('APP MANUAL','LabWhiteTitle'),P('COACHES<br/>ATHLETES<br/>ADMIN','LabWhite')]],colWidths=[4.6*inch,2.0*inch])
 hero.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),INK),('BOX',(0,0),(-1,-1),1,INK),('VALIGN',(0,0),(-1,-1),'BOTTOM'),('LEFTPADDING',(0,0),(-1,-1),20),('RIGHTPADDING',(0,0),(-1,-1),20),('TOPPADDING',(0,0),(-1,-1),28),('BOTTOMPADDING',(0,0),(-1,-1),28)]))
-story += [hero, Spacer(1,0.35*inch), P('A practical guide to connected athlete profiles, Development Blocks, training, evidence, events, and staff workflow.'), Spacer(1,0.15*inch), P('<b>Version 1.1</b>  |  September 30, 2026'), P('Live app: https://the-lab-8w5d.onrender.com','LabSmall'), Spacer(1,1.25*inch), P('This handout is versioned with the app. Keep the newest copy and replace older copies after each meaningful update.','LabSmall'), PageBreak()]
+story += [hero, Spacer(1,0.35*inch), P('A practical guide to connected athlete profiles, Development Blocks, training, evidence, events, and staff workflow.'), Spacer(1,0.15*inch), P('<b>Version 1.2</b>  |  September 30, 2026'), P('Live app: https://the-lab-8w5d.onrender.com','LabSmall'), Spacer(1,1.25*inch), P('This handout is versioned with the app. Keep the newest copy and replace older copies after each meaningful update.','LabSmall'), PageBreak()]
 
 story += page('Start here','01 / System map','THE LAB connects the website athlete record to the app training experience without erasing either system.')
 story += [status_table([('Website','Original athlete profiles, coaching history, shared and private notes.'),('App','Development Blocks, lessons, training sessions, evidence, feedback, and events.'),('Connected workflow','Coaches assign once. THE LAB delivers to every available destination and reports the result.')]), P('The most important rule','LabH2')]
@@ -79,7 +79,7 @@ story += bullets(['Open the Development Block.', 'Read the error shown in Delive
 story += [P('Retries reuse the original delivery ID. This prevents a second website record if the first response was interrupted.','LabSmall'), PageBreak()]
 
 story += page('Email notifications','06 / Communication','Shared coaching updates can reach the athlete by email as well as inside THE LAB.')
-story += [status_table([('Shared coach note','Emails the athlete and links back to their profile.'),('Development Block','Emails the title, next step, and a direct link to the block.'),('Training and retest','Emails meaningful stage changes and review prompts.'),('Events and reminders','Emails registration, schedule, and reminder updates.'),('Private coach note','Never emailed and never shown to the athlete.'),('Field Notes','Not emailed through this transactional channel.')]), P('Athlete control','LabH2')]
+story += [status_table([('Shared coach note','Emails the athlete and links back to their profile.'),('Development Block','Emails the title, next step, and a direct link to the block.'),('Training and retest','Emails meaningful stage changes and review prompts.'),('Events and reminders','Emails registration, schedule, and reminder updates.'),('Field Notes','New-content notifications can also be emailed.'),('Private coach note','Never emailed and never shown to the athlete.')]), P('Athlete control','LabH2')]
 story += bullets(['Open Profile and expand Notifications and privacy.', 'Use Email notifications to turn the email channel on or off.', 'Use each category switch to control coach feedback, training, matches, events, and reminders.', 'The in-app record remains available even when email is turned off.'])
 story += [P('Each message uses a stable idempotency key so a repeated request cannot send the same notification twice.','LabSmall'), PageBreak()]
 
@@ -104,6 +104,8 @@ story += page('Membership and troubleshooting','10 / Access support','Membership
 story += [status_table([('Only one athlete appears','Open Your workspace, confirm staff access, then Refresh athletes.'),('Website roster will not load','Reconnect with Brett or Austin staff access.'),('Athlete cannot see app work','Check Roster health. Website only means the app profile still needs to be claimed.'),('Website delivery failed','Open the block and use Retry website delivery.'),('Possible duplicate','Do not delete either record. Compare identity, notes, sessions, and links first.'),('Upload failed','Keep the page open and retry; the reflection remains in the form.')]), PageBreak()]
 
 story += page('Release notes','11 / Version control','Give staff and athletes the newest manual whenever a meaningful app update changes their workflow.')
+story += [P('Version 1.2 - September 30, 2026','LabH2')]
+story += bullets(['Expanded email delivery to every new in-app notification, including new Field Notes.', 'Kept the master email switch and category-level preferences.', 'Private coach notes remain excluded because they never create athlete notifications.'])
 story += [P('Version 1.1 - September 30, 2026','LabH2')]
 story += bullets(['Added athlete email delivery for shared coach notes and transactional app updates.', 'Added an athlete-controlled email notification switch.', 'Private coach notes remain private and are never emailed.', 'Added idempotency protection to prevent duplicate notification emails.'])
 story += [P('Version 1.0 - September 30, 2026','LabH2')]
