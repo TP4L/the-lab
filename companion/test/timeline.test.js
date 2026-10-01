@@ -12,10 +12,14 @@ test('timeline scopes both history and media, paginates without duplicates and r
  const stmt=s.app.db.prepare('INSERT INTO notes(athlete_id,author_id,kind,visibility,body,created_at) VALUES(?,?,?,?,?,?)');
  for(let i=0;i<70;i++)stmt.run(aid,coachId,'coach','shared','Shared note '+i,'2026-09-29T12:00:00.000Z');
  stmt.run(aid,coachId,'coach','private','NEVER EXPOSE PRIVATE','2026-09-30');
+ await p.post('/api/me/pre-session-checkins',{working:'Resets',not_working:'Rushing',focus:'Transition choices'});
+ s.app.db.prepare("INSERT INTO notifications(user_id,kind,title,body,link) VALUES(?,?,?,?,?)").run(self,'training','Plan ready','Open your next session','#/train');
  assert.equal((await coach2.get('/api/timeline?athlete='+aid)).status,404);
  assert.equal((await s.client().get('/api/timeline')).status,401);
  let one=(await p.get('/api/timeline')).body;assert.equal(one.sources.app.items.length,60);assert.equal(one.sources.website.status,'unlinked');assert(!JSON.stringify(one).includes('NEVER EXPOSE'));
- const two=(await p.get('/api/timeline?source=app&appBefore='+encodeURIComponent(one.sources.app.next))).body.sources.app;assert.equal(two.items.length,10);assert.equal(new Set([...one.sources.app.items,...two.items].map(x=>x.id)).size,70);
+ assert(one.sources.app.items.some(x=>x.kind==='checkin'));assert(one.sources.app.items.some(x=>x.kind==='communication'));
+ const coachView=(await coach.get('/api/timeline?athlete='+aid)).body;assert(JSON.stringify(coachView).includes('NEVER EXPOSE'));assert(coachView.sources.app.items.some(x=>x.private&&x.status==='Coach only'));
+ const two=(await p.get('/api/timeline?source=app&appBefore='+encodeURIComponent(one.sources.app.next))).body.sources.app;assert.equal(two.items.length,12);assert.equal(new Set([...one.sources.app.items,...two.items].map(x=>x.id)).size,72);
  assert.equal((await p.get('/api/timeline?appBefore=garbage')).status,400);
  s.app.db.prepare('INSERT INTO website_connections(user_id,athlete_id,athlete_name,token,connected_at) VALUES(?,?,?,?,?)').run(self,uid(),'Player','a'.repeat(64),new Date().toISOString());
  one=(await p.get('/api/timeline')).body;assert.equal(one.sources.website.status,'ok');assert.equal(one.sources.website.items[0].body,'Shared website cue');assert(!JSON.stringify(one).includes('a'.repeat(64)));assert.equal(remoteBodies.at(-1).action,'timeline');
