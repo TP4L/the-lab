@@ -278,6 +278,7 @@
       app.innerHTML = offlineNote(rows) +
         head('Train', coach ? 'Sessions' : 'Your training', coach ? 'Run a session courtside. Scores save on this device first and sync when there’s signal.' : 'Every session your coach records against you.',
           '<div class="row">' + (coach ? '<a class="btn ghost" href="#/coach/templates">Templates</a>' : '') + '<a class="btn" href="#/train/scoreboard">Scoreboard</a>' + (coach ? '<a class="btn" href="#/train/new?quick=1">Counter</a><a class="btn primary" href="#/train/new">New session</a>' : '') + '</div>') +
+        (coach ? classicsFolder() : '') +
         (boards().length ? '<div class="stack"><p class="section-title">Scoreboards on this device</p><div class="list">' + boards().slice(0, 5).map(function (bd) {
           return '<a class="li" href="#/train/scoreboard/' + h(bd.id) + '"><span class="main-col"><span class="t small">' + h(bd.name) + '</span><span class="d mono">' + (bd.done ? 'Final' : 'Game ' + (bd.games.length + 1) + ' \u00b7 ' + bd.cur.scores.join('\u2013')) + '</span></span><span class="side">' + h(L.when(new Date(bd.updated).toISOString())) + '</span></a>';
         }).join('') + '</div></div>' : '') +
@@ -450,7 +451,7 @@
   views.templates = function () {
     if (!has('coach')) return forbidden('Templates are for coaches.');
     return api.get('/api/templates').then(function (ts) {
-      app.innerHTML = '<a class="back" href="#/coach">← Coach Workspace</a>' + head('Coach Workspace', 'Session templates', 'Reusable sets of drills. Start a session from one, or assign one to an athlete.', '<a class="btn primary" href="#/coach/templates/new">New template</a>') +
+      app.innerHTML = '<a class="back" href="#/coach">← Coach Workspace</a>' + head('Coach Workspace', 'Session templates', 'Reusable sets of drills. Start a session from one, or assign one to an athlete.', '<a class="btn primary" href="#/coach/templates/new">New template</a>') + classicsFolder() +
         (ts.length ? '<div class="list">' + ts.map(function (t) { return '<a class="li" href="#/coach/templates/' + t.id + '"><span class="main-col"><span class="t">' + h(t.name) + '</span><span class="d">' + t.items.map(function (i) { return h(i.name); }).join(' · ') + '</span></span><span class="side">' + h(t.author || '') + '</span></a>'; }).join('') + '</div>' : '<div class="list"><p class="empty">No templates yet.</p></div>');
     });
   };
@@ -490,6 +491,24 @@
     { name: 'Cross-court dink rally', measure: 'score', target: '20 in a row' },
     { name: 'Session feel', measure: 'feel', target: '' }
   ];
+  var BRETT_CLASSICS = [
+    { slug: 'x-down', name: 'X Down', summary: 'Choose the starting number. The first player or team to reach zero loses.', items: [
+      { name: 'X Down', measure: 'score', target: 'Choose X · first to 0 loses', instructions: 'Give every player or team the same starting number. Subtract one after the agreed error or lost rally. Enter the remaining number after each change. The first side to reach zero loses.' }
+    ] },
+    { slug: 'x-in-a-row', name: 'X in a Row', summary: 'Build the same shot consecutively, solo or cooperatively with a partner.', items: [
+      { name: 'X in a Row', measure: 'score', target: 'Choose the consecutive target', instructions: 'Choose the shot and the target number. Count only clean consecutive repetitions. Reset the active streak to zero after a miss. Record the best streak reached by the player or partnership.' }
+    ] },
+    { slug: 'timed-reps', name: 'Timed Reps', summary: 'Focused repetition blocks. The sweet spot is 2–5 minutes; extend to 8–10 when time allows.', items: [
+      { name: 'Timed Reps · 2–5 minute block', measure: 'reps', target: 'Quality makes during 2–5 minutes', instructions: 'Choose one shot, pattern, or decision. Work continuously for 2–5 minutes and track quality makes and misses. Use this as the default for diligent athletes.' },
+      { name: 'Timed Reps · 8–10 minute extension', measure: 'reps', target: 'Quality makes during 8–10 minutes', instructions: 'Use only when the session has enough time. Keep the same intention and track whether quality holds as fatigue and repetition build.' }
+    ] }
+  ];
+  function classic(slug) { return BRETT_CLASSICS.filter(function (x) { return x.slug === slug; })[0]; }
+  function classicsFolder() {
+    return '<details class="classics-folder" open><summary><span><small>BRETT’S FAVORITES</small><b>Brett’s Classics</b></span><em>' + BRETT_CLASSICS.length + ' games</em></summary><div class="classic-grid">' + BRETT_CLASSICS.map(function (x) {
+      return '<article class="classic-card"><span class="tag">CLASSIC</span><h3>' + h(x.name) + '</h3><p>' + h(x.summary) + '</p><a class="btn primary" href="#/train/new?classic=' + h(x.slug) + '">Run this game</a></article>';
+    }).join('') + '</div></details>';
+  }
 
   views.trainNew = function (_, query) {
     if (!has('coach')) return forbidden('Only coaches can run sessions.');
@@ -497,18 +516,19 @@
     var tplReq = api.get('/api/templates').then(null, function () { return []; });
     var asgReq = query.assignment && query.athlete ? api.get('/api/athletes/' + query.athlete + '/assignments').then(null, function () { return []; }) : Promise.resolve([]);
     return Promise.all([api.get('/api/athletes'), tplReq, asgReq]).then(function (res) {
-      var roster = res[0], templates = res[1];
+      var roster = res[0], templates = res[1], pickedClassic = classic(query.classic);
       var assignment = res[2].filter(function (a) { return String(a.id) === String(query.assignment); })[0] || null;
       var items = quick ? [{ name: 'Make / miss', measure: 'reps', target: '' }] : TEMPLATE_4.map(function (x) { return Object.assign({}, x); });
+      if (pickedClassic) items = pickedClassic.items.map(function (x) { return Object.assign({}, x); });
       if (assignment && assignment.template_items) items = assignment.template_items.map(function (x) { return Object.assign({}, x); });
       var preset = query.athlete ? [Number(query.athlete)] : [];
       app.innerHTML = '<a class="back" href="#/train">← Train</a>' +
         head('Scoreboard Studio', quick ? 'Make / miss counter' : 'New session', quick ? 'Pick who’s hitting. One big counter each.' : 'Pick up to 8 athletes and 1–10 drills or situations. Four athletes get one large square each.') +
         offlineNote(roster) +
-        (assignment ? '<div class="banner"><span>Running assigned training: <b>' + h(assignment.title) + '</b>' + (assignment.note ? '. ' + h(assignment.note) : '') + '</span></div>' : '') +
+        (assignment ? '<div class="banner"><span>Running assigned training: <b>' + h(assignment.title) + '</b>' + (assignment.note ? '. ' + h(assignment.note) : '') + '</span></div>' : pickedClassic ? '<div class="banner"><span><b>Brett’s Classics · ' + h(pickedClassic.name) + '</b><br>' + h(pickedClassic.summary) + '</span></div>' : '') +
         '<form class="form" id="f" novalidate>' +
         (!quick && templates.length ? '<div class="field"><label class="flabel" for="tpl">Start from a template</label><select id="tpl"><option value="">Default drills</option>' + templates.map(function (t) { return '<option value="' + t.id + '">' + h(t.name) + ' (' + t.items.length + ')</option>'; }).join('') + '</select></div>' : '') +
-        '<div class="field"><label class="flabel" for="t">Title</label><input type="text" id="t" maxlength="120" value="' + h(assignment ? assignment.title : quick ? 'Counter · ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Session · ' + new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })) + '"></div>' +
+        '<div class="field"><label class="flabel" for="t">Title</label><input type="text" id="t" maxlength="120" value="' + h(assignment ? assignment.title : pickedClassic ? pickedClassic.name : quick ? 'Counter · ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Session · ' + new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })) + '"></div>' +
         '<div class="field"><span class="flabel">Athletes <span class="hint" id="cnt"></span></span>' +
         (roster.length ? '<input type="search" id="q" placeholder="Search athletes" aria-label="Search athletes"><div class="pick" id="pick">' + roster.map(function (a) {
           return '<label data-name="' + h(a.name.toLowerCase()) + '"><input type="checkbox" value="' + a.id + '"' + (preset.indexOf(a.id) >= 0 ? ' checked' : '') + '> ' + h(a.name) + '</label>';
