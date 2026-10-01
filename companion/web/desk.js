@@ -707,6 +707,7 @@
         var stopped = a && a.round && a.round.stopped;
         var tabs = [];
         if (e.mode !== 'fallout') tabs.push(['courts', 'Courts']);
+        if (e.mode === 'fallout' && !e.bracket) tabs.push(['board', 'Event Board']);
         if (e.bracket) tabs.push(['bracket', 'Bracket']);
         tabs.push(['standings', 'Standings'], ['mine', 'My games']);
         if (!tabs.some(function (t) { return t[0] === gTab; })) gTab = tabs[0][0];
@@ -718,12 +719,13 @@
           (st === 'withdrawn' ? '<p class="flag">You’ve left this event. Ask the host if you want back in.</p>' : '') +
           (e.status === 'cancelled' ? '<p class="flag">This event was cancelled.</p>' : '') +
           (st === 'registered' && e.me && !e.me.checked_in && e.status !== 'complete' ? '<div class="card stack"><p class="section-title">Check in when you arrive</p><div class="qr-wrap">' + qrSVG(e.guest.qr, 'Your check-in QR') + '<p class="small">Show this to the host. Can’t scan? Tell them you’re player <b class="mono">#' + h(e.guest.number) + '</b>.</p></div></div>' : '') +
-          (st === 'registered' && e.status !== 'complete' ? assignmentCard(e, aid, 'gack') : '') +
+          (st === 'registered' && e.status !== 'complete' && (e.rounds.length || e.bracket) ? assignmentCard(e, aid, 'gack') : '') +
           (canScore && st === 'registered' ? scoreBox(m, a, stopped) : '') +
           (st === 'registered' && e.status !== 'complete' && e.status !== 'cancelled' ? '<div class="row">' + (e.me.on_break ? '<button class="btn" type="button" data-gs="back">I’m back</button>' : '<button class="btn ghost" type="button" data-gs="break">Take a break</button>') + '<button class="btn ghost" type="button" data-gs="leave">Leave event</button></div>' : '') +
           '<div class="chips" id="gtabs">' + tabs.map(function (t) { return '<button class="chip" type="button" data-v="' + t[0] + '" aria-pressed="' + (gTab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
           '<div class="stack">' + ({
-            courts: function () { return courtsHTML(e, { mine: aid }); },
+            courts: function () { return e.rounds.length ? courtsHTML(e, { mine: aid }) : eventBoardPreview(e); },
+            board: function () { return eventBoardPreview(e); },
             bracket: function () { return bracketHTML(e, false); },
             standings: function () { return standingsHTML(e, aid); },
             mine: function () {
