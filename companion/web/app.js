@@ -1380,26 +1380,32 @@
           (has('admin') ? '<form class="form" id="membershipForm" novalidate><div class="form-grid"><div class="field"><label class="flabel" for="membershipStatus">Access</label><select id="membershipStatus"><option value="none"' + (!m ? ' selected' : '') + '>No membership</option><option value="active"' + (m && m.active ? ' selected' : '') + '>Complimentary access</option><option value="cancelled"' + (m && !m.active ? ' selected' : '') + '>Lapsed</option></select></div><div class="field"><label class="flabel" for="membershipExpires">Expires <span class="hint">optional</span></label><input type="date" id="membershipExpires" value="' + h(m && m.expires_at ? m.expires_at.slice(0, 10) : '') + '"></div></div><div class="field"><label class="flabel" for="membershipNote">Internal note</label><input id="membershipNote" maxlength="300" value="' + h(m ? m.note : '') + '" placeholder="Reason or access arrangement"></div><div class="row"><button class="btn" type="submit">Save membership access</button></div></form>' : '<p class="small muted">Membership status is visible to coaches. Only an administrator can change access.</p>')) +
         (p.membership_history.length ? '<details class="membership-history"><summary>Membership history</summary><div class="list">' + p.membership_history.map(function (x) { return '<div class="li"><span class="main-col"><span class="t small">' + h(x.status === 'active' ? 'Access activated' : x.status === 'none' ? 'Access removed' : 'Access lapsed') + '</span><span class="d">' + h(x.changed_by || (x.source === 'stripe' ? 'Stripe' : 'Administrator')) + (x.note ? ' · ' + h(x.note) : '') + '</span></span><span class="side">' + h(L.when(x.created_at)) + '</span></div>'; }).join('') + '</div></details>' : '') + '</section>';
       app.innerHTML = '<a class="back" href="#/coach">← Athletes</a>' + offlineNote(p) +
-        '<div class="pcard">' + avatar(a) + '<div><p class="pid">' + playerId(a.id) + (a.claimed ? ' · claimed' : ' · not claimed yet') + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
+        '<div class="pcard coach-athlete-head">' + avatar(a) + '<div><p class="pid">' + playerId(a.id) + (a.claimed ? ' · claimed' : ' · not claimed yet') + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
         '<span>Hand <b>' + h(HANDS[a.hand] || '—') + '</b></span><span>Side <b>' + h(SIDES[a.side] || '—') + '</b></span><span>Rating <b>' + h(a.rating || '—') + '</b></span></p></div></div>' +
-        '<div class="row"><a class="btn primary" href="#/coach/' + a.id + '/development/new">New Development Block</a><a class="btn" href="#/train/new?athlete=' + a.id + '">Start session</a><a class="btn" href="#/train/new?quick=1&athlete=' + a.id + '">Counter</a>' +
-        (!a.claimed ? '<button class="btn ghost" type="button" id="newcode">New claim code</button>' : '') + '</div>' +
-        '<div class="grid-2"><div class="stack">' +
-        '<form class="card form" id="nf" novalidate><p class="section-title">Add a note</p>' +
+        '<div class="coach-athlete-actions"><a class="btn primary" href="#/coach/' + a.id + '/development/new">New Development Block</a><a class="btn" href="#/train/new?athlete=' + a.id + '">Start session</a><a class="btn ghost" href="#/train/new?quick=1&athlete=' + a.id + '">Counter</a></div>' +
+        '<nav class="coach-athlete-tabs" aria-label="Athlete coaching workspace">' +
+        [['today','Today'],['plan','Plan'],['notes','Notes'],['sessions','Sessions'],['media','Media'],['progress','Progress'],['access','Access']].map(function (x) { return '<button type="button" data-athlete-tab="' + x[0] + '" aria-pressed="' + (x[0] === 'today') + '">' + x[1] + '</button>'; }).join('') + '</nav>' +
+        '<div class="coach-athlete-panels">' +
+        '<section data-athlete-panel="today" class="stack"><div class="coach-athlete-today"><article class="coach-focus-card"><p class="eyebrow">CURRENT FOCUS</p><h2>' + h(a.focus || 'Set the next focus') + '</h2><p>' + h(a.plan || 'Add a simple development plan so every session has direction.') + '</p><a href="#" data-open-athlete-tab="progress">Edit development profile</a></article>' +
+        '<div class="coach-athlete-glance"><div><strong>' + p.results.length + '</strong><span>Sessions</span></div><div><strong>' + p.media.length + '</strong><span>Media</span></div><div><strong>' + notes.length + '</strong><span>Notes</span></div><div><strong id="coach-open-count">—</strong><span>Open work</span></div></div></div>' +
+        '<form class="card form coach-capture" id="nf" novalidate><div class="coach-capture-head"><div><p class="eyebrow">QUICK CAPTURE</p><h2>Record what you noticed</h2></div><span class="small muted">Private by default</span></div>' +
         '<div class="field"><label class="flabel" for="nbody">Note</label><textarea id="nbody" maxlength="5000"></textarea></div>' +
         '<div class="field"><span class="flabel">Who can see it</span><div class="seg-btns" id="vis"><button type="button" data-v="private" aria-pressed="true">Private · coaches only</button><button type="button" data-v="shared" aria-pressed="false">Shared with athlete</button></div></div>' +
         '<div class="field"><label class="flabel" for="nfile">Photo or video <span class="hint">optional</span></label><input type="file" id="nfile" accept="image/*,video/*"><div class="upload-row" id="nprog" hidden><div class="progress"><i></i></div><span class="small muted" id="nprog-t"></span></div></div>' +
-        '<div class="row"><button class="btn primary" type="submit">Save note</button></div></form>' +
+        '<div class="row"><button class="btn primary" type="submit">Save note</button><a class="btn ghost" href="#/followups">Set follow-up</a></div></form></section>' +
+        '<section data-athlete-panel="plan" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">DEVELOPMENT PLAN</p><h2>Build the next step</h2></div><a class="btn primary" href="#/coach/' + a.id + '/development/new">New Development Block</a></div>' +
         '<form class="card form" id="af" novalidate><p class="section-title">Assign training</p><div class="form-grid">' +
         '<div class="field"><label class="flabel" for="atpl">Template</label><select id="atpl"><option value="">No template</option></select></div>' +
         '<div class="field"><label class="flabel" for="atitle">Title</label><input type="text" id="atitle" maxlength="120" placeholder="Defaults to the template name"></div>' +
         '<div class="field"><label class="flabel" for="adue">Due</label><input type="date" id="adue"></div></div>' +
         '<div class="field"><label class="flabel" for="anote">Note</label><input type="text" id="anote" maxlength="2000" placeholder="What to focus on"></div>' +
         '<div class="row"><button class="btn" type="submit">Assign</button></div></form>' +
-        '<div class="stack" id="devlist"></div><div class="stack" id="asglist"></div>' +
-        '<p class="section-title">Notes and reflections</p>' + notesHTML(notes, true) +
-        '</div><div class="stack">' +
-        membershipPanel +
+        '<div class="stack" id="devlist"></div><div class="stack" id="asglist"></div></section>' +
+        '<section data-athlete-panel="notes" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">COACHING RECORD</p><h2>Notes and reflections</h2></div><button class="btn" type="button" data-open-athlete-tab="today">Add a note</button></div>' + notesHTML(notes, true) + '</section>' +
+        '<section data-athlete-panel="sessions" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">COURT WORK</p><h2>Sessions</h2></div><div class="row"><a class="btn primary" href="#/train/new?athlete=' + a.id + '">Start session</a><a class="btn ghost" href="#/train/new?quick=1&athlete=' + a.id + '">Counter</a></div></div>' + resultsHTML(p.results) + '</section>' +
+        '<section data-athlete-panel="media" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">EVIDENCE</p><h2>Photos and video</h2></div><button class="btn" type="button" data-open-athlete-tab="today">Upload with a note</button></div>' +
+        (p.media.length ? '<div class="media-grid coach-media-grid">' + p.media.map(mediaFigure).join('') + '</div>' : '<div class="coming"><h2>No media yet</h2><p>Capture a clip or photo with a coaching note to start the visual record.</p><button class="btn" type="button" data-open-athlete-tab="today">Add the first one</button></div>') + '</section>' +
+        '<section data-athlete-panel="progress" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">PLAYER DEVELOPMENT</p><h2>Focus, goals and measurements</h2></div></div>' +
         '<form class="card form" id="pf" novalidate><p class="section-title">Development</p>' +
         '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" value="' + h(a.focus) + '"></div>' +
         '<div class="field"><label class="flabel" for="plan">Development plan</label><textarea id="plan" maxlength="4000">' + h(a.plan) + '</textarea></div>' +
@@ -1408,15 +1414,27 @@
         '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
         '<div class="field"><label class="flabel" for="side">Side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
         '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20" value="' + h(a.rating) + '"></div></div>' +
-        '<div class="row"><button class="btn" type="submit">Save</button></div></form>' +
-        (p.media.length ? '<p class="section-title">Media</p><div class="media-grid">' + p.media.map(mediaFigure).join('') + '</div>' : '') +
-        '<p class="section-title">Session results</p>' + resultsHTML(p.results) +
-        '<p class="small muted">Coaches: ' + h(p.coaches.map(function (c) { return c.name; }).join(', ')) + '</p>' +
-        '</div></div>';
+        '<div class="row"><button class="btn primary" type="submit">Save development profile</button></div></form></section>' +
+        '<section data-athlete-panel="access" class="stack" hidden>' + membershipPanel +
+        (!a.claimed ? '<div class="card stack"><p class="section-title">Account connection</p><p>This athlete has not claimed the profile yet.</p><button class="btn" type="button" id="newcode">Create a new claim code</button></div>' : '') +
+        '<p class="small muted">Coaches: ' + h(p.coaches.map(function (c) { return c.name; }).join(', ')) + '</p></section></div>';
+
+      var athleteTab = Store.get('coach-athlete-tab:' + a.id, 'today');
+      function showAthleteTab(name) {
+        if (!document.querySelector('[data-athlete-panel="' + name + '"]')) name = 'today';
+        athleteTab = name; Store.set('coach-athlete-tab:' + a.id, name);
+        $$('[data-athlete-tab]').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-athlete-tab') === name ? 'true' : 'false'); });
+        $$('[data-athlete-panel]').forEach(function (panel) { panel.hidden = panel.getAttribute('data-athlete-panel') !== name; });
+      }
+      $$('[data-athlete-tab]').forEach(function (b) { b.addEventListener('click', function () { showAthleteTab(b.getAttribute('data-athlete-tab')); }); });
+      $$('[data-open-athlete-tab]').forEach(function (b) { b.addEventListener('click', function (e) { e.preventDefault(); showAthleteTab(b.getAttribute('data-open-athlete-tab')); window.scrollTo({ top: 0, behavior: 'smooth' }); }); });
+      showAthleteTab(athleteTab);
 
       api.get('/api/templates').then(function (ts) { $('#atpl').innerHTML += ts.map(function (t) { return '<option value="' + t.id + '">' + h(t.name) + '</option>'; }).join(''); }, function () {});
       api.get('/api/athletes/' + a.id + '/assignments').then(function (as) {
-        if (!as.length) return;
+        var open = as.filter(function (x) { return x.status === 'open'; }).length;
+        if ($('#coach-open-count')) $('#coach-open-count').textContent = open;
+        if (!as.length) { $('#asglist').innerHTML = '<div class="coming"><h2>No assigned training</h2><p>Use the form above to create the next piece of work.</p></div>'; return; }
         $('#asglist').innerHTML = '<p class="section-title">Assigned training</p>' + assignmentList(as, true, a.id);
         bindAssignments($('#asglist'));
       }, function () {});

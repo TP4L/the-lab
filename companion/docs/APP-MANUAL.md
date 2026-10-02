@@ -1,6 +1,6 @@
 # THE LAB App Manual
 
-Version 1.2 · October 1, 2026
+Version 1.3 · October 1, 2026
 
 Live app: https://the-lab-8w5d.onrender.com
 
@@ -93,6 +93,20 @@ Use Your workspace to open a website athlete. Overview shows current training fo
 
 App athlete profiles contain app sessions, assignments, measurements, media, and Development Blocks. Website athletes that are mirrored into the app roster keep their original website history.
 
+### Coach Athlete Workspace
+
+Open an app athlete to use the courtside coaching workspace:
+
+- Today shows the current focus, plan, activity totals, open work, and Quick Capture.
+- Plan contains Development Blocks and assigned training.
+- Notes holds the complete coaching and reflection record.
+- Sessions holds saved session results and shortcuts to start a new session or counter.
+- Media holds the athlete’s coaching photos and videos.
+- Progress holds goals, sport, measurements, playing profile, and development plan.
+- Access holds membership status, coach access, and claim-code controls.
+
+Quick Capture saves private notes by default. Change the visibility to Shared with athlete only when the athlete should receive the feedback. A photo or video can be attached to the same note.
+
 ## Sessions
 
 Choose Start session, select athletes, use a template or add drills, and begin scoring. Complete the session when the work is finished. Linked Development Blocks advance automatically when their assigned session or retest is completed.
@@ -117,6 +131,13 @@ Membership and paywall controls are built in but not activated for general use. 
 - Upload fails: keep the page open and retry. The reflection text stays in the form.
 
 ## Release notes
+
+### Version 1.3 · October 1, 2026
+
+- Added the Coach Athlete Workspace with Today, Plan, Notes, Sessions, Media, Progress, and Access sections.
+- Added a courtside Quick Capture surface with private-by-default notes and optional media.
+- Added an immediate athlete snapshot for current focus, sessions, media, notes, and open work.
+- Reorganized the existing athlete record without removing its assignments, history, measurements, or membership controls.
 
 ### Version 1.2 · October 1, 2026
 
