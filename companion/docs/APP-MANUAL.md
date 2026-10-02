@@ -1,6 +1,6 @@
 # THE LAB App Manual
 
-Version 1.3 · October 1, 2026
+Version 1.4 · October 2, 2026
 
 Live app: https://the-lab-8w5d.onrender.com
 
@@ -130,7 +130,40 @@ Membership and paywall controls are built in but not activated for general use. 
 - Duplicate athlete is suspected: do not delete either record. Compare email, name, website link, sessions, and notes before merging.
 - Upload fails: keep the page open and retry. The reflection text stays in the form.
 
+## Coach Athlete Workspace
+
+Open **Coaching → Athletes**, then choose an athlete. Website athletes and app athletes use the same app workspace once the website roster has synced.
+
+- **Today:** review the current focus, capture a typed observation, attach media, or complete a session closeout.
+- **Plan:** assign training and manage Development Blocks.
+- **Communication:** read shared coach notes, athlete reflections and replies in one conversation. Reply directly to an unread athlete reflection.
+- **Notes:** review the full coaching record, including coach-only private notes.
+- **Sessions / Media / Progress:** review court work, visual evidence, goals and measurements.
+- **Access:** manage membership access and add another verified coach by their THE LAB account email.
+
+### Complete a session closeout
+
+1. Open the athlete and stay on **Today**.
+2. Choose the session if it was recorded in the app.
+3. Record what improved, what still needs work and the next action.
+4. Choose whether the recap is shared with the athlete or remains coach-only.
+5. Leave **Assign the next action** selected to create athlete work.
+6. Leave **Add to the coaching follow-up list** selected to create a coach reminder. Add a date when timing matters.
+7. Select **Complete closeout**. Shared recaps and assignments trigger the athlete's normal in-app/email notification rules.
+
+### Add Brett, Austin or another coach
+
+Open **Access**, enter the email used by that person's existing THE LAB coach account, and select **Add coach**. This grants access to the athlete's private notes and coaching controls; it does not create a second athlete profile.
+
 ## Release notes
+
+### Version 1.4 · October 2, 2026
+
+- Added a Communication tab for shared coach notes, athlete reflections and direct replies.
+- Added structured Quick Capture types so observations can be identified at a glance.
+- Added a one-minute session closeout that saves the recap, assigns the next action and creates a coach follow-up.
+- Added coach access management for Brett, Austin and other verified coach accounts.
+- Kept website and app athletes in the existing unified roster and Coach Athlete Workspace.
 
 ### Version 1.3 · October 1, 2026
 

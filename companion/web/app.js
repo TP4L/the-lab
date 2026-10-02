@@ -1384,15 +1384,21 @@
         '<span>Hand <b>' + h(HANDS[a.hand] || '—') + '</b></span><span>Side <b>' + h(SIDES[a.side] || '—') + '</b></span><span>Rating <b>' + h(a.rating || '—') + '</b></span></p></div></div>' +
         '<div class="coach-athlete-actions"><a class="btn primary" href="#/coach/' + a.id + '/development/new">New Development Block</a><a class="btn" href="#/train/new?athlete=' + a.id + '">Start session</a><a class="btn ghost" href="#/train/new?quick=1&athlete=' + a.id + '">Counter</a></div>' +
         '<nav class="coach-athlete-tabs" aria-label="Athlete coaching workspace">' +
-        [['today','Today'],['plan','Plan'],['notes','Notes'],['sessions','Sessions'],['media','Media'],['progress','Progress'],['access','Access']].map(function (x) { return '<button type="button" data-athlete-tab="' + x[0] + '" aria-pressed="' + (x[0] === 'today') + '">' + x[1] + '</button>'; }).join('') + '</nav>' +
+        [['today','Today'],['plan','Plan'],['communication','Communication'],['notes','Notes'],['sessions','Sessions'],['media','Media'],['progress','Progress'],['access','Access']].map(function (x) { return '<button type="button" data-athlete-tab="' + x[0] + '" aria-pressed="' + (x[0] === 'today') + '">' + x[1] + '</button>'; }).join('') + '</nav>' +
         '<div class="coach-athlete-panels">' +
         '<section data-athlete-panel="today" class="stack"><div class="coach-athlete-today"><article class="coach-focus-card"><p class="eyebrow">CURRENT FOCUS</p><h2>' + h(a.focus || 'Set the next focus') + '</h2><p>' + h(a.plan || 'Add a simple development plan so every session has direction.') + '</p><a href="#" data-open-athlete-tab="progress">Edit development profile</a></article>' +
         '<div class="coach-athlete-glance"><div><strong>' + p.results.length + '</strong><span>Sessions</span></div><div><strong>' + p.media.length + '</strong><span>Media</span></div><div><strong>' + notes.length + '</strong><span>Notes</span></div><div><strong id="coach-open-count">—</strong><span>Open work</span></div></div></div>' +
         '<form class="card form coach-capture" id="nf" novalidate><div class="coach-capture-head"><div><p class="eyebrow">QUICK CAPTURE</p><h2>Record what you noticed</h2></div><span class="small muted">Private by default</span></div>' +
-        '<div class="field"><label class="flabel" for="nbody">Note</label><textarea id="nbody" maxlength="5000"></textarea></div>' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="ntype">Capture type</label><select id="ntype"><option>Coaching note</option><option>What is working</option><option>What is not working</option><option>Next focus</option><option>Athlete question</option><option>Video review</option><option>Follow-up</option></select></div><div class="field"><label class="flabel" for="nbody">Observation</label><textarea id="nbody" maxlength="5000" placeholder="Keep it specific and useful."></textarea></div></div>' +
         '<div class="field"><span class="flabel">Who can see it</span><div class="seg-btns" id="vis"><button type="button" data-v="private" aria-pressed="true">Private · coaches only</button><button type="button" data-v="shared" aria-pressed="false">Shared with athlete</button></div></div>' +
         '<div class="field"><label class="flabel" for="nfile">Photo or video <span class="hint">optional</span></label><input type="file" id="nfile" accept="image/*,video/*"><div class="upload-row" id="nprog" hidden><div class="progress"><i></i></div><span class="small muted" id="nprog-t"></span></div></div>' +
-        '<div class="row"><button class="btn primary" type="submit">Save note</button><a class="btn ghost" href="#/followups">Set follow-up</a></div></form></section>' +
+        '<div class="row"><button class="btn primary" type="submit">Save capture</button><a class="btn ghost" href="#/followups">Set follow-up</a></div></form>' +
+        '<form class="card form session-closeout" id="closeoutForm" novalidate><div class="coach-capture-head"><div><p class="eyebrow">SESSION CLOSEOUT</p><h2>Turn today into the next step</h2></div><span class="small muted">About one minute</span></div>' +
+        '<div class="field"><label class="flabel" for="closeSession">Session <span class="hint">optional</span></label><select id="closeSession"><option value="">General coaching closeout</option>' + p.results.map(function (s) { return '<option value="' + h(s.session_id) + '">' + h(s.title) + ' · ' + h(L.when(s.started_at)) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="closeout-grid"><div class="field"><label class="flabel" for="closeWorked">What improved?</label><textarea id="closeWorked" maxlength="1200" required></textarea></div><div class="field"><label class="flabel" for="closeNeeds">What still needs work?</label><textarea id="closeNeeds" maxlength="1200" required></textarea></div><div class="field"><label class="flabel" for="closeNext">Next action</label><textarea id="closeNext" maxlength="1200" required></textarea></div></div>' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="closeVisibility">Athlete visibility</label><select id="closeVisibility"><option value="shared">Share the recap</option><option value="private">Coaches only</option></select></div><div class="field"><label class="flabel" for="closeDue">Follow-up date <span class="hint">optional</span></label><input id="closeDue" type="date"></div></div>' +
+        '<label class="check"><input id="closeAssign" type="checkbox" checked> Assign the next action to the athlete</label><label class="check"><input id="closeFollow" type="checkbox" checked> Add this to the coaching follow-up list</label>' +
+        '<div class="row"><button class="btn primary" type="submit">Complete closeout</button><p class="small muted" id="closeoutStatus" role="status"></p></div></form></section>' +
         '<section data-athlete-panel="plan" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">DEVELOPMENT PLAN</p><h2>Build the next step</h2></div><a class="btn primary" href="#/coach/' + a.id + '/development/new">New Development Block</a></div>' +
         '<form class="card form" id="af" novalidate><p class="section-title">Assign training</p><div class="form-grid">' +
         '<div class="field"><label class="flabel" for="atpl">Template</label><select id="atpl"><option value="">No template</option></select></div>' +
@@ -1402,6 +1408,9 @@
         '<div class="row"><button class="btn" type="submit">Assign</button></div></form>' +
         '<div class="stack" id="devlist"></div><div class="stack" id="asglist"></div></section>' +
         '<section data-athlete-panel="notes" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">COACHING RECORD</p><h2>Notes and reflections</h2></div><button class="btn" type="button" data-open-athlete-tab="today">Add a note</button></div>' + notesHTML(notes, true) + '</section>' +
+        '<section data-athlete-panel="communication" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">COMMUNICATION</p><h2>Coach and athlete conversation</h2></div><button class="btn primary" type="button" data-open-athlete-tab="today">New message</button></div>' +
+        '<p class="small muted">Shared notes, athlete reflections and coach replies stay together here. Private notes remain in the Notes tab.</p>' +
+        '<div class="coach-conversation">' + (notes.filter(function (n) { return n.visibility === 'shared'; }).map(function (n) { return '<article class="conversation-item ' + (n.kind === 'reflection' ? 'from-athlete' : 'from-coach') + '"><div class="conversation-meta"><span>' + h(n.kind === 'reflection' ? 'Athlete' : 'Coach') + '</span><time>' + h(L.when(n.created_at)) + '</time></div><p>' + h(n.body) + '</p>' + (n.kind === 'reflection' && !n.reviewed_at ? '<button class="btn ghost sm" type="button" data-reply-note="' + n.id + '">Reply</button><div class="inline-reply" data-reply-box="' + n.id + '"></div>' : '') + '</article>'; }).join('') || '<div class="coming"><h2>No shared messages yet</h2><p>Share a note or wait for the athlete’s first reflection.</p></div>') + '</div></section>' +
         '<section data-athlete-panel="sessions" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">COURT WORK</p><h2>Sessions</h2></div><div class="row"><a class="btn primary" href="#/train/new?athlete=' + a.id + '">Start session</a><a class="btn ghost" href="#/train/new?quick=1&athlete=' + a.id + '">Counter</a></div></div>' + resultsHTML(p.results) + '</section>' +
         '<section data-athlete-panel="media" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">EVIDENCE</p><h2>Photos and video</h2></div><button class="btn" type="button" data-open-athlete-tab="today">Upload with a note</button></div>' +
         (p.media.length ? '<div class="media-grid coach-media-grid">' + p.media.map(mediaFigure).join('') + '</div>' : '<div class="coming"><h2>No media yet</h2><p>Capture a clip or photo with a coaching note to start the visual record.</p><button class="btn" type="button" data-open-athlete-tab="today">Add the first one</button></div>') + '</section>' +
@@ -1415,7 +1424,7 @@
         '<div class="field"><label class="flabel" for="side">Side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
         '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20" value="' + h(a.rating) + '"></div></div>' +
         '<div class="row"><button class="btn primary" type="submit">Save development profile</button></div></form></section>' +
-        '<section data-athlete-panel="access" class="stack" hidden>' + membershipPanel +
+        '<section data-athlete-panel="access" class="stack" hidden><section class="card form coach-ownership"><div class="coach-capture-head"><div><p class="eyebrow">COACH OWNERSHIP</p><h2>Who can coach this athlete?</h2></div></div><div class="ownership-list">' + p.coaches.map(function (c) { return '<span class="tag">' + h(c.name) + '</span>'; }).join('') + '</div><form id="addCoachForm"><label class="flabel" for="coachEmail">Add Brett, Austin or another coach by account email</label><div class="row"><input id="coachEmail" type="email" required placeholder="coach@example.com"><button class="btn" type="submit">Add coach</button></div><p class="small muted">Added coaches can see private notes, assign work and manage the athlete workspace.</p></form></section>' + membershipPanel +
         (!a.claimed ? '<div class="card stack"><p class="section-title">Account connection</p><p>This athlete has not claimed the profile yet.</p><button class="btn" type="button" id="newcode">Create a new claim code</button></div>' : '') +
         '<p class="small muted">Coaches: ' + h(p.coaches.map(function (c) { return c.name; }).join(', ')) + '</p></section></div>';
 
@@ -1458,6 +1467,7 @@
       $('#nf').addEventListener('submit', function (e) {
         e.preventDefault();
         var text = $('#nbody').value.trim(); if (!text) return L.formError($('#nf'), 'Write the note first.');
+        text = '[' + $('#ntype').value + ']\n' + text;
         var file = $('#nfile').files[0];
         function saveNote(mediaId) {
           L.queue({ method: 'POST', path: '/api/athletes/' + a.id + '/notes', body: { body: text, visibility: vis, client_id: L.uuid(), media_id: mediaId || undefined }, kind: 'coach', label: 'Note for ' + a.name });
@@ -1473,6 +1483,30 @@
         $('#nprog-t').textContent = 'Uploading ' + file.name;
         api.upload(file, 'athlete_id=' + a.id + '&visibility=' + vis, function (x) { $('i', prog).style.width = Math.round(x * 100) + '%'; $('#nprog-t').textContent = Math.round(x * 100) + '% of ' + file.name; }, pendingUpload)
           .then(function (m) { saveNote(m.id); }, function (err) { $('#nprog-t').textContent = err.message + ' Tap Save note to retry.'; });
+      });
+      $('#closeoutForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var worked = $('#closeWorked').value.trim(), needs = $('#closeNeeds').value.trim(), next = $('#closeNext').value.trim();
+        if (!worked || !needs || !next) return L.formError($('#closeoutForm'), 'Complete all three closeout questions.');
+        var button = $('#closeoutForm button[type="submit"]'), due = $('#closeDue').value || undefined;
+        var recap = '[Session closeout]\nImproved: ' + worked + '\nStill working on: ' + needs + '\nNext action: ' + next;
+        var requests = [api.request('POST', '/api/athletes/' + a.id + '/notes', { body: recap, visibility: $('#closeVisibility').value, client_id: L.uuid(), session_id: $('#closeSession').value || undefined })];
+        if ($('#closeAssign').checked) requests.push(api.request('POST', '/api/athletes/' + a.id + '/assignments', { title: 'Next action: ' + next.slice(0, 100), note: next, due_on: due }));
+        if ($('#closeFollow').checked) requests.push(api.request('POST', '/api/coach/followups', { id: L.uuid(), athleteId: a.id, title: 'Follow up: ' + next.slice(0, 240), due: due || '', assignee: ME.user.id, status: 'open', revision: 0 }));
+        button.disabled = true; $('#closeoutStatus').textContent = 'Saving recap and next steps…';
+        Promise.all(requests).then(function () { L.toast('Session closed out. The next step is ready.'); route(); }, function (err) { button.disabled = false; $('#closeoutStatus').textContent = err.message; });
+      });
+      $$('[data-reply-note]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var id = button.getAttribute('data-reply-note'), box = document.querySelector('[data-reply-box="' + id + '"]');
+          box.innerHTML = '<form class="inline-reply-form"><label class="flabel" for="reply-' + id + '">Reply to athlete</label><textarea id="reply-' + id + '" maxlength="5000" required></textarea><div class="row"><button class="btn primary" type="submit">Send reply</button></div></form>';
+          button.hidden = true;
+          box.querySelector('form').addEventListener('submit', function (e) { e.preventDefault(); var send = e.target.querySelector('button'); send.disabled = true; api.request('POST', '/api/notes/' + id + '/reply', { body: box.querySelector('textarea').value, client_id: L.uuid() }).then(function () { L.toast('Reply shared with athlete'); route(); }, function (err) { send.disabled = false; L.formError(e.target, err.message); }); });
+        });
+      });
+      $('#addCoachForm').addEventListener('submit', function (e) {
+        e.preventDefault(); var button = e.target.querySelector('button'); button.disabled = true;
+        api.request('POST', '/api/athletes/' + a.id + '/coaches', { email: $('#coachEmail').value.trim().toLowerCase() }).then(function () { L.toast('Coach added to ' + a.name + '\'s workspace'); route(); }, function (err) { button.disabled = false; L.formError(e.target, err.message); });
       });
       $('#pf').addEventListener('submit', function (e) {
         e.preventDefault();
