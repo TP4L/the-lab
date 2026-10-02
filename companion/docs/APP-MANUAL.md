@@ -1,6 +1,6 @@
 # THE LAB App Manual
 
-Version 1.1 · October 1, 2026
+Version 1.2 · October 1, 2026
 
 Live app: https://the-lab-8w5d.onrender.com
 
@@ -29,7 +29,14 @@ Private coaching notes are never shown to athletes.
 
 Open Coaching Dashboard to see reviews, overdue work, the next seven days, unassigned follow-ups, and the athlete count across the app and website.
 
-Use the shortcuts to Assign Development, open the Development Library, view Athletes, check Roster health, set a follow-up, start a session, or open Events desk.
+The four primary actions are always shown first:
+
+- Athletes: open the combined roster, profiles, notes, and history.
+- Assign development: connect a player problem to learning, training, evidence, and a retest.
+- Start a session: plan, score, and save court work.
+- Events: manage participants, courts, brackets, and results.
+
+Open More coaching tools for the Development Library, Roster health, Follow-ups, and Pre-session check-ins. Use the compact counters to jump toward work needing review, overdue work, the next seven days, or unassigned work. Search and filters narrow the Action Queue without changing any records.
 
 ## Roster health
 
@@ -110,6 +117,13 @@ Membership and paywall controls are built in but not activated for general use. 
 - Upload fails: keep the page open and retry. The reflection text stays in the form.
 
 ## Release notes
+
+### Version 1.2 · October 1, 2026
+
+- Simplified the Coaching Dashboard around four primary actions.
+- Moved secondary destinations into a quieter More coaching tools menu.
+- Compacted the status counters and combined search and filters into one control bar.
+- Reduced mobile scrolling while preserving reviews, follow-ups, roster health, assignments, sessions, and events.
 
 ### Version 1.1 · October 1, 2026
 
