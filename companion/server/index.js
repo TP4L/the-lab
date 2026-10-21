@@ -34,8 +34,9 @@ function createApp(opts = {}) {
   };
   const mailer = opts.mailer || require('./mail.js').createMailer({ apiKey: opts.resendKey, from: opts.mailFrom });
   config.mailEnabled = mailer.enabled;
+  config.resetEnabled = !!opts.onResetLink || mailer.enabled;
   // Reset links go by email when a provider is configured; tests can capture them.
-  config.onResetLink = opts.onResetLink || ((email, link) => mailer.sendSoon({
+  config.onResetLink = opts.onResetLink || ((email, link) => mailer.send({
     to: email, subject: 'Reset your THE LAB password',
     text: `Someone asked to reset the password for your THE LAB account.\n\nChoose a new password here (the link works once, for one hour):\n${link}\n\nIf this wasn't you, ignore this email.`,
     html: `<p>Someone asked to reset the password for your THE LAB account.</p><p><a href="${link}">Choose a new password</a>. The link works once, for one hour.</p><p>If this wasn't you, ignore this email.</p>`

@@ -97,14 +97,17 @@
 
   views.forgot = function () {
     app.innerHTML = '<div class="auth-wrap"><a class="back" href="#/signin">← Sign in</a>' + head('Account recovery', 'Reset your password', 'We’ll send a reset link to your email. It works for one hour.') +
-      '<form class="card form" id="f" novalidate><div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
+      '<form class="card form" id="f"><div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="row"><button class="btn primary" type="submit">Send reset link</button></div></form>' +
       '<p class="small muted">No email? Your club admin can issue a reset link from the Admin screen.</p></div>';
     $('#f').addEventListener('submit', function (e) {
       e.preventDefault();
+      var form = e.currentTarget, button = form.querySelector('button[type=submit]');
+      if (button.disabled) return;
+      button.disabled = true; button.textContent = 'Sending…';
       api.request('POST', '/api/auth/reset/request', { email: $('#em').value }).then(function () {
         $('#f').innerHTML = '<p>If an account uses that email, a reset link is on its way. Check your inbox and spam folder.</p>';
-      }, function (err) { L.formError($('#f'), err.message); });
+      }, function (err) { button.disabled = false; button.textContent = 'Send reset link'; L.formError(form, err.message); });
     });
   };
 

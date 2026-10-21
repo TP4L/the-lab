@@ -172,11 +172,15 @@ module.exports = function account(r, { db, auth, config }) {
       .run(sha256(t), userId, new Date(Date.now() + 3600e3).toISOString());
     return `${config.publicUrl}/#/reset/${t}`;
   }
-  r.post('/api/auth/reset/request', ({ body, req }) => {
+  r.post('/api/auth/reset/request', async ({ body, req }) => {
     const e = email(body.email);
     if (!resetLimit(clientIp(req) + '|' + e)) throw new HttpError(429, 'Too many reset requests. Try again in an hour.');
+    if (!config.resetEnabled) throw new HttpError(503, 'Password reset email is unavailable. Please contact your club admin or use Continue with THE LAB on the sign-in page.');
     const u = db.prepare('SELECT id, email FROM users WHERE email = ?').get(e);
-    if (u) config.onResetLink(u.email, issueReset(u.id));
+    if (u) {
+      try { await config.onResetLink(u.email, issueReset(u.id)); }
+      catch { throw new HttpError(503, 'We could not send the reset email. Please try again shortly or contact your club admin.'); }
+    }
     return withStatus(202, { ok: true });
   });
   r.post('/api/auth/reset/confirm', ({ body, res }) => {

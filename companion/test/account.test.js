@@ -94,3 +94,24 @@ test('validation and plumbing', async (t) => {
   const trav = await fetch(s.base + '/..%2f..%2fserver%2fdb.js');
   assert.notEqual(trav.status, 200);
 });
+
+test('reset requests report disabled delivery without revealing account existence', async (t) => {
+  const s = await start({ onResetLink: undefined }); t.after(s.close);
+  const c = s.client(); await c.signup('Rae', 'rae@lab.test');
+  for (const email of ['rae@lab.test', 'nobody@lab.test']) {
+    const result = await c.post('/api/auth/reset/request', { email });
+    assert.equal(result.status, 503);
+    assert.match(result.body.error, /unavailable/);
+  }
+});
+
+test('reset requests await delivery and surface provider failures', async (t) => {
+  let delivered = false;
+  const s = await start({ onResetLink: async () => { await new Promise(r => setTimeout(r, 20)); delivered = true; throw new Error('provider rejected'); } }); t.after(s.close);
+  const c = s.client(); await c.signup('Rae', 'rae@lab.test');
+  const result = await c.post('/api/auth/reset/request', { email: 'rae@lab.test' });
+  assert.equal(delivered, true);
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /could not send/);
+  assert.doesNotMatch(JSON.stringify(result.body), /provider rejected/);
+});
