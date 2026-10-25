@@ -54,18 +54,51 @@
   /* ================= auth views ================= */
   var views = {};
 
+  function emailForm() {
+    return '<form class="card form" id="emailform"><h2>Sign in with email</h2><p>No password needed. Use your existing account email to keep your profile and history.</p><div class="field"><label class="flabel" for="magicemail">Email</label><input id="magicemail" type="email" autocomplete="email" maxlength="200" required></div><button class="btn primary" type="submit">Email me a sign-in link</button><p id="emailstatus" role="status" aria-live="polite"></p></form>';
+  }
+  function bindEmailForm() {
+    var form = $('#emailform');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var button = form.querySelector('button');
+      button.disabled = true; button.textContent = 'Sending…';
+      $('#emailstatus').textContent = '';
+      api.request('POST', '/api/auth/email/request', { email: $('#magicemail').value }).then(function () {
+        $('#emailstatus').textContent = 'Check your inbox and spam folder. Your link works once and expires in 15 minutes. You can open it on any device.';
+        button.disabled = false; button.textContent = 'Send another link';
+      }, function (err) {
+        $('#emailstatus').textContent = err.message;
+        button.disabled = false; button.textContent = 'Email me a sign-in link';
+      });
+    });
+  }
+  views.emailSignin = function (token) {
+    // Remove the secret from browser history while retaining it only in this closure.
+    history.replaceState(null, '', '/#/email-signin');
+    app.innerHTML = '<div class="auth-wrap">' + head('THE LAB', 'Finish signing in', 'Continue to securely open the account this email link belongs to.') + '<form id="finishsignin" class="card form"><button class="btn primary" type="submit">Continue to THE LAB</button><p role="status" id="signinstatus"></p></form><p><a href="#/signin">Request a new sign-in link</a></p></div>';
+    $('#finishsignin').addEventListener('submit', function (e) {
+      e.preventDefault(); var button = this.querySelector('button');
+      button.disabled = true; button.textContent = 'Signing in…';
+      api.request('POST', '/api/auth/email/confirm', { token: token || '' }).then(function (m) {
+        setMe(m); location.hash = '#/';
+      }, function (err) { $('#signinstatus').textContent = err.message; button.disabled = false; button.textContent = 'Continue to THE LAB'; });
+    });
+  };
+
   views.signin = function (_, query) {
     app.innerHTML = '<div class="auth-wrap"><h1 class="brandmark">THE <span>LAB</span></h1><p class="muted">Know what to work on, do the work, record what happened, know what comes next.</p>' +
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
       '<div class="card stack demo-card" id="democard" hidden><p class="section-title">Try the demo</p><p class="small">Sample players, a live event on courts 4 and 5, a double-elimination bracket, interest checks, a coached session plan and Field Notes. Nothing is emailed, and everything resets daily.</p>' +
       '<div class="demo-btns"><button class="btn primary" type="button" data-demo="host">Host and coach<span>Brett: runs events, plans, publishing</span></button><button class="btn" type="button" data-demo="player">Player<span>Jordan: courts, scores, notes, recap</span></button><button class="btn ghost" type="button" data-demo="coach">Assistant coach<span>Austin: roster and training</span></button></div></div>' +
-      '<a class="btn primary" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p><a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
+      (META.magic ? emailForm() : '') + '<details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p><a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="field"><label class="flabel" for="pw">Password</label><input type="password" id="pw" autocomplete="current-password" required></div>' +
       '<div class="row"><button class="btn primary" type="submit">Sign in</button><a class="link-btn" href="#/forgot">Forgot password?</a></div></form>' +
       '<p class="small">New to THE LAB? <a href="#/signup">Create an account</a>. If your coach gave you a claim code, create your account first, then add the code on your Profile.</p>' +
-      '<p class="small"><a href="#/learn">Read Field Notes without signing in →</a></p></div>';
+      '</details><p class="small"><a href="#/learn">Read Field Notes without signing in →</a></p></div>';
     $('#f').addEventListener('submit', function (e) {
       e.preventDefault();
       api.request('POST', '/api/auth/login', { email: $('#em').value, password: $('#pw').value })
@@ -77,7 +110,8 @@
       api.request('POST', '/api/demo/login', { as: b.getAttribute('data-demo') }).then(function () { return api.request('GET', '/api/me'); })
         .then(function (m) { setMe(m); location.hash = b.getAttribute('data-demo') === 'player' ? '#/play' : '#/coach/desk'; }, function (err) { L.toast(err.message); });
     }); });
-    if (!META.demo) $('#em').focus();
+    bindEmailForm();
+    if (!META.demo) (META.magic ? $('#magicemail') : $('#em')).focus();
   };
 
   views.signup = function () {
@@ -2224,7 +2258,7 @@
 
   /* ================= router ================= */
   var ROUTES = [
-    [/^\/signin$/, 'signin', '', true], [/^\/signup$/, 'signup', '', true], [/^\/forgot$/, 'forgot', '', true], [/^\/reset\/([\w-]+)$/, 'reset', '', true],
+    [/^\/email-signin(?:\/([\w-]+))?$/, 'emailSignin', '', true], [/^\/signin$/, 'signin', '', true], [/^\/signup$/, 'signup', '', true], [/^\/forgot$/, 'forgot', '', true], [/^\/reset\/([\w-]+)$/, 'reset', '', true],
     [/^\/?$/, 'home', 'home'],
     [/^\/train$/, 'train', 'train'], [/^\/train\/new$/, 'trainNew', 'train'],
     [/^\/train\/scoreboard$/, 'boardNew', 'train'], [/^\/train\/scoreboard\/([0-9a-f-]{36})$/, 'board', 'train'],

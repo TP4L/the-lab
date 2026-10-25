@@ -41,6 +41,11 @@ function createApp(opts = {}) {
     text: `Someone asked to reset the password for your THE LAB account.\n\nChoose a new password here (the link works once, for one hour):\n${link}\n\nIf this wasn't you, ignore this email.`,
     html: `<p>Someone asked to reset the password for your THE LAB account.</p><p><a href="${link}">Choose a new password</a>. The link works once, for one hour.</p><p>If this wasn't you, ignore this email.</p>`
   }));
+  config.magicEnabled = !!opts.onSignInLink || mailer.enabled;
+  config.onSignInLink = opts.onSignInLink || ((email, link) => mailer.send({
+    to: email, subject: 'Your THE LAB sign-in link',
+    text: `Sign in to THE LAB:\n${link}\n\nThis link works once and expires in 15 minutes. If you did not request it, ignore this email.`
+  }));
   const auth = createAuth(db, { secureCookies: !!opts.secureCookies });
   const r = createRouter();
   const push = opts.push || require('./push.js').createPush(db, { publicKey: opts.vapidPublic, privateKey: opts.vapidPrivate, subject: opts.vapidSubject, fetchImpl: opts.fetchImpl });
@@ -55,9 +60,10 @@ function createApp(opts = {}) {
   const { MODES } = require('./formats.js');
   const { SCORING, ROUND_END } = require('./api/play.js');
   const { KINDS } = require('./api/planning.js');
-  r.get('/api/meta', () => ({ lanes: LANES, version: 4, google: !!config.googleEnabled, push: !!config.pushEnabled, email: !!config.mailEnabled, demo: !!config.demo, modes: MODES, scoring: SCORING, round_end: ROUND_END, interest_kinds: KINDS }));
+  r.get('/api/meta', () => ({ lanes: LANES, version: 4, magic: !!config.magicEnabled, google: !!config.googleEnabled, push: !!config.pushEnabled, email: !!config.mailEnabled, demo: !!config.demo, modes: MODES, scoring: SCORING, round_end: ROUND_END, interest_kinds: KINDS }));
 
   require('./api/account.js')(r, ctx);
+  require('./api/email-signin.js')(r, ctx);
   require('./api/site-bridge.js')(r, ctx);
   require('./api/site-signin.js')(r, ctx);
   require('./api/workspace.js')(r, ctx);
