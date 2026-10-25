@@ -92,7 +92,7 @@
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
       '<div class="card stack demo-card" id="democard" hidden><p class="section-title">Try the demo</p><p class="small">Sample players, a live event on courts 4 and 5, a double-elimination bracket, interest checks, a coached session plan and Field Notes. Nothing is emailed, and everything resets daily.</p>' +
       '<div class="demo-btns"><button class="btn primary" type="button" data-demo="host">Host and coach<span>Brett: runs events, plans, publishing</span></button><button class="btn" type="button" data-demo="player">Player<span>Jordan: courts, scores, notes, recap</span></button><button class="btn ghost" type="button" data-demo="coach">Assistant coach<span>Austin: roster and training</span></button></div></div>' +
-      (META.magic ? emailForm() : '') + '<details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p><a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
+      '<div id="email-slot">' + (META.magic ? emailForm() : '') + '</div><details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p><a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="field"><label class="flabel" for="pw">Password</label><input type="password" id="pw" autocomplete="current-password" required></div>' +
@@ -2322,7 +2322,7 @@
   // Confirm the session is still valid, then render.
   function demoBar() { $('#demobar').hidden = !META.demo; if ($('#democard') && META.demo) $('#democard').hidden = false; }
   demoBar();
-  api.request('GET', '/api/meta').then(function (m) { META = m; Store.set('meta', m); if ($('#gbtn') && m.google) $('#gbtn').hidden = false; demoBar(); }, function () {});
+  api.request('GET', '/api/meta').then(function (m) { META = m; Store.set('meta', m); if (m.magic && $('#email-slot') && !$('#emailform')) { $('#email-slot').innerHTML = emailForm(); bindEmailForm(); } if ($('#gbtn') && m.google) $('#gbtn').hidden = false; demoBar(); }, function () {});
   if (ME) api.request('GET', '/api/me').then(function (m) { setMe(m); }, function (err) { if (err.status === 401) setMe(null); }).then(function () { route(); pollBell(); });
   else route();
   L.status(); L.flush();
