@@ -220,7 +220,22 @@
     });
   }
 
-  function downloadBlob(blob, name) {
+  /* Inside a claude.ai artifact, downloads go through the host's save prompt. */
+  let hostDownloads = null;
+  const inHost = !!(window.claude && window.claude.use);
+  if (inHost) window.claude.use('downloads').then((d) => { hostDownloads = d; }).catch(() => {});
+
+  async function downloadBlob(blob, name) {
+    if (hostDownloads) {
+      try {
+        await hostDownloads.save({ filename: name, data: blob });
+        return true;
+      } catch (e) {
+        if (e && e.code === 'declined') return false;
+        if (e && e.code === 'rate_limited') { status('A save prompt is already open.'); return false; }
+      }
+    }
+    if (inHost && !hostDownloads) { status('Downloads are not available in this view.'); return false; }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -277,10 +292,9 @@
     status('Rendering…');
     const blob = await exportBlob();
     if (!blob) return status('Could not create the image in this browser.');
-    downloadBlob(blob, fileName('png'));
-    status('Downloaded ' + fileName('png'));
+    if (await downloadBlob(blob, fileName('png'))) status('Saved ' + fileName('png'));
   };
-  if (navigator.canShare && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] })) {
+  if (!inHost && navigator.canShare && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] })) {
     $('share').hidden = false;
     $('share').onclick = async () => {
       const blob = await exportBlob();
@@ -289,10 +303,9 @@
       } catch (e) { /* cancelled */ }
     };
   }
-  $('save').onclick = () => {
+  $('save').onclick = async () => {
     const blob = new Blob([JSON.stringify({ ...state, savedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, fileName('json'));
-    status('Project saved. Open it later with "Open project".');
+    if (await downloadBlob(blob, fileName('json'))) status('Project saved. Open it later with "Open project".');
   };
   $('open').onclick = () => $('openFile').click();
   $('openFile').onchange = (e) => {
@@ -317,7 +330,17 @@
   };
   $('reset').onclick = () => {
     const p = presetById(state.preset) && presetById(state.preset).template === state.template ? presetById(state.preset) : firstPresetFor(state.template);
-    if (!p || !confirm(`Replace the current ${L.templates[state.template].name} content with "${p.name}"?`)) return;
+    if (!p) return;
+    const btn = $('reset');
+    if (!btn.dataset.armed) {
+      btn.dataset.armed = '1';
+      btn.textContent = 'Click again to reset';
+      status(`This replaces your ${L.templates[state.template].name} content with "${p.name}".`);
+      setTimeout(() => { delete btn.dataset.armed; btn.textContent = 'Reset to preset'; }, 4000);
+      return;
+    }
+    delete btn.dataset.armed;
+    btn.textContent = 'Reset to preset';
     state.data[state.template] = clone(p.data);
     buildFields();
     schedule();
