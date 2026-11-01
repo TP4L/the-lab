@@ -61,11 +61,11 @@
     img.src = state.logo;
   }
 
-  function theme() {
-    const base = THEMES[state.theme] || THEMES.green;
+  function theme(s = state) {
+    const base = THEMES[s.theme] || THEMES.green;
     const th = { ...base };
-    if (state.accent) th.accent = state.accent;
-    const head = state.head || base.head;
+    if (s.accent) th.accent = s.accent;
+    const head = s.head || base.head;
     th.HF = head === 'cond' ? L.F.cond : L.F.heavy;
     th.HW = head === 'cond' ? 700 : 400;
     return th;
@@ -359,5 +359,45 @@
   Promise.race([fontsReady, new Promise((r) => setTimeout(r, 3000))]).then(schedule);
   if (document.fonts) document.fonts.addEventListener('loadingdone', schedule);
   window.LAB.state = () => state;
+  L.THEMES = THEMES;
+  /* Render any document (used by the studio for thumbnails and exports). */
+  L.renderDoc = (canvas, doc, scale = 1) => {
+    const t = L.templates[doc.template];
+    const sz = L.SIZES[doc.size && t.sizes.includes(doc.size) ? doc.size : t.sizes[0]];
+    canvas.width = Math.round(sz.w * scale);
+    canvas.height = Math.round(sz.h * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    t.render(ctx, sz.w, sz.h, doc.data || {}, theme({ theme: doc.theme || state.theme, accent: doc.accent || '', head: doc.head || '' }), { brand: state.brand, logo: logoImg });
+    return canvas;
+  };
+  L.openDoc = (doc) => {
+    state.template = doc.template;
+    if (doc.size) state.size = doc.size;
+    if (doc.theme) state.theme = doc.theme;
+    state.accent = doc.accent || '';
+    state.head = doc.head || '';
+    state.data[doc.template] = clone(doc.data || {});
+    state.docId = doc.id || null;
+    state.docTitle = doc.title || '';
+    $('preset').value = '';
+    buildStatic();
+    buildSizes();
+    buildFields();
+    schedule();
+  };
+  L.currentDoc = () => ({
+    id: state.docId || null, title: state.docTitle || '', template: state.template, size: state.size,
+    theme: state.theme, accent: state.accent, head: state.head, data: clone(state.data[state.template] || {}),
+  });
+  L.exportDoc = async (doc, scale) => {
+    const c = L.renderDoc(document.createElement('canvas'), doc, scale || Number($('scale').value) || 2);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    const d = doc.data || {};
+    const base = (doc.title || d.name || d.title || doc.template).toString().split('\n').join(' ');
+    const name = ('the-lab-' + base).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) + '.png';
+    return (await downloadBlob(blob, name)) ? name : null;
+  };
+  L.status = status;
   window.LAB.loadPreset = (id) => { $('preset').value = id; $('preset').onchange({ target: $('preset') }); };
 })();

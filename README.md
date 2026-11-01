@@ -51,11 +51,21 @@ parts, nothing more:
 
 Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 
-## Graphics Studio
+## THE LAB Studio
 
-`public/graphics.html` makes LAB-branded graphics in the browser: pick a layout,
-type the content, download a PNG (standard, 2× or print 3×). Nothing is uploaded;
-work autosaves in the tab and can be saved/opened as a `.json` project.
+`public/graphics.html` is the studio. Three tabs:
+
+- **Create** — describe a lesson; Claude writes finished LAB sheets in THE LAB's
+  code words, zones and decision-engine vocabulary (`public/graphics/knowledge.js`,
+  generated from the coach skill by `tools/build-knowledge.py`). Pick a format or
+  a full lesson pack, then "Make 3 variations" on any result, as often as you like.
+  AI writing runs when the studio is opened from its claude.ai link.
+- **Library** — everything you save, searchable. On the claude.ai link it is
+  stored in the page's database; elsewhere in this browser.
+- **Editor** — change any word or court line by hand, download a PNG
+  (standard, 2× or print 3×), save back to the library.
+
+`tools/build-artifact.py` bundles the page into one file for the claude.ai link.
 
 Layouts: numbered list poster · court grid / zone map · pattern playbook card ·
 team shape sheet · pressure / escapes · language codebook. Each one ships with a
@@ -77,7 +87,8 @@ O7-8 = seam      Y7^ = at the net     Y1_ = at the baseline
 | `public/graphics/engine.js` | Canvas drawing: text fitting, brand mark, court, arrows, diagram language |
 | `public/graphics/templates.js` | The six layouts and the court-logic table |
 | `public/graphics/presets.js` | Starting content for each layout |
-| `public/graphics/app.js` | Form, themes, preview, export, save/open |
+| `public/graphics/app.js` | Editor: form, themes, preview, export, save/open |
+| `public/graphics/studio.js` | AI writer, variations, library |
 
 ## Layout
 

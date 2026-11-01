@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>THE LAB · Graphics Studio</title>
+<title>THE LAB · Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700;800&family=Oswald:wght@500;600;700&display=swap">
@@ -39,6 +39,7 @@ canvas#out{max-width:100%;max-height:calc(100vh - 230px);height:auto;box-shadow:
 .bar select{width:auto}
 #status{min-height:20px;font-size:13px;color:#9caab4;margin:10px 0 0}
 .err{color:#ff8f80;font-size:12.5px;margin:6px 0 0;white-space:pre-line}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .blurb{font-size:13px;color:#9caab4;margin:6px 0 0}
 details{margin-top:18px;border-top:1px solid #29343e;padding-top:12px}
 summary{cursor:pointer;font-weight:700;font-size:14px}
@@ -46,18 +47,92 @@ details code,details pre{font-family:ui-monospace,Menlo,monospace;font-size:12.5
 details pre{background:#0d1319;border:1px solid #29343e;border-radius:8px;padding:10px;white-space:pre-wrap}
 .actions button{margin-top:12px}
 @media(max-width:900px){.layout{grid-template-columns:1fr}.preview{position:static;order:-1}canvas#out{max-height:70vh}}
+.tabs{display:flex;gap:8px;margin-top:20px;flex-wrap:wrap}
+.tabs button{width:auto;background:transparent;color:#c9d5dd;border:1px solid #374550;padding:10px 18px;font-size:15px}
+.tabs button[aria-selected=true]{background:#75dbcc;color:#102522;border-color:#75dbcc}
+.create{display:grid;grid-template-columns:minmax(300px,520px) 1fr;gap:24px;margin-top:22px;align-items:start}
+#topic{font-family:inherit;font-size:16px;min-height:110px}
+.ideas{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.idea{width:auto;background:#0d1319;color:#b9c7d0;border:1px solid #2c3944;font-weight:500;font-size:12.5px;padding:6px 10px;border-radius:99px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.card{background:#151c23;border:1px solid #29343e;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.card .thumb{width:100%;height:auto;border-radius:6px;background:#000;cursor:default}
+.card h3{font-size:15px;margin:2px 0 0;line-height:1.25}
+.card .meta{font-size:12px;color:#8d9ba6;margin:0}
+.card .warn{font-size:12px;color:#ffb36b;margin:0}
+.card .row{display:flex;flex-wrap:wrap;gap:6px}
+.card .vary{display:flex;gap:6px;border-top:1px solid #29343e;padding-top:8px;margin-top:auto}
+.card .vary input{font-size:12.5px;padding:7px 9px}
+.card .vary button{white-space:nowrap}
+button.danger{color:#ff9a8c}
+button:disabled{opacity:.45;cursor:not-allowed}
+.libbar{display:grid;grid-template-columns:1fr 240px;gap:10px;margin:22px 0 16px}
+.empty{padding:40px;text-align:center;color:#9caab4;border:1px dashed #33414c;border-radius:14px}
+.note{font-size:13px;color:#9caab4;margin:6px 0}
+@media(max-width:900px){.create{grid-template-columns:1fr}.libbar{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <main>
   <header>
     <a href="/">← Decision engine</a> · <a href="/session-builder.html">Session builder</a>
-    <p class="eyebrow">THE LAB / COACH TOOLS / 03</p>
-    <h1>Graphics Studio.</h1>
-    <p class="muted">Pick a layout, type your content, download a finished graphic. Everything runs in this browser tab — nothing is uploaded.</p>
+    <p class="eyebrow">THE LAB / STUDIO</p>
+    <h1>THE LAB Studio.</h1>
+    <p class="muted">Describe a lesson. Get finished LAB sheets in your language — then as many variations as you want, all kept in your library.</p>
+    <nav class="tabs" aria-label="Studio sections">
+      <button type="button" data-view="create" aria-selected="true">✦ Create</button>
+      <button type="button" data-view="library">Library <span id="libCount"></span></button>
+      <button type="button" data-view="editor">Editor</button>
+    </nav>
   </header>
 
-  <div class="layout">
+  <section id="viewCreate" class="create" aria-label="Create with AI">
+    <div class="panel controls">
+      <div id="aiOff"><h2>AI writing</h2><p class="muted">Connecting to Claude… AI writing works when you open the studio from your claude.ai link. You can still build sheets by hand in the Editor tab.</p></div>
+      <div id="aiForm" hidden>
+        <h2>What's the lesson?</h2>
+        <label for="topic" class="sr">Lesson</label>
+        <textarea id="topic" placeholder="e.g. Beating a banger who drives every third ball from zone 3"></textarea>
+        <div class="ideas" aria-label="Lesson ideas">
+          <button type="button" class="idea">Resetting hard drives at the kitchen line</button>
+          <button type="button" class="idea">Getting out of zone 5 after a deep return</button>
+          <button type="button" class="idea">When to speed up from a dink rally</button>
+          <button type="button" class="idea">Stacking to keep the forehand in the middle</button>
+          <button type="button" class="idea">Lob defense and recovering the kitchen</button>
+          <button type="button" class="idea">Third-shot choices: INDIGO vs BLUE</button>
+        </div>
+        <div class="two">
+          <div><label for="fmt">Format</label><select id="fmt"></select></div>
+          <div><label for="count">How many</label><select id="count"><option value="1">1</option><option value="3" selected>3</option><option value="6">6</option></select></div>
+        </div>
+        <div class="two">
+          <div><label for="level">For</label><select id="level"><option value="3.0-4.0">3.0–4.0 players</option><option value="2.5-3.0">2.5–3.0 players</option><option value="4.0+">4.0+ players</option><option value="coaches">Coaches</option></select></div>
+          <div><label for="genTheme">Look</label><select id="genTheme"></select></div>
+        </div>
+        <label for="extra">Coach notes (optional)</label>
+        <textarea id="extra" rows="3" placeholder="Anything to include: code words, a drill, the group, what went wrong last session…"></textarea>
+        <button id="generate" type="button" data-ai="1">Create</button>
+        <button id="stop" type="button" class="secondary" hidden>Stop</button>
+        <p id="genStatus" class="note" role="status"></p>
+      </div>
+    </div>
+    <div>
+      <div id="results" class="cards" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="viewLibrary" hidden aria-label="Library">
+    <div class="libbar">
+      <input id="libSearch" placeholder="Search your library — title, lesson, code word…" aria-label="Search library">
+      <select id="libTemplate" aria-label="Filter by layout"><option value="">All layouts</option></select>
+    </div>
+    <p class="note"><span id="libWhere"></span> <span id="libNote"></span></p>
+    <div id="libEmpty" class="empty" hidden>Nothing saved yet. Create something and press <b>Save</b>, or press <b>Save to library</b> in the Editor.</div>
+    <div id="libGrid" class="cards"></div>
+    <p id="libMore" class="note"></p>
+  </section>
+
+  <div class="layout" id="viewEditor" hidden>
     <section class="panel controls" aria-label="Graphic settings">
       <h2>Start</h2>
       <label for="preset">Start from</label>
@@ -108,6 +183,7 @@ note Y5 Hold     small text label
       <div class="stage"><canvas id="out" role="img" aria-label="Graphic preview"></canvas></div>
       <div class="bar">
         <button id="download" type="button">Download PNG</button>
+        <button id="saveLib" type="button" class="secondary">Save to library</button>
         <select id="scale" aria-label="Export resolution">
           <option value="1">Standard</option>
           <option value="2" selected>High-res (2×)</option>
@@ -127,5 +203,7 @@ note Y5 Hold     small text label
 <script src="graphics/templates.js"></script>
 <script src="graphics/presets.js"></script>
 <script src="graphics/app.js"></script>
+<script src="graphics/knowledge.js"></script>
+<script src="graphics/studio.js"></script>
 </body>
 </html>
