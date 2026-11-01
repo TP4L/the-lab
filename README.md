@@ -60,6 +60,11 @@ Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
   generated from the coach skill by `tools/build-knowledge.py`). Pick a format or
   a full lesson pack, then "Make 3 variations" on any result, as often as you like.
   AI writing runs when the studio is opened from its claude.ai link.
+- **Custom Lab** — a free-form board you arrange by hand: drag players,
+  opponents, numbered steps, ball paths and movement arrows (bend them with the
+  middle handle), paint zones, add headlines, text, panels, extra courts, images.
+  Snap to zones, layers with lock/hide, undo/redo, PNG export. Any generated or
+  edited sheet opens here with its court rebuilt as movable pieces.
 - **Library** — everything you save, searchable. On the claude.ai link it is
   stored in the page's database; elsewhere in this browser.
 - **Editor** — change any word or court line by hand, download a PNG
@@ -89,6 +94,7 @@ O7-8 = seam      Y7^ = at the net     Y1_ = at the baseline
 | `public/graphics/presets.js` | Starting content for each layout |
 | `public/graphics/app.js` | Editor: form, themes, preview, export, save/open |
 | `public/graphics/studio.js` | AI writer, variations, library |
+| `public/graphics/custom.js` | Custom Lab drag-and-drop board |
 
 ## Layout
 

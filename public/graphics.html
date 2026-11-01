@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700;800&family=Oswald:wght@500;600;700&display=swap">
 <style>
+[hidden]{display:none!important}
 :root{color-scheme:dark;font-family:"Archivo",system-ui,sans-serif;background:#0d1115;color:#eaf0f4}
 body{margin:0}
 a{color:#75dbcc}
@@ -70,6 +71,32 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .empty{padding:40px;text-align:center;color:#9caab4;border:1px dashed #33414c;border-radius:14px}
 .note{font-size:13px;color:#9caab4;margin:6px 0}
 @media(max-width:900px){.create{grid-template-columns:1fr}.libbar{grid-template-columns:1fr}}
+.custom .ctool{display:flex;flex-wrap:wrap;gap:6px;margin:20px 0 12px;align-items:center}
+.custom .ctool button,.custom .ctool label.btn{width:auto;padding:8px 11px;font-size:13.5px;background:#151c23;color:#dfe8ee;border:1px solid #33414c;border-radius:9px;cursor:pointer;font-weight:600;margin:0}
+.custom .ctool button[aria-pressed=true]{background:#75dbcc;color:#102522;border-color:#75dbcc}
+.custom .ctool .sep{width:1px;height:26px;background:#33414c;margin:0 4px}
+.custom .ctool .snap{display:flex;align-items:center;font-size:13px;margin:0 0 0 6px;font-weight:600}
+.cgrid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+.cstage{padding:10px}
+#cv{max-width:100%;max-height:calc(100vh - 210px);height:auto;touch-action:none;box-shadow:0 18px 50px -18px rgba(0,0,0,.8);border-radius:4px;background:#000}
+.cside{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+.cside label.f{display:block;margin:10px 0 0;font-size:12.5px;font-weight:600}
+.cside label.f span{display:block;margin-bottom:5px}
+.cside input[type=range]{padding:0;accent-color:#75dbcc}
+.cside .checks{display:flex;gap:14px;flex-wrap:wrap}
+.cside .checks label.f{display:flex;align-items:center;gap:6px}
+.cside .checks label.f span{margin:0;order:2}
+.cside .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.cpick{display:flex;gap:6px}.cpick input[type=color]{width:56px;flex:none}
+#paintBar{display:flex;gap:6px;align-items:center;font-size:13px}
+.swatch{width:30px!important;height:30px;padding:0!important;border-radius:50%!important;border:2px solid #33414c!important}
+.swatch[aria-pressed=true]{outline:3px solid #fff;outline-offset:1px}
+#layers{list-style:none;padding:0;margin:6px 0 0;font-size:13px}
+#layers li{display:flex;align-items:center;gap:4px;border-radius:7px}
+#layers li.on{background:#1f2a33}
+#layers .licon{width:28px;padding:4px;background:transparent;border:0;color:#9caab4;font-size:12px}
+#layers .lname{flex:1;text-align:left;background:transparent;border:0;color:#dfe8ee;font-weight:500;padding:6px 4px;font-size:13px}
+@media(max-width:900px){.cgrid{grid-template-columns:1fr}.cside{position:static;max-height:none}#cv{max-height:65vh}}
 </style>
 </head>
 <body>
@@ -78,9 +105,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <a href="/">← Decision engine</a> · <a href="/session-builder.html">Session builder</a>
     <p class="eyebrow">THE LAB / STUDIO</p>
     <h1>THE LAB Studio.</h1>
-    <p class="muted">Describe a lesson. Get finished LAB sheets in your language — then as many variations as you want, all kept in your library.</p>
+    <p class="muted"><b>AI Generate</b>: describe a lesson and get finished LAB sheets, with endless variations. <b>Custom Lab</b>: build the board yourself — drag every player, arrow and word. Both save to your library.</p>
     <nav class="tabs" aria-label="Studio sections">
-      <button type="button" data-view="create" aria-selected="true">✦ Create</button>
+      <button type="button" data-view="create" aria-selected="true">✦ AI Generate</button>
+      <button type="button" data-view="custom">✎ Custom Lab</button>
       <button type="button" data-view="library">Library <span id="libCount"></span></button>
       <button type="button" data-view="editor">Editor</button>
     </nav>
@@ -118,6 +146,65 @@ button:disabled{opacity:.45;cursor:not-allowed}
     </div>
     <div>
       <div id="results" class="cards" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="viewCustom" class="custom" hidden aria-label="Custom Lab">
+    <div class="ctool" role="toolbar" aria-label="Board tools">
+      <button type="button" data-tool="select" aria-pressed="true">↖ Select</button>
+      <span class="sep"></span>
+      <button type="button" data-add="P">+ Player</button>
+      <button type="button" data-add="D">+ Opponent</button>
+      <button type="button" data-add="coach">+ Coach</button>
+      <button type="button" data-add="num">+ Number</button>
+      <button type="button" data-tool="ball">⤳ Ball path</button>
+      <button type="button" data-tool="move">⇢ Movement</button>
+      <button type="button" data-tool="solid">— Line</button>
+      <button type="button" data-tool="paint">🎨 Paint zones</button>
+      <span class="sep"></span>
+      <button type="button" data-add="heading">+ Headline</button>
+      <button type="button" data-add="text">+ Text</button>
+      <button type="button" data-add="box">+ Panel</button>
+      <button type="button" data-add="court">+ Court</button>
+      <button type="button" data-add="brand">+ Brand</button>
+      <label class="btn" for="cImage">+ Image</label><input type="file" id="cImage" accept="image/*" hidden>
+      <span class="sep"></span>
+      <button type="button" id="cUndo" title="Undo (Ctrl+Z)">↶ Undo</button>
+      <button type="button" id="cRedo" title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
+      <label class="snap"><input type="checkbox" id="cSnap" checked> Snap to zones</label>
+    </div>
+    <div id="paintBar" hidden>Paint colour:
+      <button type="button" class="swatch" data-c="#36c46a" style="background:#36c46a" aria-pressed="true" aria-label="Green"></button>
+      <button type="button" class="swatch" data-c="#ff4d4f" style="background:#ff4d4f" aria-pressed="false" aria-label="Red"></button>
+      <button type="button" class="swatch" data-c="#ffd43b" style="background:#ffd43b" aria-pressed="false" aria-label="Yellow"></button>
+      <button type="button" class="swatch" data-c="#4fb0ff" style="background:#4fb0ff" aria-pressed="false" aria-label="Light blue"></button>
+      <button type="button" class="swatch" data-c="#9b5cff" style="background:#9b5cff" aria-pressed="false" aria-label="Purple"></button>
+      <button type="button" class="swatch" data-c="#ff8a2a" style="background:#ff8a2a" aria-pressed="false" aria-label="Orange"></button>
+    </div>
+    <div class="cgrid">
+      <div class="stage cstage"><canvas id="cv" role="img" aria-label="Custom board"></canvas></div>
+      <aside class="panel controls cside" aria-label="Board settings">
+        <h2 id="inspTitle">Selected</h2>
+        <div id="insp"></div>
+        <h2>Board</h2>
+        <label for="cTitle">Name</label><input id="cTitle" maxlength="120">
+        <div class="two">
+          <div><label for="cSize">Size</label><select id="cSize"></select></div>
+          <div><label for="cTheme">Theme</label><select id="cTheme"></select></div>
+        </div>
+        <label for="cAccent">Accent colour</label>
+        <div style="display:flex;gap:6px"><input type="color" id="cAccent"><button class="secondary small" id="cAccentReset" type="button">Reset</button></div>
+        <label for="cStarter">New board from</label>
+        <div style="display:flex;gap:6px"><select id="cStarter"></select><button class="secondary small" id="cNew" type="button">Start new</button></div>
+        <div class="row" style="margin-top:16px">
+          <button type="button" id="cPng" class="small">Download PNG</button>
+          <select id="cScale" aria-label="Export resolution" style="width:auto"><option value="1">Standard</option><option value="2" selected>High-res</option><option value="3">Print</option></select>
+          <button type="button" id="cSave" class="secondary small">Save to library</button>
+        </div>
+        <p id="cStatus" class="note" role="status"></p>
+        <h2>Layers</h2>
+        <ol id="layers"></ol>
+      </aside>
     </div>
   </section>
 
@@ -184,6 +271,7 @@ note Y5 Hold     small text label
       <div class="bar">
         <button id="download" type="button">Download PNG</button>
         <button id="saveLib" type="button" class="secondary">Save to library</button>
+        <button id="toCustom" type="button" class="secondary">Open in Custom Lab</button>
         <select id="scale" aria-label="Export resolution">
           <option value="1">Standard</option>
           <option value="2" selected>High-res (2×)</option>
@@ -204,6 +292,7 @@ note Y5 Hold     small text label
 <script src="graphics/presets.js"></script>
 <script src="graphics/app.js"></script>
 <script src="graphics/knowledge.js"></script>
+<script src="graphics/custom.js"></script>
 <script src="graphics/studio.js"></script>
 </body>
 </html>

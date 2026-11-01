@@ -399,5 +399,8 @@
     return (await downloadBlob(blob, name)) ? name : null;
   };
   L.status = status;
+  L.themeFor = (s) => theme({ theme: s.theme || state.theme, accent: s.accent || '', head: s.head || '' });
+  L.globals = () => ({ brand: state.brand, logo: logoImg });
+  L.saveBlob = downloadBlob;
   window.LAB.loadPreset = (id) => { $('preset').value = id; $('preset').onchange({ target: $('preset') }); };
 })();

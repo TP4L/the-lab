@@ -11,11 +11,12 @@
   let busy = null; // AbortController of the running generation
 
   /* ---------------- views ---------------- */
-  const views = { create: $('viewCreate'), library: $('viewLibrary'), editor: $('viewEditor') };
+  const views = { create: $('viewCreate'), custom: $('viewCustom'), library: $('viewLibrary'), editor: $('viewEditor') };
   function show(v) {
     for (const [k, node] of Object.entries(views)) node.hidden = k !== v;
     document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === v)));
     if (v === 'library') renderLibrary();
+    if (v === 'custom' && L.custom) L.custom.onShow();
     window.scrollTo({ top: 0 });
   }
   document.querySelectorAll('.tabs button').forEach((b) => (b.onclick = () => show(b.dataset.view)));
@@ -255,9 +256,14 @@ Make ${n} new variations of it, using the same template "${doc.template}". Keep 
   function thumb(doc) {
     const c = el('canvas', 'thumb');
     try {
-      const t = L.templates[doc.template];
-      const sz = L.SIZES[t.sizes.includes(doc.size) ? doc.size : t.sizes[0]];
-      L.renderDoc(c, doc, 420 / Math.max(sz.w, sz.h));
+      if (doc.kind === 'custom') {
+        const sz = L.SIZES[doc.board.size] || L.SIZES.letterL;
+        L.custom.renderBoard(c, doc.board, 420 / Math.max(sz.w, sz.h));
+      } else {
+        const t = L.templates[doc.template];
+        const sz = L.SIZES[t.sizes.includes(doc.size) ? doc.size : t.sizes[0]];
+        L.renderDoc(c, doc, 420 / Math.max(sz.w, sz.h));
+      }
     } catch (e) { console.error(e); }
     c.setAttribute('role', 'img');
     c.setAttribute('aria-label', doc.title);
@@ -266,6 +272,7 @@ Make ${n} new variations of it, using the same template "${doc.template}". Keep 
 
   function card(doc, mode) {
     const c = el('article', 'card');
+    if (doc.kind === 'custom') return customCard(doc);
     const t = L.templates[doc.template];
     c.append(thumb(doc));
     c.append(el('h3', null, doc.title));
@@ -283,6 +290,7 @@ Make ${n} new variations of it, using the same template "${doc.template}". Keep 
       }, 'small');
     }
     btn('PNG', async () => { const n = await L.exportDoc(doc); if (n) L.status('Saved ' + n); });
+    btn('Custom Lab', () => { L.custom.fromDoc(doc); show('custom'); });
     if (mode === 'library') {
       btn('Duplicate', async () => { const copy = { ...JSON.parse(JSON.stringify(doc)), id: null, createdAt: null, title: doc.title + ' (copy)' }; await lib.save(copy).catch((e) => alertLib(saveError(e))); });
       const del = btn('Delete', async () => {
@@ -306,6 +314,25 @@ Make ${n} new variations of it, using the same template "${doc.template}". Keep 
     if (sample) c.append(vr);
     return c;
   }
+  function customCard(doc) {
+    const c = el('article', 'card');
+    c.append(thumb(doc), el('h3', null, doc.title), el('p', 'meta', 'Custom Lab board'));
+    const row = el('div', 'row');
+    const btn = (label, fn, cls) => { const b = el('button', cls || 'secondary small', label); b.type = 'button'; b.onclick = fn; row.append(b); return b; };
+    btn('Open', () => { L.custom.open(doc); show('custom'); });
+    btn('PNG', async () => {
+      const cv = L.custom.renderBoard(document.createElement('canvas'), doc.board, Number($('scale').value) || 2);
+      const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
+      await L.saveBlob(blob, ('the-lab-' + doc.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60) + '.png');
+    });
+    btn('Duplicate', async () => { await lib.save({ ...JSON.parse(JSON.stringify(doc)), id: null, createdAt: null, title: doc.title + ' (copy)' }).catch((e) => alertLib(saveError(e))); });
+    const del = btn('Delete', async () => {
+      if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Really delete?'; setTimeout(() => { delete del.dataset.armed; del.textContent = 'Delete'; }, 3500); return; }
+      await lib.remove(doc.id).catch((e) => alertLib('Could not delete (' + e.code + ').'));
+    }, 'secondary small danger');
+    c.append(row);
+    return c;
+  }
   function saveError(e) {
     return e && e.code === 'quota_exceeded' ? 'Your library is full — delete some documents first.' : 'Could not save (' + ((e && e.code) || 'error') + ').';
   }
@@ -316,7 +343,7 @@ Make ${n} new variations of it, using the same template "${doc.template}". Keep 
     updateCount();
     const q = $('libSearch').value.trim().toLowerCase();
     const tf = $('libTemplate').value;
-    const list = libDocs.filter((d) => L.templates[d.template] && (!tf || d.template === tf) && (!q || [d.title, d.lesson, (d.tags || []).join(' '), JSON.stringify(d.data)].join(' ').toLowerCase().includes(q)));
+    const list = libDocs.filter((d) => (d.kind === 'custom' ? d.board : L.templates[d.template]) && (!tf || d.template === tf) && (!q || [d.title, d.lesson, (d.tags || []).join(' '), JSON.stringify(d.data)].join(' ').toLowerCase().includes(q)));
     const wrap = $('libGrid');
     wrap.replaceChildren(...list.slice(0, 120).map((d) => card(d, 'library')));
     $('libEmpty').hidden = libDocs.length > 0;
@@ -324,7 +351,7 @@ Make ${n} new variations of it, using the same template "${doc.template}". Keep 
   }
   $('libSearch').oninput = () => renderLibrary();
   $('libTemplate').onchange = () => renderLibrary();
-  $('libTemplate').append(...Object.entries(L.templates).map(([k, t]) => { const o = el('option', null, t.name); o.value = k; return o; }));
+  $('libTemplate').append(...[['custom', 'Custom Lab boards'], ...Object.entries(L.templates).map(([k, t]) => [k, t.name])].map(([k, t]) => { const o = el('option', null, t); o.value = k; return o; }));
 
   /* ---------------- editor: save to library ---------------- */
   $('saveLib').onclick = async () => {
@@ -340,6 +367,9 @@ Make ${n} new variations of it, using the same template "${doc.template}". Keep 
       L.status(existing ? 'Library copy updated.' : 'Saved to your library.');
     } catch (e) { L.status(saveError(e)); }
   };
+
+  L.library = lib;
+  $('toCustom').onclick = () => { const d = L.currentDoc(); d.title = d.title || String(d.data.name || d.data.title || '').split('\n').join(' '); L.custom.fromDoc(d); show('custom'); };
 
   /* ---------------- setup ---------------- */
   $('fmt').append(...[['auto', 'Best fit (AI chooses)'], ['pack', 'Full lesson pack (one of each)'], ...Object.entries(L.templates).map(([k, t]) => [k, t.name])].map(([v, t]) => { const o = el('option', null, t); o.value = v; return o; }));
