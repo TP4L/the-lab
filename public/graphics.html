@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>THE LAB · Graphics Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700;800&family=Oswald:wght@500;600;700&display=swap">
+<style>
+:root{color-scheme:dark;font-family:"Archivo",system-ui,sans-serif;background:#0d1115;color:#eaf0f4}
+body{margin:0}
+a{color:#75dbcc}
+main{max-width:1440px;margin:auto;padding:28px 22px 60px}
+.eyebrow{letter-spacing:3px;font-size:12px;color:#75dbcc;margin:14px 0 0}
+h1{font-family:"Archivo Black","Archivo",sans-serif;font-weight:400;font-size:clamp(30px,5vw,54px);letter-spacing:-1px;margin:8px 0 4px}
+.muted,small{color:#9caab4}
+.layout{display:grid;grid-template-columns:minmax(320px,440px) 1fr;gap:24px;margin-top:22px;align-items:start}
+.panel{background:#151c23;border:1px solid #29343e;border-radius:16px;padding:20px}
+.controls h2{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#75dbcc;margin:22px 0 4px}
+.controls h2:first-child{margin-top:0}
+label{display:block;margin:14px 0 6px;font-size:13.5px;font-weight:600}
+.help{display:block;font-size:12px;color:#8d9ba6;margin:5px 0 0;line-height:1.4}
+input,select,textarea,button{box-sizing:border-box;font:inherit;font-size:14px;border-radius:9px;padding:10px 11px;width:100%;background:#0d1319;color:#eef3f5;border:1px solid #374550}
+textarea{resize:vertical;line-height:1.45;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:13px}
+input[type=color]{padding:3px;height:42px;cursor:pointer}
+input[type=checkbox]{width:auto;margin-right:8px;vertical-align:middle}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid #75dbcc;outline-offset:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two>div>label{margin-top:14px}
+button{cursor:pointer;background:#75dbcc;color:#102522;font-weight:700;border:0}
+button.secondary{background:transparent;color:#c9d5dd;border:1px solid #374550}
+button.small{padding:7px 10px;font-size:13px;width:auto}
+.preview{position:sticky;top:16px}
+.stage{background:repeating-conic-gradient(#11171d 0 25%,#141b22 0 50%) 0 0/24px 24px;border-radius:12px;padding:14px;display:flex;justify-content:center;align-items:center;min-height:300px}
+canvas#out{max-width:100%;max-height:calc(100vh - 230px);height:auto;box-shadow:0 18px 50px -18px rgba(0,0,0,.8);border-radius:4px;background:#000}
+.bar{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;align-items:center}
+.bar button{width:auto}
+.bar select{width:auto}
+#status{min-height:20px;font-size:13px;color:#9caab4;margin:10px 0 0}
+.err{color:#ff8f80;font-size:12.5px;margin:6px 0 0;white-space:pre-line}
+.blurb{font-size:13px;color:#9caab4;margin:6px 0 0}
+details{margin-top:18px;border-top:1px solid #29343e;padding-top:12px}
+summary{cursor:pointer;font-weight:700;font-size:14px}
+details code,details pre{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#cfe}
+details pre{background:#0d1319;border:1px solid #29343e;border-radius:8px;padding:10px;white-space:pre-wrap}
+.actions button{margin-top:12px}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.preview{position:static;order:-1}canvas#out{max-height:70vh}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <a href="/">← Decision engine</a> · <a href="/session-builder.html">Session builder</a>
+    <p class="eyebrow">THE LAB / COACH TOOLS / 03</p>
+    <h1>Graphics Studio.</h1>
+    <p class="muted">Pick a layout, type your content, download a finished graphic. Everything runs in this browser tab — nothing is uploaded.</p>
+  </header>
+
+  <div class="layout">
+    <section class="panel controls" aria-label="Graphic settings">
+      <h2>Start</h2>
+      <label for="preset">Start from</label>
+      <select id="preset"></select>
+      <label for="template">Layout</label>
+      <select id="template"></select>
+      <p class="blurb" id="blurb"></p>
+
+      <h2>Look</h2>
+      <div class="two">
+        <div><label for="size">Size</label><select id="size"></select></div>
+        <div><label for="theme">Theme</label><select id="theme"></select></div>
+      </div>
+      <div class="two">
+        <div><label for="head">Headline font</label>
+          <select id="head"><option value="">Theme default</option><option value="heavy">Heavy</option><option value="cond">Condensed</option></select></div>
+        <div><label for="accent">Accent colour</label>
+          <div style="display:flex;gap:6px"><input type="color" id="accent"><button class="secondary small" id="accentReset" type="button" title="Use the theme's accent">Reset</button></div></div>
+      </div>
+      <div class="two">
+        <div><label for="brand">Brand text</label><input id="brand" maxlength="40"></div>
+        <div><label for="logo">Logo image (optional)</label><input type="file" id="logo" accept="image/*"></div>
+      </div>
+      <button class="secondary small" id="logoClear" type="button" style="margin-top:8px" hidden>Remove logo</button>
+
+      <h2>Content</h2>
+      <div id="fields"></div>
+      <div class="actions" id="actions"></div>
+
+      <details id="dslHelp">
+        <summary>How to draw on the court</summary>
+        <p class="help">Zones use the LAB grid. <code>O</code> = opponent side, <code>Y</code> = your side, then the zone number 1–9.</p>
+<pre>P1 Y1            your player (blue chip)
+D1 O3            opponent (red chip)
+ball Y1 > O7 1   ball path, step "1" at the end
+ball Y2 ~> O1    arced ball (drops, lobs)
+move Y1 > Y5 2   player movement (yellow)
+zone O7 O8       highlight zones
+hot O5           highlight in red
+chip X Y5 orange any label, any colour
+note Y5 Hold     small text label
+// comment</pre>
+        <p class="help"><code>O7-8</code> = seam between 7 and 8 · <code>Y7^</code> = front of the zone (at the net) · <code>Y1_</code> = back of the zone (baseline) · <code>0.5,0.9</code> = exact spot (across, down).</p>
+      </details>
+    </section>
+
+    <section class="preview" aria-label="Preview">
+      <div class="stage"><canvas id="out" role="img" aria-label="Graphic preview"></canvas></div>
+      <div class="bar">
+        <button id="download" type="button">Download PNG</button>
+        <select id="scale" aria-label="Export resolution">
+          <option value="1">Standard</option>
+          <option value="2" selected>High-res (2×)</option>
+          <option value="3">Print (3×)</option>
+        </select>
+        <button class="secondary" id="share" type="button" hidden>Share</button>
+        <button class="secondary" id="save" type="button">Save project</button>
+        <button class="secondary" id="open" type="button">Open project</button>
+        <input type="file" id="openFile" accept="application/json,.json" hidden>
+        <button class="secondary" id="reset" type="button">Reset to preset</button>
+      </div>
+      <p id="status" role="status"></p>
+    </section>
+  </div>
+</main>
+<script src="graphics/engine.js"></script>
+<script src="graphics/templates.js"></script>
+<script src="graphics/presets.js"></script>
+<script src="graphics/app.js"></script>
+</body>
+</html>

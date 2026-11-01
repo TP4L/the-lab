@@ -51,6 +51,34 @@ parts, nothing more:
 
 Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 
+## Graphics Studio
+
+`public/graphics.html` makes LAB-branded graphics in the browser: pick a layout,
+type the content, download a PNG (standard, 2× or print 3×). Nothing is uploaded;
+work autosaves in the tab and can be saved/opened as a `.json` project.
+
+Layouts: numbered list poster · court grid / zone map · pattern playbook card ·
+team shape sheet · pressure / escapes · language codebook. Each one ships with a
+preset built from the existing LAB sheets (`public/graphics/presets.js` — copy a
+block to add your own).
+
+Court diagrams use a small text language on the 9-zone grid
+(`O` = opponent side, `Y` = your side):
+
+```
+P1 Y1            your player          D1 O3           opponent
+ball Y1 > O7 1   ball path + step     ball Y2 ~> O1   arced ball
+move Y1 > Y5 2   player movement      zone O7 O8      highlight zones
+O7-8 = seam      Y7^ = at the net     Y1_ = at the baseline
+```
+
+| Path | What's in it |
+|---|---|
+| `public/graphics/engine.js` | Canvas drawing: text fitting, brand mark, court, arrows, diagram language |
+| `public/graphics/templates.js` | The six layouts and the court-logic table |
+| `public/graphics/presets.js` | Starting content for each layout |
+| `public/graphics/app.js` | Form, themes, preview, export, save/open |
+
 ## Layout
 
 | Path | What's in it |
