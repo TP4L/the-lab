@@ -2391,7 +2391,10 @@
     var p = parse();
     if(ME && p && p.r[1]==='signin' && !p.query.error){location.hash='#/';return;}
     if (!p) { location.hash = '#/'; return; }
-    if (!p.r[3] && !ME) { location.hash = '#/signin'; return; }
+    if(ME && p.r[1]==='home'){
+      const pending=window.LabInviteReturn.take();if(pending){location.hash=pending;return;}
+    }
+    if (!p.r[3] && !ME) { window.LabInviteReturn.save(location.hash); location.hash = '#/signin'; return; }
     $('#nav').hidden = !ME;
     $('#bell').hidden = !ME;
     if (ME) pollBell(true);

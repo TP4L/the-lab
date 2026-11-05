@@ -7,17 +7,17 @@ function lessonBrief(db,auth,user,id) {
   if(!plan || (plan.owner_id!==user.id && !auth.has(user,'admin')))throw new HttpError(404,'Lesson plan not found.');
   const session=db.prepare('SELECT id,status FROM training_sessions WHERE source_plan_id=?').get(id);
   const blocks=db.prepare('SELECT id,ord,drill,instructions,court FROM plan_blocks WHERE plan_id=? ORDER BY ord').all(id);
-  const players=db.prepare(`SELECT pp.athlete_id AS id,pp.name,pp.rsvp,pp.court,pp.recap_cue,a.focus,a.training_needs
+  const players=db.prepare(`SELECT pp.athlete_id AS id,pp.name,pp.rsvp,pp.invitational_arrival AS arrival,pp.court,pp.recap_cue,a.focus,a.training_needs
     FROM plan_players pp LEFT JOIN athletes a ON a.id=pp.athlete_id WHERE pp.plan_id=? ORDER BY pp.id`).all(id)
     .map(p=>{
       const eligible=Boolean(p.id && auth.coachesAthlete(user,p.id));
-      if(!eligible) return {name:p.name,rsvp:p.rsvp,eligible:false};
+      if(!eligible) return {name:p.name,rsvp:p.rsvp,arrival:p.arrival,court:p.court,eligible:false};
       const previous=db.prepare(`SELECT b.title,b.constraint_text,b.retest_notes,b.coach_feedback,b.athlete_reflection,
         (SELECT trim(COALESCE(CASE WHEN attempts IS NOT NULL THEN makes || '/' || attempts || ' drill' END,'') || ' ' ||
         COALESCE(CASE WHEN game_attempts IS NOT NULL THEN game_makes || '/' || game_attempts || ' game' END,'') || ' ' || result)
         FROM development_attempts WHERE block_id=b.id ORDER BY id DESC LIMIT 1) AS result
         FROM development_blocks b WHERE b.athlete_id=? ORDER BY b.updated_at DESC,b.id DESC LIMIT 1`).get(p.id);
-      return {id:p.id,name:p.name,rsvp:p.rsvp,court:p.court,eligible:true,training_needs:JSON.parse(p.training_needs||'[]'),
+      return {id:p.id,name:p.name,rsvp:p.rsvp,arrival:p.arrival,court:p.court,eligible:true,training_needs:JSON.parse(p.training_needs||'[]'),
         cue:p.recap_cue||previous?.retest_notes||previous?.coach_feedback||previous?.constraint_text||p.focus||'',
         previous:previous?.title||'',result:previous?.result||previous?.athlete_reflection||''};
     });

@@ -42,6 +42,7 @@
 .court-weeks h3{margin:.35rem 0;font-size:1.18rem}
 .court-weeks blockquote{margin:10px 0;padding-left:10px;border-left:2px solid var(--ok)}
 .court-qr{display:grid;justify-items:center;gap:12px;text-align:center}
+.invite-player{display:grid;grid-template-columns:minmax(0,1fr) minmax(175px,1fr);align-items:center;gap:16px;border-bottom:1px solid var(--rule-soft);padding:10px 0}.invite-player .court-select{border:0}.invite-profile{font:500 .8rem/1.35 var(--display)}.invite-plan{white-space:pre-wrap;overflow-wrap:anywhere}.invite-profile select{margin-top:4px;width:100%}@media(max-width:620px){.invite-player{grid-template-columns:1fr;gap:2px}.invite-player .court-select{padding-bottom:3px}}
 .court-qr svg{width:min(100%,220px);height:auto;border-radius:8px}
 .court-qr .btn{justify-self:center}
 .court-history,.court-observation{border-bottom:1px solid var(--rule-soft);padding:12px 0}

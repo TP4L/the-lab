@@ -65,6 +65,7 @@ function createApp(opts = {}) {
   require('./api/account.js')(r, ctx);
   require('./api/email-signin.js')(r, ctx);
   require('./api/site-bridge.js')(r, ctx);
+  require('./api/invitationals.js')(r,ctx,opts.invitationalsPublicKey);
   require('./api/site-signin.js')(r, ctx);
   require('./api/workspace.js')(r, ctx);
   require('./api/training.js')(r, ctx);
