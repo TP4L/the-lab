@@ -26,9 +26,15 @@
   function ApiError(msg, status, data) { this.message = msg; this.status = status; this.data = data || {}; }
   ApiError.prototype = Object.create(Error.prototype);
 
-  var CACHEABLE = /^\/api\/(me|home|posts|athletes|training\/sessions|studio\/posts|matches|events|leaderboard|notifications|g\/|i\/|plans|interest)/;
+  var CACHEABLE = /^\/api\/(me|home|posts|athletes|development-blocks|training\/sessions|studio\/posts|matches|events|leaderboard|notifications|g\/|i\/|plans|interest)/;
+
+  function cacheKey(path) {
+    var userId = Store.get('me', null)?.user?.id;
+    return 'cache:' + (userId || 'public') + ':' + path;
+  }
 
   function request(method, path, body) {
+    var key = cacheKey(path);
     var opts = { method: method, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
     if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
     return fetch(path, opts).then(function (res) {
@@ -38,7 +44,7 @@
           if (res.status === 401) Lab.emit('signedout');
           throw new ApiError(data.error || 'Request failed (' + res.status + ').', res.status, data);
         }
-        if (method === 'GET' && CACHEABLE.test(path)) Store.set('cache:' + path, { at: Date.now(), data: data });
+        if (method === 'GET' && CACHEABLE.test(path)) Store.set(key, { at: Date.now(), data: data });
         return data;
       });
     }, function () {
@@ -51,7 +57,7 @@
   function get(path) {
     return request('GET', path).then(function (d) { setOnline(true); return d; }, function (err) {
       if (err.status === 0) {
-        var c = Store.get('cache:' + path);
+        var c = Store.get(cacheKey(path));
         if (c) { var d = c.data; try { Object.defineProperty(d, '_offline', { value: c.at }); } catch (e) {} return d; }
       }
       throw err;

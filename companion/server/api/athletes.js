@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { HttpError, withStatus, str, oneOf, int, uuid, isoTime, SECURITY_HEADERS } = require('../http.js');
+const { HttpError, withStatus, str, oneOf, int, list, uuid, isoTime, SECURITY_HEADERS } = require('../http.js');
 const { claimCode, normalizeCode, sha256, limiter } = require('../auth.js');
 const { tx, now } = require('../db.js');
 const { athleteResults } = require('./training.js');
@@ -52,7 +52,7 @@ module.exports = function athletes(r, ctx) {
       goals: a.goals, focus: a.focus, plan: a.plan, photo_media_id: a.photo_media_id,
       claimed: !!a.user_id, updated_at: a.updated_at
     };
-    if (level === 'coach') { out.claim_pending = !a.user_id && !!a.claim_code_hash; out.claim_email = a.claim_email || ''; }
+    if (level === 'coach') { out.training_needs = JSON.parse(a.training_needs || '[]'); out.claim_pending = !a.user_id && !!a.claim_code_hash; out.claim_email = a.claim_email || ''; }
     return out;
   }
   function notesFor(athleteId, level) {
@@ -188,12 +188,18 @@ module.exports = function athletes(r, ctx) {
 
   r.put('/api/athletes/:id', async ({ user, params, body }) => {
     const { a, level } = access(user, int(params.id, 'id', { min: 1, required: true }));
+    let needs;
+    if (body.training_needs !== undefined) {
+      if (level !== 'coach') throw new HttpError(403, 'Only the coach can set training needs.');
+      needs = [...new Set(list(body.training_needs, 'training needs', { max: 24, item: x => str(x, 'need', { required: true, max: 60 }).toLowerCase() }))];
+    }
     const currentShared=ctx.sharedProfile?await ctx.sharedProfile(a,a):null;
     const f = fields(body, level, currentShared?{...a,...currentShared}:a);
     const shared=ctx.sharedProfile?await ctx.sharedProfile(a,f,true):null;
     if(shared)Object.assign(f,shared);
     db.prepare('UPDATE athletes SET name = ?, hand = ?, side = ?, rating = ?, goals = ?, focus = ?, plan = ?, updated_at = ? WHERE id = ?')
       .run(f.name, f.hand, f.side, f.rating, f.goals, f.focus, f.plan, now(), a.id);
+    if (needs) db.prepare('UPDATE athletes SET training_needs = ? WHERE id = ?').run(JSON.stringify(needs), a.id);
     saveMeasurements(a.id, f);
     return profile(load(a.id), level);
   });

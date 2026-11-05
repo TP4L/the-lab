@@ -135,6 +135,12 @@ module.exports = function training(r, { db, auth, notifier }) {
     const full = loadSession(db, s.id);
     const coachView = s.coach_id === user.id || user.roles.includes('admin');
     const mine = auth.ownAthleteId(user);
+    if (coachView) {
+      full.athletes.forEach(a => {
+        a.training_needs = JSON.parse(db.prepare('SELECT training_needs FROM athletes WHERE id=?').get(a.id).training_needs);
+        a.closeout_block_id = db.prepare('SELECT id FROM development_blocks WHERE source_session_id=? AND athlete_id=?').get(s.id, a.id)?.id;
+      });
+    }
     // Notes written during this session; athletes see only what's shared with them.
     full.notes = db.prepare(`SELECT n.id, n.athlete_id, n.kind, n.visibility, n.body, n.created_at, u.name AS author, a.name AS athlete_name
       FROM notes n LEFT JOIN users u ON u.id = n.author_id JOIN athletes a ON a.id = n.athlete_id WHERE n.session_id = ? ORDER BY n.created_at`).all(s.id)

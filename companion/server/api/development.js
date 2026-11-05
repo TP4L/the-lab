@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { HttpError, withStatus, str, oneOf, int, list } = require('../http.js');
+const { HttpError, withStatus, str, oneOf, int, list, uuid } = require('../http.js');
 const { tx, now } = require('../db.js');
 
 const READS = ['height', 'time', 'balance'];
@@ -35,6 +35,9 @@ module.exports = function development(r, ctx) {
     const level = row && auth.athleteAccess(user, row.athlete_id);
     if (!level) throw new HttpError(404, 'Development Block not found.');
     return { row, level };
+  }
+  function detail(row) {
+    return { ...shape(row), attempts: db.prepare('SELECT result,conditions,cue,confidence,media_id,at FROM development_attempts WHERE block_id=? ORDER BY id').all(row.id) };
   }
   function due(value) {
     if (!value) return null;
@@ -136,12 +139,23 @@ module.exports = function development(r, ctx) {
     if (!auth.athleteAccess(user, aid)) throw new HttpError(404, 'Athlete not found.');
     return db.prepare(select("WHERE b.athlete_id = ? ORDER BY CASE b.status WHEN 'mastered' THEN 1 ELSE 0 END, b.updated_at DESC")).all(aid).map(shape);
   });
-  r.get('/api/development-blocks/:id', ({ user, params }) => shape(block(user, params.id).row));
+  r.get('/api/development-blocks/:id', ({ user, params }) => detail(block(user, params.id).row));
 
   r.post('/api/athletes/:id/development-blocks', async ({ user, params, body }) => {
     auth.require(user, 'coach');
     const aid = int(params.id, 'id', { min: 1, required: true });
     if (!auth.coachesAthlete(user, aid)) throw new HttpError(404, 'Athlete not found.');
+    const source = body.source_session_id ? uuid(body.source_session_id, 'source_session_id') : null;
+    const key = body.client_key ? uuid(body.client_key, 'client_key') : null;
+    if (source) {
+      const session = db.prepare('SELECT s.coach_id,s.status FROM training_sessions s JOIN training_athletes ta ON s.id=ta.session_id WHERE s.id=? AND ta.athlete_id=?').get(source, aid);
+      if (!session || (session.coach_id !== user.id && !auth.has(user, 'admin'))) throw new HttpError(404, 'Session not found.');
+      if (session.status !== 'complete') throw new HttpError(409, 'Finish the session before assigning its closeout.');
+    }
+    const prior = db.prepare(select('WHERE b.athlete_id=? AND ((b.assigned_by=? AND b.client_key=?) OR b.source_session_id=?)')).get(aid, user.id, key, source);
+    if (prior) return shape(prior);
+    const conditions = str(body.baseline_conditions, 'test conditions', { max: 600 });
+    const minutes = int(body.practice_minutes, 'minutes', { min: 1, max: 480 });
     const title = str(body.title, 'title', { required: true, max: 120 });
     const reads = list(body.read_targets || [], 'read_targets', { max: 3, item: (x, f) => oneOf(x, READS, f) });
     const { lessonId, templateId } = references(body);
@@ -161,6 +175,8 @@ module.exports = function development(r, ctx) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(aid, lessonId, templateId, assignmentId, title, f.problem, JSON.stringify([...new Set(reads)]), f.start, f.desired, body.scramble ? 1 : 0,
           f.layer, f.intensity, f.constraint, f.expected, f.evidence, f.reflection, f.due, user.id).lastInsertRowid);
+      db.prepare('UPDATE development_blocks SET baseline_conditions=?,practice_minutes=?,review_required=?,client_key=?,source_session_id=? WHERE id=?')
+        .run(conditions, minutes, body.review_required === false ? 0 : 1, key, source, blockId);
     });
     notifier.notify(notifier.usersOfAthletes([aid]), 'training', `New Development Block from ${user.name}: ${title}`, f.due ? `Due ${f.due}.` : 'Your learning and training are connected in one path.', `#/development/${blockId}`);
     await deliverWebsite(user, blockId);
@@ -179,7 +195,12 @@ module.exports = function development(r, ctx) {
   r.put('/api/development-blocks/:id', ({ user, params, body }) => {
     const { row, level } = block(user, params.id);
     const isCoach = level === 'coach';
+    if (isCoach && ((body.expected_status && row.status !== body.expected_status) || (body.expected_updated_at && row.updated_at !== body.expected_updated_at))) throw new HttpError(409, 'This practice changed. Reopen it before saving your decision.');
     let status = body.status === undefined ? row.status : oneOf(body.status, STATUSES, 'status');
+    const submitting = !isCoach && body.status === 'evidence_submitted';
+    const key = submitting && body.attempt_id ? uuid(body.attempt_id, 'attempt_id') : null;
+    if (key && db.prepare('SELECT 1 FROM development_attempts WHERE block_id=? AND request_key=?').get(row.id, key)) return detail(row);
+    if (!isCoach && ['mastered','evidence_submitted','coach_review'].includes(row.status)) throw new HttpError(409, 'This result is saved. Your coach can open a new attempt.');
     if (!isCoach && !['assigned', 'in_progress', 'evidence_submitted'].includes(status)) throw new HttpError(403, 'Your coach advances review and retest stages.');
     const reflection = body.athlete_reflection === undefined ? row.athlete_reflection : str(body.athlete_reflection, 'athlete_reflection', { max: 4000 });
     const confidence = body.confidence === undefined || body.confidence === null || body.confidence === '' ? row.confidence : int(body.confidence, 'confidence', { min: 1, max: 5 });
@@ -194,12 +215,20 @@ module.exports = function development(r, ctx) {
         if (!media || media.athlete_id !== row.athlete_id) throw new HttpError(400, 'Evidence must be uploaded to this athlete.');
       }
     }
+    const conditions = submitting ? str(body.conditions, 'test conditions', { max: 600 }) : '';
+    if (submitting && !str(body.athlete_reflection, 'result', {max:4000}) && !body.evidence_media_id) throw new HttpError(400, 'Enter your result or attach evidence.');
+    if (submitting && !row.review_required) status = 'mastered';
     if (!isCoach && status === 'assigned' && (reflection || confidence)) status = 'in_progress';
     let retestAssignmentId = row.retest_assignment_id;
     tx(db, () => {
-      if (isCoach && status === 'ready_retest' && row.template_id && !retestAssignmentId) {
+      if (submitting) {
+        db.prepare('INSERT INTO development_attempts(block_id,request_key,result,conditions,cue,confidence,media_id,at) VALUES(?,?,?,?,?,?,?,?)')
+          .run(row.id, key || crypto.randomUUID(), reflection, conditions, row.retest_notes || row.coach_feedback || row.constraint_text, confidence, evidenceId, now());
+      }
+      if (isCoach && status === 'ready_retest' && row.template_id && (!retestAssignmentId || (row.retest_session_id && row.status !== 'ready_retest'))) {
         retestAssignmentId = Number(db.prepare('INSERT INTO assignments (athlete_id, template_id, title, note, assigned_by) VALUES (?, ?, ?, ?, ?)')
           .run(row.athlete_id, row.template_id, `Retest · ${row.title}`, retest || row.success_evidence, user.id).lastInsertRowid);
+        db.prepare('UPDATE development_blocks SET retest_session_id=NULL WHERE id=?').run(row.id);
       }
       db.prepare('UPDATE development_blocks SET athlete_reflection = ?, confidence = ?, coach_feedback = ?, retest_notes = ?, session_id = ?, evidence_media_id = ?, retest_assignment_id = ?, status = ?, updated_at = ? WHERE id = ?')
         .run(reflection, confidence, feedback, retest, sessionId, evidenceId, retestAssignmentId, status, now(), row.id);

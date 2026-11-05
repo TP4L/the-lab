@@ -810,7 +810,25 @@ ALTER TABLE notifications ADD COLUMN email_state TEXT NOT NULL DEFAULT 'none' CH
 ALTER TABLE notifications ADD COLUMN email_priority TEXT NOT NULL DEFAULT 'routine' CHECK (email_priority IN ('urgent','important','routine'));
 CREATE INDEX notification_email_queue ON notifications(user_id, email_state, created_at);
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY];
+const COURTSIDE_DEVELOPMENT = `
+ALTER TABLE athletes ADD COLUMN training_needs TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE development_blocks ADD COLUMN review_required INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE development_blocks ADD COLUMN baseline_conditions TEXT NOT NULL DEFAULT '';
+ALTER TABLE development_blocks ADD COLUMN practice_minutes INTEGER;
+ALTER TABLE development_blocks ADD COLUMN client_key TEXT;
+ALTER TABLE development_blocks ADD COLUMN source_session_id TEXT REFERENCES training_sessions(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX development_client_key ON development_blocks(athlete_id,assigned_by,client_key);
+CREATE UNIQUE INDEX development_closeout ON development_blocks(athlete_id,source_session_id);
+CREATE TABLE development_attempts (
+  id INTEGER PRIMARY KEY, block_id INTEGER NOT NULL REFERENCES development_blocks(id) ON DELETE CASCADE,
+  request_key TEXT NOT NULL, result TEXT NOT NULL, conditions TEXT NOT NULL DEFAULT '', cue TEXT NOT NULL DEFAULT '',
+  confidence INTEGER, media_id TEXT, at TEXT NOT NULL, UNIQUE(block_id,request_key)
+);
+INSERT INTO development_attempts (block_id,request_key,result,cue,confidence,media_id,at)
+SELECT id,'legacy',athlete_reflection,coach_feedback,confidence,evidence_media_id,updated_at FROM development_blocks
+WHERE athlete_reflection <> '' OR evidence_media_id IS NOT NULL;
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

@@ -69,3 +69,52 @@ test('coaches share complete pathways through the Development Library', async (t
   assert.equal((await coach2.del(`/api/development-library/${saved.body.id}`)).status, 403);
   assert.equal((await coach.del(`/api/development-library/${saved.body.id}`)).status, 204);
 });
+
+test('group closeout keeps individual cues private and retries one athlete safely', async t => {
+  const s = await start(); t.after(s.close);
+  const {coach, coach2} = await staff(s);
+  async function make(name) {
+    const made = (await coach.post('/api/athletes',{name})).body;
+    const member = s.client();
+    await member.signup(name,name+'@lab.test');
+    await member.post('/api/claim',{code:made.claim_code});
+    return {id:made.athlete.id,member};
+  }
+  const a=await make('First'), b=await make('Second');
+  for(const id of [a.id,b.id]) {
+    const response=await coach.put('/api/athletes/'+id,{training_needs:['Reset','reset','Bounce read']});
+    assert.deepEqual(response.body.athlete.training_needs,['reset','bounce read']);
+  }
+  assert.equal((await a.member.get('/api/athletes/'+a.id)).body.athlete.training_needs,undefined);
+  assert.equal((await a.member.put('/api/athletes/'+a.id,{training_needs:['test']})).status,403);
+  const sid=uid(), session='/api/training/sessions/'+sid;
+  await coach.post('/api/training/sessions',{id:sid,title:'Transition',athletes:[a.id,b.id],items:[{name:'Reset',measure:'reps'}]});
+  const practice={source_session_id:sid,title:'Pitch and catch',constraint_text:'Wait for the bounce',success_evidence:'7 of 10',review_required:false};
+  const path='/api/athletes/'+a.id+'/development-blocks';
+  assert.equal((await coach.post(path,practice)).status,409);
+  await coach.put(session,{version:1,status:'complete'});
+  assert.equal((await coach2.post(path,practice)).status,404);
+  const first=await coach.post(path,practice);
+  assert.equal(first.status,201);
+  assert.equal((await coach.post(path,practice)).body.id,first.body.id);
+  const peer=await coach.post('/api/athletes/'+b.id+'/development-blocks',{...practice,constraint_text:'Hold the line'});
+  assert.notEqual(peer.body.id,first.body.id);
+  assert.equal((await b.member.get('/api/development-blocks/'+first.body.id)).status,404);
+  const coachSession=(await coach.get(session)).body;
+  assert.equal(coachSession.athletes[0].closeout_block_id,first.body.id);
+  assert.deepEqual(coachSession.athletes[0].training_needs,['reset','bounce read']);
+  const playerSession=(await a.member.get(session)).body;
+  assert.equal(playerSession.athletes.length,1);
+  assert.equal(playerSession.athletes[0].training_needs,undefined);
+  const url='/api/development-blocks/'+first.body.id;
+  const result={status:'evidence_submitted',attempt_id:uid(),conditions:'10 feeds from transition',athlete_reflection:'7/10'};
+  assert.equal((await a.member.put(url,result)).body.status,'mastered');
+  assert.equal((await a.member.put(url,result)).body.status,'mastered');
+  assert.equal((await a.member.put(url,{...result,attempt_id:uid()})).status,409);
+  await coach.put(url,{status:'ready_retest',retest_notes:'Repeat same feed'});
+  await a.member.put(url,{...result,attempt_id:uid(),athlete_reflection:'8/10'});
+  const history=(await a.member.get(url)).body.attempts;
+  assert.deepEqual(history.map(a=>a.result),['7/10','8/10']);
+  assert.equal(history[1].cue,'Repeat same feed');
+  assert.equal(history[1].conditions,result.conditions);
+});

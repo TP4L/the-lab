@@ -92,7 +92,7 @@
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
       '<div class="card stack demo-card" id="democard" hidden><p class="section-title">Try the demo</p><p class="small">Sample players, a live event on courts 4 and 5, a double-elimination bracket, interest checks, a coached session plan and Field Notes. Nothing is emailed, and everything resets daily.</p>' +
       '<div class="demo-btns"><button class="btn primary" type="button" data-demo="host">Host and coach<span>Brett: runs events, plans, publishing</span></button><button class="btn" type="button" data-demo="player">Player<span>Jordan: courts, scores, notes, recap</span></button><button class="btn ghost" type="button" data-demo="coach">Assistant coach<span>Austin: roster and training</span></button></div></div>' +
-      '<div id="email-slot">' + (META.magic ? emailForm() : '') + '</div><details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p><a class="btn google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a>' +
+      '<a class="btn primary google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a><div id="email-slot">' + (META.magic ? emailForm() : '') + '</div><details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="field"><label class="flabel" for="pw">Password</label><input type="password" id="pw" autocomplete="current-password" required></div>' +
@@ -297,7 +297,7 @@
   function fmtTime(s) { s = Math.round(s * 10) / 10; var m = Math.floor(s / 60); return (m ? m + ':' + ('0' + (s % 60).toFixed(1)).slice(-4) : s.toFixed(1) + 's'); }
 
   function localSessions() {
-    return Store.keys('session:').map(function (k) { return Store.get(k); }).filter(Boolean);
+    return Store.keys('session:').map(function (k) { return Store.get(k); }).filter(s => s && (s.viewer_id || s.coach_id) === ME?.user?.id);
   }
 
   views.train = function () {
@@ -360,6 +360,14 @@
     }).join('') + '</div>';
   }
 
+  function sharedNeeds(athletes) {
+    if (athletes.length < 2) return '';
+    var counts = new Map();
+    athletes.forEach(a => (a.training_needs || []).forEach(need => counts.set(need, (counts.get(need) || 0) + 1)));
+    var matches = [...counts].filter(entry => entry[1] > 1).sort((a,b) => b[1] - a[1]);
+    return matches.length ? 'Shared training needs: ' + matches.map(([need,n]) => need + ' (' + n + '/' + athletes.length + ')').join(' · ') : 'No shared training needs tagged yet.';
+  }
+
   views.developmentNew = function (athleteId, query) {
     if (!has('coach')) return forbidden('Only coaches can create Development Blocks.');
     var athleteReq = athleteId ? api.get('/api/athletes/' + athleteId).then(function (p) { return [p.athlete]; }) : api.get('/api/athletes');
@@ -371,12 +379,17 @@
           return lessons.length ? '<optgroup label="' + h(c.title) + '">' + lessons.join('') + '</optgroup>' : '';
         }).join('');
         app.innerHTML = '<a class="back" href="' + (athleteId ? '#/coach/' + athlete.id : '#/coach/today') + '">← ' + (athleteId ? h(athlete.name) : 'Coaching Dashboard') + '</a>' +
-          head('Development Block', 'Assign the complete pathway', athleteId ? 'Build one clear path from what ' + h(athlete.name.split(' ')[0]) + ' needs to understand to what they must prove on court.' : 'Choose one athlete or a group, then connect what they learn to what they must prove on court.') +
+          head('Development Block', 'Plan the next practice', athleteId ? 'Build one clear path from what ' + h(athlete.name.split(' ')[0]) + ' needs to understand to what they must prove on court.' : 'Choose one athlete or a group, then connect what they learn to what they must prove on court.') +
           '<form class="card form" id="dbf" novalidate>' +
           (library.length ? '<div class="field library-picker"><label class="flabel" for="dblibrary">Start from the Development Library</label><div class="row"><select id="dblibrary"><option value="">Build from scratch</option>' + library.map(function (x) { return '<option value="' + x.id + '">' + h(x.name) + '</option>'; }).join('') + '</select><a class="btn ghost" href="#/coach/development/library">View library</a></div></div>' : '<p class="small"><a href="#/coach/development/library">Create your first reusable pathway →</a></p>') +
           (!athleteId ? '<fieldset class="field"><legend class="flabel">Athletes · ' + athletes.length + ' connected</legend><p class="small muted">Website and app profiles are combined here. Website athletes keep their original history.</p><div class="athlete-pick">' + athletes.map(function (a) { return '<label><input type="checkbox" name="dbathlete" value="' + a.id + '"><span><b>' + h(a.name) + '</b><small>' + (a.website_id ? '<span class="tag">Website</span> ' : '') + h(a.focus || a.sport || 'Ready for a development focus') + '</small></span></label>'; }).join('') + '</div></fieldset>' : '') +
-          '<div class="field"><label class="flabel" for="dbtitle">Block title</label><input id="dbtitle" maxlength="120" placeholder="Creating Time in Transition"></div>' +
-          '<div class="field"><label class="flabel" for="dbproblem">Player problem</label><textarea id="dbproblem" maxlength="1000" placeholder="Attacking before balance and time are available"></textarea></div>' +
+          '<div class="field"><label class="flabel" for="dbtitle">Practice name</label><input id="dbtitle" maxlength="120" placeholder="Creating Time in Transition"></div>' +
+          '<div class="field"><label class="flabel" for="dbproblem">Athlete focus</label><textarea id="dbproblem" maxlength="1000" placeholder="Attacking before balance and time are available"></textarea></div>' +
+          '<div class="field"><label class="flabel" for="dbconstraint">What to do</label><textarea id="dbconstraint" maxlength="1000" placeholder="Earn balance before attacking"></textarea></div>' +
+          '<div class="field"><label class="flabel" for="dbevidence">How to score it</label><input id="dbevidence" maxlength="1000" placeholder="Correct decision on 7 of 10 balls"></div>' +
+          '<div class="form-grid"><label>Minutes <input type="number" id="dbminutes" min="1" max="480" placeholder="8"></label><label>Test setup <input id="dbconditions" maxlength="600" placeholder="10 balls, lower transition, same feeder"></label></div>' +
+          '<label class="check-line"><input type="checkbox" id="dbcheckpoint" checked> Coach reviews the result</label>' +
+          '<details class="more"><summary>Lesson, training situation &amp; coaching details</summary>' +
           '<fieldset class="field"><legend class="flabel">Read target</legend><div class="check-row"><label><input type="checkbox" name="read" value="height"> Height</label><label><input type="checkbox" name="read" value="time"> Time</label><label><input type="checkbox" name="read" value="balance"> Balance</label></div></fieldset>' +
           '<div class="form-grid"><div class="field"><label class="flabel" for="dbstart">Starting state</label><select id="dbstart"><option value="defensive">Defensive</option><option value="neutral" selected>Neutral</option><option value="offensive">Offensive</option></select></div>' +
           '<div class="field"><label class="flabel" for="dbdesired">Desired state</label><select id="dbdesired"><option value="defensive">Defensive</option><option value="neutral">Neutral</option><option value="offensive" selected>Offensive</option></select></div>' +
@@ -386,12 +399,21 @@
           '<div class="form-grid"><div class="field"><label class="flabel" for="dblesson">Learning lesson</label><select id="dblesson"><option value="">No lesson yet</option>' + lessonOptions + '</select></div>' +
           '<div class="field"><label class="flabel" for="dbtemplate">Training situation</label><select id="dbtemplate"><option value="">No template yet</option>' + templates.map(function (t) { return '<option value="' + t.id + '">' + h(t.name) + '</option>'; }).join('') + '</select></div>' +
           '<div class="field"><label class="flabel" for="dbdue">Due</label><input type="date" id="dbdue"></div></div>' +
-          '<div class="field"><label class="flabel" for="dbconstraint">Constraint</label><textarea id="dbconstraint" maxlength="1000" placeholder="Earn balance before attacking"></textarea></div>' +
           '<div class="field"><label class="flabel" for="dbexpected">Expected ball</label><input id="dbexpected" maxlength="1000" placeholder="A shorter, attackable reply after the reset"></div>' +
-          '<div class="field"><label class="flabel" for="dbevidence">Success evidence</label><input id="dbevidence" maxlength="1000" placeholder="Correct decision on 7 of 10 balls"></div>' +
           '<div class="field"><label class="flabel" for="dbreflection">Reflection question</label><input id="dbreflection" maxlength="1000" placeholder="What told you it was safe to attack?"></div>' +
-          '<label class="check-line"><input type="checkbox" id="dbsave"> Save this complete pathway to the coach library</label>' +
+          '</details><label class="check-line"><input type="checkbox" id="dbsave"> Save this complete pathway to the coach library</label>' +
           '<div class="row"><button class="btn primary" type="submit">Assign Development Block</button></div></form>';
+        var assignmentKey = L.uuid();
+        var pickers = $$('input[name="dbathlete"]', $('#dbf'));
+        if (pickers.length) {
+          var match = document.createElement('p');
+          match.className = 'small'; match.setAttribute('aria-live', 'polite');
+          pickers[0].closest('fieldset').append(match);
+          pickers.forEach(box => box.onchange = () => {
+            var ids = pickers.filter(x => x.checked).map(x => Number(x.value));
+            match.textContent = sharedNeeds(athletes.filter(a => ids.includes(a.id)));
+          });
+        }
         function loadPathway(x) {
           if (!x) return;
           $('#dbtitle').value = x.title || ''; $('#dbproblem').value = x.problem || ''; $('#dbstart').value = x.start_state; $('#dbdesired').value = x.desired_state;
@@ -404,19 +426,21 @@
           $('#dblibrary').addEventListener('change', function () { loadPathway(library.find(function (x) { return String(x.id) === $('#dblibrary').value; })); });
           if (query && query.library) { $('#dblibrary').value = query.library; loadPathway(library.find(function (x) { return String(x.id) === String(query.library); })); }
         }
+        var librarySaved = false;
         $('#dbf').addEventListener('submit', function (e) {
           e.preventDefault();
           var athleteIds = athleteId ? [Number(athleteId)] : $$('input[name="dbathlete"]:checked', $('#dbf')).map(function (x) { return Number(x.value); });
           if (!athleteIds.length) return L.formError($('#dbf'), 'Choose at least one athlete.');
           var reads = $$('input[name="read"]:checked', $('#dbf')).map(function (x) { return x.value; });
           var payload = {
-            title: $('#dbtitle').value, problem: $('#dbproblem').value, read_targets: reads, start_state: $('#dbstart').value, desired_state: $('#dbdesired').value,
+            client_key: assignmentKey, review_required: $('#dbcheckpoint').checked, practice_minutes: $('#dbminutes').value || undefined,
+            baseline_conditions: $('#dbconditions').value, title: $('#dbtitle').value, problem: $('#dbproblem').value, read_targets: reads, start_state: $('#dbstart').value, desired_state: $('#dbdesired').value,
             scramble: $('#dbscramble').checked, error_layer: $('#dblayer').value, intensity: $('#dbintensity').value, lesson_id: $('#dblesson').value || undefined,
             template_id: $('#dbtemplate').value || undefined, due_on: $('#dbdue').value || undefined, constraint_text: $('#dbconstraint').value,
             expected_ball: $('#dbexpected').value, success_evidence: $('#dbevidence').value, reflection_prompt: $('#dbreflection').value
           };
           var submit = $('#dbf button[type="submit"]'); submit.disabled = true; submit.textContent = athleteIds.length > 1 ? 'Assigning to ' + athleteIds.length + ' athletes…' : 'Assigning…';
-          var save = $('#dbsave').checked ? api.request('POST', '/api/development-library', Object.assign({ name: payload.title }, payload)) : Promise.resolve();
+          var save = $('#dbsave').checked && !librarySaved ? api.request('POST', '/api/development-library', Object.assign({ name: payload.title }, payload)).then(() => { librarySaved = true; }) : Promise.resolve();
           save.then(function () { return Promise.all(athleteIds.map(function (id) { return api.request('POST', '/api/athletes/' + id + '/development-blocks', payload); })); }).then(function (blocks) {
             var websiteFailed = blocks.filter(function (x) { return x.delivery && x.delivery.website === 'failed'; }).length;
             L.toast('Development Block assigned to ' + athleteIds.length + ' athlete' + (athleteIds.length === 1 ? '' : 's') + (websiteFailed ? ' · ' + websiteFailed + ' website delivery needs retry' : ' · delivery checked'));
@@ -447,6 +471,8 @@
       var webDelivery = b.delivery.website === 'delivered' ? 'Website delivered' : b.delivery.website === 'failed' ? 'Website needs retry' : b.delivery.website === 'pending' ? 'Website pending' : 'No website profile';
       app.innerHTML = '<a class="back" href="' + (coach ? '#/coach/' + b.athlete_id : '#/train') + '">← ' + (coach ? 'Athlete profile' : 'Training') + '</a>' +
         '<section class="dev-hero"><span class="dev-kicker">' + h(statusLabel) + '</span><h1>' + h(b.title) + '</h1><p>' + h(b.problem) + '</p><div class="dev-read"><b>' + h(reads) + '</b><span>' + h(state) + '</span></div></section>' +
+        (b.baseline_conditions || b.practice_minutes ? '<section class="card"><p class="section-title">Practice setup</p><p>' + h([b.practice_minutes && b.practice_minutes + ' minutes', b.baseline_conditions].filter(Boolean).join(' · ')) + '</p></section>' : '') +
+        ((b.attempts || []).length ? '<section class="card stack-sm"><p class="section-title">Result history</p>' + b.attempts.map((a,i) => '<article class="journey-note"><b>' + (i ? 'Retest ' + i : 'First result') + ' · ' + h(L.when(a.at)) + '</b><p>' + h(a.result || 'Media submitted') + '</p><p class="small">' + h(a.conditions || 'Setup unrecorded') + (a.cue ? ' · Cue: ' + h(a.cue) : '') + '</p>' + (a.media_id ? '<a target="_blank" rel="noopener" href="/api/media/'+h(a.media_id)+'">View evidence</a>' : '') + '</article>').join('') + '</section>' : '') +
         '<div class="dev-steps"><span class="' + (b.lesson_id ? 'on' : '') + '">Learn</span><span class="' + (b.session_id ? 'on' : '') + '">Train</span><span class="' + (b.evidence_media_id || b.athlete_reflection ? 'on' : '') + '">Evidence</span><span class="' + (['coach_review','ready_retest','mastered'].includes(b.status) ? 'on' : '') + '">Review</span><span class="' + (b.retest_session_id || b.status === 'mastered' ? 'on' : '') + '">Retest</span></div>' +
         (coach ? '<section class="card delivery-check"><div><p class="section-title">Delivery check</p><div class="row"><span class="tag">' + h(appDelivery) + '</span><span class="tag">' + h(webDelivery) + '</span></div>' + (b.delivery.website_error ? '<p class="small muted">' + h(b.delivery.website_error) + '</p>' : '') + '</div>' + (b.delivery.website !== 'not_linked' && b.delivery.website !== 'delivered' ? '<button class="btn ghost" id="resendDelivery">Retry website delivery</button>' : '') + '</section>' : '') +
         '<div class="grid-2"><div class="stack">' +
@@ -458,18 +484,36 @@
         (b.retest_assignment_id ? '<a class="li" href="' + (coach && !b.retest_session_id ? '#/train/new?athlete=' + b.athlete_id + '&assignment=' + b.retest_assignment_id : b.retest_session_id ? '#/train/' + h(b.retest_session_id) : '#/train') + '"><span class="main-col"><span class="t small">Retest · ' + h(b.title) + '</span><span class="d">' + (b.retest_session_id ? 'Open completed retest' : coach ? 'Run the retest' : 'Ready in your training assignments') + '</span></span></a>' : '') +
         (b.evidence_media_id ? '<div class="card stack-sm"><p class="section-title">Athlete evidence</p>' + (String(b.evidence_mime || '').startsWith('image/') ? '<img class="lesson-video" alt="Athlete evidence for ' + h(b.title) + '" src="/api/media/' + h(b.evidence_media_id) + '">' : '<video class="lesson-video" controls playsinline preload="metadata" src="/api/media/' + h(b.evidence_media_id) + '"></video>') + '</div>' : '') +
         '</div><div class="stack">' +
-        (coach ? '<form class="card form" id="reviewf"><p class="section-title">Coach review</p><div class="field"><label class="flabel" for="dbstatus">Stage</label><select id="dbstatus">' + Object.keys(DEV_STATUS).map(function (x) { return '<option value="' + x + '"' + (x === b.status ? ' selected' : '') + '>' + h(DEV_STATUS[x]) + '</option>'; }).join('') + '</select></div><div class="field"><label class="flabel" for="dbfeedback">Feedback shared with athlete</label><textarea id="dbfeedback" maxlength="4000">' + h(b.coach_feedback) + '</textarea></div><div class="field"><label class="flabel" for="dbretest">Retest plan</label><textarea id="dbretest" maxlength="4000">' + h(b.retest_notes) + '</textarea></div><div class="row"><button class="btn primary" type="submit">Save review</button></div></form>' :
-          '<form class="card form" id="evidencef"><p class="section-title">Your evidence</p><p class="small">' + h(b.reflection_prompt || 'What changed when you applied this?') + '</p><div class="field"><label class="flabel" for="dbreflect">Reflection</label><textarea id="dbreflect" maxlength="4000">' + h(b.athlete_reflection) + '</textarea></div><div class="field"><label class="flabel" for="dbconfidence">Confidence</label><select id="dbconfidence"><option value="">Choose 1–5</option>' + [1,2,3,4,5].map(function (x) { return '<option value="' + x + '"' + (x === b.confidence ? ' selected' : '') + '>' + x + ' · ' + (x === 1 ? 'Unsure' : x === 5 ? 'Ready under pressure' : 'Building') + '</option>'; }).join('') + '</select></div><div class="field"><label class="flabel" for="dbevidencefile">Video or photo <span class="hint">optional</span></label><input type="file" id="dbevidencefile" accept="image/*,video/*"><div class="upload-row" id="dbprog" hidden><div class="progress"><i></i></div><span class="small muted" id="dbprogtext"></span></div></div><div class="row"><button class="btn primary" type="submit">Submit evidence</button></div></form>') +
-        (b.coach_feedback ? '<div class="card stack-sm"><p class="section-title">Coach feedback</p><p>' + h(b.coach_feedback) + '</p>' + (b.retest_notes ? '<p class="small"><b>Retest:</b> ' + h(b.retest_notes) + '</p>' : '') + '</div>' : '') + '</div></div>';
-      if ($('#reviewf')) $('#reviewf').addEventListener('submit', function (e) { e.preventDefault(); api.request('PUT', '/api/development-blocks/' + b.id, { status: $('#dbstatus').value, coach_feedback: $('#dbfeedback').value, retest_notes: $('#dbretest').value }).then(function () { L.toast('Review saved'); route(); }, function (err) { L.formError($('#reviewf'), err.message); }); });
+        (coach ? '<form class="card form" id="reviewf"><p class="section-title">Coach review</p><div class="field"><label class="flabel" for="dbstatus">Next step</label><select id="dbstatus">' + Object.keys(DEV_STATUS).map(function (x) { return '<option value="' + x + '"' + (x === b.status ? ' selected' : '') + '>' + h(({ready_retest:'Repeat or adjust and retest',mastered:'Advance · close this block'})[x] || DEV_STATUS[x]) + '</option>'; }).join('') + '</select></div><div class="field"><label class="flabel" for="dbfeedback">Feedback shared with athlete</label><textarea id="dbfeedback" maxlength="4000">' + h(b.coach_feedback) + '</textarea></div><div class="field"><label class="flabel" for="dbretest">Retest plan</label><textarea id="dbretest" maxlength="4000">' + h(b.retest_notes) + '</textarea></div><div class="row"><button class="btn primary" type="submit">Save review</button></div></form>' :
+          ['mastered','coach_review','evidence_submitted'].includes(b.status) ? '<div class="card"><h2>' + (b.status === 'mastered' ? 'Practice complete' : 'Your result is with your coach') + '</h2></div>' : '<form class="card form" id="evidencef"><p class="section-title">Your evidence</p><p class="small">' + h(b.reflection_prompt || 'What changed when you applied this?') + '</p><div class="field"><label class="flabel" for="dbreflect">Your result</label><textarea id="dbreflect" maxlength="4000"></textarea></div><label>Test setup this time<input id="attemptSetup" maxlength="600" value="' + h(b.baseline_conditions || b.attempts?.[0]?.conditions || '') + '" placeholder="Feed, reps, position or changes"></label><div class="field"><label class="flabel" for="dbconfidence">Confidence</label><select id="dbconfidence"><option value="">Choose 1–5</option>' + [1,2,3,4,5].map(function (x) { return '<option value="' + x + '"' + (x === b.confidence ? ' selected' : '') + '>' + x + ' · ' + (x === 1 ? 'Unsure' : x === 5 ? 'Ready under pressure' : 'Building') + '</option>'; }).join('') + '</select></div><div class="field"><label class="flabel" for="dbevidencefile">Video or photo <span class="hint">optional</span></label><input type="file" id="dbevidencefile" accept="image/*,video/*"><div class="upload-row" id="dbprog" hidden><div class="progress"><i></i></div><span class="small muted" id="dbprogtext"></span></div></div><div class="row"><button class="btn primary" type="submit">' + (b.review_required ? 'Send result to coach' : 'Log practice') + '</button><span class="small" id="draftState" role="status"></span></div></form>') +
+        ((b.coach_feedback || b.retest_notes) ? '<div class="card stack-sm"><p class="section-title">Coach feedback</p><p>' + h(b.coach_feedback) + '</p>' + (b.retest_notes ? '<p class="small"><b>Retest:</b> ' + h(b.retest_notes) + '</p>' : '') + '</div>' : '') + '</div></div>';
+      if ($('#reviewf')) $('#reviewf').addEventListener('submit', function (e) { e.preventDefault(); api.request('PUT', '/api/development-blocks/' + b.id, { expected_status:b.status, expected_updated_at:b.updated_at, status: $('#dbstatus').value, coach_feedback: $('#dbfeedback').value, retest_notes: $('#dbretest').value }).then(function () { L.toast('Review saved'); route(); }, function (err) { L.formError($('#reviewf'), err.message); }); });
       if ($('#resendDelivery')) $('#resendDelivery').addEventListener('click', function () { var button = $('#resendDelivery'); button.disabled = true; button.textContent = 'Retrying…'; api.request('POST', '/api/development-blocks/' + b.id + '/deliver', {}).then(function (x) { L.toast(x.delivery.website === 'delivered' ? 'Website delivery confirmed' : 'Website delivery still needs attention'); route(); }, function (err) { button.disabled = false; button.textContent = 'Retry website delivery'; L.toast(err.message); }); });
-      if ($('#evidencef')) $('#evidencef').addEventListener('submit', function (e) {
-        e.preventDefault(); var file = $('#dbevidencefile').files[0];
-        function save(mediaId) { api.request('PUT', '/api/development-blocks/' + b.id, { status: 'evidence_submitted', athlete_reflection: $('#dbreflect').value, confidence: $('#dbconfidence').value || undefined, evidence_media_id: mediaId || b.evidence_media_id || undefined }).then(function () { L.toast('Evidence sent to your coach'); route(); }, function (err) { L.formError($('#evidencef'), err.message); }); }
-        if (!file) return save();
-        var prog = $('#dbprog'); prog.hidden = false; $('#dbprogtext').textContent = 'Uploading ' + file.name;
-        api.upload(file, 'athlete_id=' + b.athlete_id + '&visibility=shared', function (x) { $('i', prog).style.width = Math.round(x * 100) + '%'; $('#dbprogtext').textContent = Math.round(x * 100) + '%'; }, L.uuid()).then(function (m) { save(m.id); }, function (err) { L.formError($('#evidencef'), err.message); });
-      });
+      if ($('#evidencef')) {
+        var form = $('#evidencef'), draftKey = 'practice-draft:' + ME.user.id + ':' + b.id + ':' + (b.attempts || []).length;
+        var draft = Store.get(draftKey, {}), attemptId = draft.id || L.uuid();
+        if (draft.id) { $('#dbreflect').value = draft.result; $('#attemptSetup').value = draft.setup; $('#dbconfidence').value = draft.confidence; }
+        function persist() {
+          var saved = Store.set(draftKey, {id: attemptId, result: $('#dbreflect').value, setup: $('#attemptSetup').value, confidence: $('#dbconfidence').value});
+          $('#draftState').textContent = saved ? 'Text draft saved on this device' : 'Device storage unavailable';
+        }
+        form.oninput = persist;
+        form.onsubmit = async function (e) {
+          e.preventDefault(); var file = $('#dbevidencefile').files[0], button = form.querySelector('button[type=submit]');
+          if (!file && !$('#dbreflect').value.trim()) return L.formError(form,'Enter a result or attach evidence.');
+          button.disabled = true; persist();
+          try {
+            var mediaId = null;
+            if (file) {
+              var prog = $('#dbprog'); prog.hidden = false;
+              var media = await api.upload(file,'athlete_id=' + b.athlete_id + '&visibility=shared',x => { $('i', prog).style.width = Math.round(x*100) + '%'; $('#dbprogtext').textContent = Math.round(x*100) + '%'; },attemptId);
+              mediaId = media.id;
+            }
+            await api.request('PUT','/api/development-blocks/' + b.id,{status:'evidence_submitted',attempt_id:attemptId,athlete_reflection:$('#dbreflect').value,conditions:$('#attemptSetup').value,confidence:$('#dbconfidence').value || undefined,evidence_media_id:mediaId});
+            Store.del(draftKey); L.toast(b.review_required ? 'Result sent to your coach' : 'Practice logged'); route();
+          } catch (err) { L.formError(form,err.message + ' Retry when connected.'); button.disabled = false; }
+        };
+      }
     });
   };
 
@@ -612,7 +656,7 @@
         var id = L.uuid(), started = new Date().toISOString();
         var byId = {}; roster.forEach(function (a) { byId[a.id] = a; });
         var local = {
-          id: id, title: $('#t').value.trim() || 'Session', status: 'live', version: 1, started_at: started,
+          id: id, coach_id: ME.user.id, viewer_id: ME.user.id, title: $('#t').value.trim() || 'Session', status: 'live', version: 1, started_at: started,
           items: clean.map(function (it, i) { return Object.assign({ idx: i }, it); }),
           athletes: ids.map(function (aid, i) { return { id: aid, name: byId[aid].name, slot: i + 1 }; }),
           events: []
@@ -629,13 +673,13 @@
     var local = Store.get('session:' + id);
     return api.get('/api/training/sessions/' + id).then(function (srv) {
       var seen = {}, events = [];
-      srv.events.concat(local ? local.events : []).forEach(function (e) { if (!seen[e.id]) { seen[e.id] = 1; events.push(e); } });
-      var merged = { id: srv.id, title: srv.title, status: srv.status, version: srv.version, started_at: srv.started_at, items: srv.items, athletes: srv.athletes, events: events, coach_id: srv.coach_id, notes: srv.notes || [], matches: srv.matches || [] };
-      if (local && local.status === 'complete' && srv.status === 'live') merged.status = 'complete';
+      srv.events.concat(local && local.coach_id === ME?.user?.id ? local.events : []).forEach(function (e) { if (!seen[e.id]) { seen[e.id] = 1; events.push(e); } });
+      var merged = { id: srv.id, viewer_id: ME.user.id, title: srv.title, status: srv.status, version: srv.version, started_at: srv.started_at, items: srv.items, athletes: srv.athletes, events: events, coach_id: srv.coach_id, notes: srv.notes || [], matches: srv.matches || [] };
+      if (local && local.coach_id === ME?.user?.id && local.status === 'complete' && srv.status === 'live') merged.status = 'complete';
       Store.set('session:' + id, merged);
       return merged;
     }, function (err) {
-      if ((err.status === 0 || err.status === 404) && local) return local; // not synced yet, or offline
+      if ((err.status === 0 || err.status === 404) && local && (local.viewer_id || local.coach_id) === ME?.user?.id) return local; // not synced yet, or offline
       throw err;
     });
   }
@@ -754,6 +798,41 @@
     });
   };
 
+  function closeoutPanel(s) {
+    return '<section class="card stack"><div><p class="section-title">Session closeout</p><h2>Assign the next practice</h2><p>' + h(sharedNeeds(s.athletes)) + '</p></div>' +
+      '<label>Group drill<input id="groupDrill" maxlength="120" placeholder="Pitch &amp; Catch from lower transition"></label>' +
+      '<label>How to score it<input id="groupTarget" maxlength="1000" placeholder="Land 7 of 10 resets in the kitchen"></label>' +
+      s.athletes.map(a => a.closeout_block_id ? '<p>' + h(a.name) + ' · <a href="#/development/' + a.closeout_block_id + '">Open assigned practice</a></p>' :
+        '<form class="form" data-close-athlete="' + a.id + '"><label>' + h(a.name) + ' · individual cue<input name="cue" required maxlength="1000" placeholder="Only this athlete and their coaches see this cue"></label>' +
+        '<button type="submit" class="btn">Assign to ' + h(a.name.split(' ')[0]) + '</button><p role="status" class="small"></p></form>').join('') + '</section>';
+  }
+  function bindCloseout(s) {
+    var key = 'closeout-draft:' + ME.user.id + ':' + s.id, draft = Store.get(key, {});
+    var title = $('#groupDrill'), target = $('#groupTarget'), forms = $$('[data-close-athlete]');
+    if (!forms.length) { title.closest('label').hidden = true; target.closest('label').hidden = true; Store.del(key); return; }
+    title.value = draft.title || ''; target.value = draft.target || '';
+    function saveDraft() {
+      var cues = {}; forms.forEach(f => { if (f.elements.cue) cues[f.dataset.closeAthlete] = f.elements.cue.value; });
+      Store.set(key, {title:title.value,target:target.value,cues:cues});
+    }
+    title.oninput = target.oninput = saveDraft;
+    forms.forEach(f => {
+      var aid = f.dataset.closeAthlete, cue = f.elements.cue;
+      cue.value = draft.cues?.[aid] || ''; cue.oninput = saveDraft;
+      f.onsubmit = async e => {
+        e.preventDefault(); var button = f.querySelector('button'), status = f.querySelector('[role=status]');
+        if (!title.value.trim() || !target.value.trim()) { status.textContent = 'Enter the group drill and scoring target first.'; return; }
+        button.disabled = true; saveDraft(); status.textContent = 'Assigning…';
+        try {
+          var block = await api.request('POST','/api/athletes/' + aid + '/development-blocks',{
+            title:title.value,source_session_id:s.id,constraint_text:cue.value,success_evidence:target.value
+          });
+          f.innerHTML = '<a href="#/development/' + block.id + '">Open assigned practice</a>' + (block.delivery?.website === 'failed' ? ' · Website delivery needs retry' : '');
+          if (!forms.some(form => form.elements.cue)) Store.del(key); else saveDraft();
+        } catch (err) { status.textContent = err.message + ' Retry this athlete when connected.'; button.disabled = false; }
+      };
+    });
+  }
   views.session = function (id) {
     return syncSession(id).then(function (s) {
       var coach = has('coach') && (!s.coach_id || s.coach_id === ME.user.id || has('admin'));
@@ -770,6 +849,7 @@
           var m = 0, t = 0; s.items.forEach(function (it) { if (it.measure === 'reps') { var c = cells[it.idx + ':' + a.id]; m += c.makes; t += c.attempts; } });
           return '<div class="tile"><span class="l">' + h(a.name) + '</span><span class="n">' + (t ? Math.round(m / t * 100) + '%' : '—') + '</span><span class="s">' + m + ' of ' + t + ' makes</span></div>';
         }).join('') + '</div>' : '') +
+        (coach && s.status === 'complete' ? closeoutPanel(s) : '') +
         '<div class="stack"><p class="section-title">Games from this session</p>' + ((s.matches || []).length ? '<div class="list">' + s.matches.map(function (m) {
           var names = function (t) { return m.players.filter(function (p) { return p.team === t; }).map(function (p) { return h(p.name); }).join(' & '); };
           return '<a class="li" href="#/play/match/' + h(m.id) + '"><span class="main-col"><span class="t small">' + names(1) + ' <span class="muted">vs</span> ' + names(2) + '</span><span class="d mono">' + h(m.games.map(function (g) { return g.join('–'); }).join(', ')) + '</span></span></a>';
@@ -781,12 +861,13 @@
         (coach ? '<form class="card form" id="snf" novalidate><div class="form-grid"><div class="field"><label class="flabel" for="sna">Athlete</label><select id="sna">' + s.athletes.map(function (a) { return '<option value="' + a.id + '">' + h(a.name) + '</option>'; }).join('') + '</select></div>' +
           '<div class="field"><label class="flabel" for="snv">Who can see it</label><select id="snv"><option value="private">Private · coaches only</option><option value="shared">Shared with athlete</option></select></div></div>' +
           '<div class="field"><label class="flabel" for="snb">Note</label><textarea id="snb" maxlength="5000"></textarea></div><div class="row"><button class="btn primary" type="submit">Add note</button></div></form>' : '') + '</div>';
+      if ($('#groupDrill')) bindCloseout(s);
       if ($('#snf')) $('#snf').addEventListener('submit', function (e) {
         e.preventDefault();
         var text = $('#snb').value.trim(); if (!text) return L.formError($('#snf'), 'Write the note first.');
         var aid = $('#sna').value;
         L.queue({ method: 'POST', path: '/api/athletes/' + aid + '/notes', body: { body: text, visibility: $('#snv').value, session_id: id, client_id: L.uuid() }, kind: 'coach', label: 'Session note' });
-        L.toast(L.isOnline() ? 'Note saved' : 'Saved on this device. It’ll sync when you’re online.');
+        L.toast('Note queued on this device. Check sync status for delivery.');
         setTimeout(route, 400);
       });
     });
@@ -1453,6 +1534,7 @@
         (p.media.length ? '<div class="media-grid coach-media-grid">' + p.media.map(mediaFigure).join('') + '</div>' : '<div class="coming"><h2>No media yet</h2><p>Capture a clip or photo with a coaching note to start the visual record.</p><button class="btn" type="button" data-open-athlete-tab="today">Add the first one</button></div>') + '</section>' +
         '<section data-athlete-panel="progress" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">PLAYER DEVELOPMENT</p><h2>Focus, goals and measurements</h2></div></div>' +
         '<form class="card form" id="pf" novalidate><p class="section-title">Development</p>' +
+        '<label>Coach-assigned training needs <input id="trainingNeeds" maxlength="1450" value="' + h((a.training_needs || []).join(', ')) + '" placeholder="transition reset, bounce read, middle priority"></label><p class="small muted">Separate needs with commas. Coaches see overlaps when planning a group lesson.</p>' +
         '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" value="' + h(a.focus) + '"></div>' +
         '<div class="field"><label class="flabel" for="plan">Development plan</label><textarea id="plan" maxlength="4000">' + h(a.plan) + '</textarea></div>' +
         athleticFields(a) +
@@ -1508,7 +1590,7 @@
         var file = $('#nfile').files[0];
         function saveNote(mediaId) {
           L.queue({ method: 'POST', path: '/api/athletes/' + a.id + '/notes', body: { body: text, visibility: vis, client_id: L.uuid(), media_id: mediaId || undefined }, kind: 'coach', label: 'Note for ' + a.name });
-          L.toast(L.isOnline() ? 'Note saved' : 'Saved on this device. It’ll sync when you’re online.');
+          L.toast('Note queued on this device. Check sync status for delivery.');
           setTimeout(route, 300);
         }
         if (!file) return saveNote();
@@ -1547,7 +1629,7 @@
       });
       $('#pf').addEventListener('submit', function (e) {
         e.preventDefault();
-        api.request('PUT', '/api/athletes/' + a.id, { ...athleticValues(), focus: $('#focus').value, plan: $('#plan').value, goals: $('#goals').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value })
+        api.request('PUT', '/api/athletes/' + a.id, { ...athleticValues(), training_needs: $('#trainingNeeds').value.split(',').map(x => x.trim()).filter(Boolean), focus: $('#focus').value, plan: $('#plan').value, goals: $('#goals').value, hand: $('#hand').value, side: $('#side').value, rating: $('#rating').value })
           .then(function () { L.toast('Saved'); }, function (err) { L.formError($('#pf'), err.message); });
       });
       if ($('#newcode')) $('#newcode').addEventListener('click', function () {

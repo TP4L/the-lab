@@ -38,21 +38,36 @@
  for(const [key,link]of [['coachAthlete',id=>'#/progress/app/'+id],['workspaceAthlete',id=>'#/progress/website/'+id],['profile',()=> '#/progress'],['workspace',()=> '#/followups']]){
   const old=ctx.views[key];ctx.views[key]=async function(...args){const hash=location.hash;await old(...args);if(location.hash!==hash)return;const nav=document.createElement('div');nav.className='row';nav.innerHTML='<a class="btn primary" href="'+link(args[0])+'">'+(key==='workspace'?'Coach follow-ups':'Measurements & progress')+'</a>';root().prepend(nav);};
  }
- const home=ctx.views.home;ctx.views.home=async function(){
-  const hash=location.hash;await home();if(location.hash!==hash)return;const host=document.createElement('section');host.className='journey card';host.innerHTML='<h2>Your next step</h2><p role="status">Checking assignments and your website connection…</p>';root().prepend(host);
-  const results=await Promise.allSettled([api.request('GET','/api/me/assignments'),api.request('GET','/api/site-bridge'),api.request('GET','/api/site-bridge/feed'),ctx.me()?.athlete_id?api.request('GET','/api/athletes/'+ctx.me().athlete_id+'/progress'):Promise.resolve(null)]);if(!host.isConnected)return;
-  const tasks=results[0].status==='fulfilled'?results[0].value.filter(a=>a.status==='open'):[],connection=results[1].status==='fulfilled'?results[1].value:null,feed=results[2].status==='fulfilled'?results[2].value:null;
-  const focuses=feed?.records.filter(r=>r.kind==='focus'&&r.data.status==='approved')||[];
-  const latestTest=results[3].status==='fulfilled'?results[3].value?.measurements?.[0]:null;
-  const websiteTraining=(feed?.assignments||[]).filter(a=>a.status!=='resolved');
-  host.innerHTML='<div class="journey-section"><h2>Your next step</h2><a href="#/progress">Measurements & progress</a></div>'+
-   (tasks.length?tasks.slice(0,2).map(t=>'<p><a href="#/train">'+h(t.title)+'</a> · '+h(t.due_on||'Next practice')+'</p>').join(''):'')+
-   focuses.slice(0,2).map(f=>'<article><h3>'+h(f.data.title)+'</h3><p>'+h(f.data.practice)+'</p><p class="small">Retest: '+h(f.data.test)+'</p><a href="#/website">Open assignment & reflect</a></article>').join('')+
-   websiteTraining.slice(0,2).map(a=>'<article><h3>'+h(a.title)+'</h3><p>'+h(a.instructions)+'</p><a href="https://transcending-performance-lab.brettadamstp.chatgpt.site/members" target="_blank" rel="noopener">Update training progress</a></article>').join('')+
-   (!tasks.length&&!focuses.length&&!websiteTraining.length?'<p>No loaded assignment is waiting. Ask your coach what to focus on next.</p><a class="btn" href="#/journey/feedback">Ask your coach</a>':'')+
-   (feed?'<p class="small muted">Website coaching checked '+h(new Date(feed.checkedAt).toLocaleString())+'</p>':connection?.connected?'<p role="status">Website coaching could not load. Your records are still saved. <a href="#/website">Retry connection</a></p>':'<p class="small">Connect your website coaching to bring its assignments into this view. <a href="#/website">Connect profile</a></p>')+
-   (results[0].status==='rejected'?'<p role="status">App assignments could not load. Refresh to retry.</p>':'')+
-   (latestTest?.retestOn?'<p><a href="#/progress">Retest '+h(latestTest.retestOn)+(latestTest.retestOn<today()?' · Due':'')+'</a></p>':'')+
-   (ctx.has('coach')?'<a class="btn primary" href="#/followups">Open coach follow-ups</a>':'');
+ ctx.views.journeyOverview=ctx.views.home;
+ ctx.routes.push([/^\/journey\/overview$/,'journeyOverview','home']);
+ ctx.views.home=async function(){
+  const host=document.createElement('section');host.className='journey stack';root().replaceChildren(host);
+  host.innerHTML=ctx.head('THE LAB','Today','Your next practice and how to score it.')+'<p role="status">Checking your program…</p>';
+  const [blocks,assignments,site,measurements]=await Promise.allSettled([
+   api.get('/api/me/development-blocks'),api.get('/api/me/assignments'),api.request('GET','/api/site-bridge/feed'),
+   ctx.me()?.athlete_id ? api.get('/api/athletes/'+ctx.me().athlete_id+'/progress') : Promise.resolve(null)
+  ]);
+  if(!host.isConnected)return;
+  const rows=blocks.value||[], rank={ready_retest:0,in_progress:1,assigned:2};
+  const active=rows.filter(b=>b.status in rank).sort((a,b)=>rank[a.status]-rank[b.status]||(a.due_on||'9999').localeCompare(b.due_on||'9999'));
+  const b=active[0],task=assignments.value?.find(a=>a.status==='open'),feed=site.value;
+  const focus=feed?.records?.find(r=>r.kind==='focus'&&r.data.status==='approved')?.data;
+  const training=feed?.assignments?.find(a=>a.status!=='resolved'),waiting=rows.find(b=>['evidence_submitted','coach_review'].includes(b.status));
+  const retest=measurements.value?.measurements?.[0]?.retestOn;
+  let item;
+  if(b) item={label:b.status==='ready_retest'?'Retest':'Next practice',title:b.title,cue:b.retest_notes||b.constraint_text||b.problem,target:b.success_evidence,meta:[b.practice_minutes&&b.practice_minutes+' min',b.due_on&&'Due '+b.due_on].filter(Boolean).join(' · '),action:'Open practice',href:'#/development/'+b.id};
+  else if(task) item={label:'Assigned training',title:task.title,cue:task.note,action:'Open training',href:'#/train'};
+  else if(focus) item={label:'Coach focus',title:focus.title,cue:focus.practice,target:focus.test,action:'Open assignment',href:'#/website'};
+  else if(training) item={label:'Website training',title:training.title,cue:training.instructions,action:'Open training',href:'https://transcending-performance-lab.brettadamstp.chatgpt.site/members'};
+  else if(waiting) item={label:'Coach review',title:waiting.title,cue:'Your result is with your coach.',action:'See your result',href:'#/development/'+waiting.id};
+  else if(!ctx.me()?.athlete_id) item={label:'Get started',title:'Connect your athlete profile',action:'Open profile',href:'#/profile'};
+  else item={label:'Next practice',title:'Check in with your coach',cue:'Tell your coach what happened the last time you played.',action:'Ask your coach',href:'#/journey/feedback'};
+  host.innerHTML=ctx.head('THE LAB','Today','')+'<article class="journey-note today-focus"><p class="eyebrow">'+h(item.label)+'</p><h2>'+h(item.title)+'</h2>'+
+   (item.cue?'<p>'+h(item.cue)+'</p>':'')+(item.target?'<p><b>How to score it</b><br>'+h(item.target)+'</p>':'')+(item.meta?'<p class="small">'+h(item.meta)+'</p>':'')+'<a class="btn primary" href="'+h(item.href)+'">'+h(item.action)+'</a></article>'+
+   '<nav class="row" aria-label="Athlete sections"><a class="btn" href="#/train">My program</a><a class="btn" href="#/progress">Progress</a><a class="btn ghost" href="#/journey/overview">Sessions &amp; tools</a></nav>'+
+   (retest?'<p><a href="#/progress">Measurement retest · '+h(retest)+'</a></p>':'')+
+   ([blocks,assignments].some(r=>r.status==='rejected')?'<p role="status">Some app assignments could not load. <button class="btn" id="practiceRetry">Retry</button></p>':'')+
+   (site.status==='rejected'?'<p class="small"><a href="#/website">Check website coaching connection</a></p>':'');
+  if(host.querySelector('#practiceRetry'))host.querySelector('#practiceRetry').onclick=()=>ctx.views.home();
  };
 });})();
