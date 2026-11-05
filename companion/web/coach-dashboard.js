@@ -30,18 +30,19 @@
    return '#/workspace/athlete/'+item.athleteId;
   }
   ctx.routes.push([/^\/coach\/today$/,'coachToday','home']);
-  ctx.views.coachToday=async function(){
+  ctx.views.coachToday=async function(_,query={}){
    if(!ctx.has('coach')&&!ctx.me()?.user?.workspace){location.hash='#/';return;}
    const host=document.createElement('div');host.className='journey coach-today';root().replaceChildren(host);
-   host.innerHTML='<header class="coach-command"><div><p class="eyebrow">COACH DASHBOARD</p><h1>Today in THE LAB</h1><p>Start with what needs attention, then give each athlete a clear next step.</p></div><button class="btn ghost coach-refresh" id="coach-refresh">Refresh</button></header>'+
-    '<nav class="coach-actions" aria-label="Primary coach actions"><a href="#/workspace"><span>Roster</span><b>Athletes</b><small>Profiles, notes and history</small></a><a class="assign" href="#/coach/development/new"><span>Build</span><b>Assign development</b><small>Connect learning and training</small></a><a href="#/train/new"><span>Court</span><b>Start a session</b><small>Plan, score and save</small></a><a href="#/coach/desk"><span>Host</span><b>Events</b><small>Players, courts and brackets</small></a></nav>'+
-    '<details class="coach-more-tools"><summary>More coaching tools</summary><div><a href="#/coach/development/library">Development Library</a><a href="#/coach/connections">Roster health</a><a href="#/followups">Follow-ups</a><a href="#/coach/checkins">Pre-session check-ins</a><a href="#/journey/overview">Full dashboard</a></div></details><div id="coach-load" role="status">Checking both coaching systems…</div>';
+   const reviewing=query.filter==='review';
+   host.innerHTML='<nav class="court-nav" aria-label="Coach workspace"><a href="#/coach/today" '+(!reviewing?'aria-current="page"':'')+'>Today</a><a href="#/workspace">Athletes</a><a href="#/coach/programs">Programs</a><a href="#/coach/today?filter=review" '+(reviewing?'aria-current="page"':'')+'>Review</a><button class="btn ghost coach-refresh" id="coach-refresh">Refresh</button></nav>'+
+    '<div id="next-lesson" role="region" aria-label="Next lesson"></div><details class="coach-more-tools"><summary>Coaching tools &amp; member access</summary><div><a href="#/coach/plans">Team planner</a><a href="#/train/new">Start a session</a><a href="#/coach/development/new">Assign a single practice</a><a href="#/coach/development/library">Development library</a><a href="#/coach/desk">Events</a><a href="#/companion-link">Member QR &amp; NFC link</a><a href="#/coach/connections">Roster health</a><a href="#/followups">Follow-ups</a><a href="#/coach/checkins">Check-ins</a><a href="#/journey/overview">Full dashboard</a></div></details><div id="coach-load" role="status">Loading coaching work…</div>';
+   if(ctx.has('coach'))window.LabCourt.nextLesson(host.querySelector('#next-lesson'));
    const load=async()=>{
     host.querySelector('#coach-refresh').disabled=true;host.querySelector('#coach-load').textContent='Checking both coaching systems…';
     const results=await Promise.allSettled([api.request('GET','/api/coach/dashboard'),ws({action:'followups'})]);if(!host.isConnected)return;
     const app=results[0].status==='fulfilled'?results[0].value:null,site=results[1].status==='fulfilled'?results[1].value:null;
     if(!app){host.querySelector('#coach-load').innerHTML='<div class="card"><h2>App dashboard unavailable</h2><p>'+h(results[0].reason.message)+'</p><button class="btn" id="coach-retry">Retry</button></div>';host.querySelector('#coach-retry').onclick=load;host.querySelector('#coach-refresh').disabled=false;return;}
-    const state={items:[...app.items,...(site?siteItems(site):[])],app,site,filter:'all',query:'',expanded:false};
+    const state={items:[...app.items,...(site?siteItems(site):[])],app,site,filter:reviewing?'review':'all',query:'',expanded:false};
     host.querySelector('#coach-load').outerHTML='<div id="coach-content"></div>';const content=host.querySelector('#coach-content');
     function counts(items){return {review:items.filter(x=>x.priority==='review').length,overdue:items.filter(x=>x.priority==='overdue').length,soon:items.filter(x=>['today','soon'].includes(x.priority)).length,unassigned:items.filter(x=>x.kind==='task'&&!x.assignee).length,athletes:new Set([...app.athletes.map(a=>'app:'+a.id),...(site?.athletes||[]).map(a=>'website:'+a.id)]).size};}
     function relevant(i){
@@ -74,8 +75,8 @@
       try {
        const block=await api.request('GET','/api/development-blocks/'+item.recordId);
        const last=block.attempts?.at(-1);
-       slot.innerHTML='<form class="form coach-inline"><p>'+h(last?.result||block.athlete_reflection||'Review the session scores in the practice.')+'</p>'+
-        (last?.conditions?'<p class="small">Setup · '+h(last.conditions)+'</p>':'')+
+       slot.innerHTML='<form class="form coach-inline"><p>'+h([window.LabCourt.scores(last),last?.result||block.athlete_reflection].filter(Boolean).join(' · ')||'Open practice for the full result.')+'</p>'+
+        (block.observations?.length?'<p>After open play · '+h(block.observations[0].body)+'</p>':'')+(last?.conditions?'<p class="small">Setup · '+h(last.conditions)+'</p>':'')+
         '<label>Next step<select name="decision"><option value="ready_retest">Repeat or adjust and retest</option><option value="mastered">Advance and close</option></select></label>'+
         '<label>Feedback for athlete<textarea name="feedback" maxlength="4000" required></textarea></label><button class="btn primary">Save decision</button><p role="status"></p></form>';
        slot.querySelector('form').onsubmit=async e=>{
@@ -91,7 +92,7 @@
     }
     paint();host.querySelector('#coach-refresh').disabled=false;
    };
-   host.querySelector('#coach-refresh').onclick=()=>ctx.views.coachToday();await load();
+   host.querySelector('#coach-refresh').onclick=()=>ctx.views.coachToday(_,query);await load();
   };
   for(const key of ['home','workspace']){
    const old=ctx.views[key];if(!old)continue;ctx.views[key]=async function(...args){if(key==='home'&&(ctx.has('coach')||ctx.me()?.user?.workspace))return ctx.views.coachToday();const hash=location.hash;await old(...args);if(location.hash!==hash||(!ctx.has('coach')&&!ctx.me()?.user?.workspace))return;const entry=document.createElement('section');entry.className='coach-today-entry';entry.innerHTML='<div><p class="eyebrow">Coach today</p><h2>What needs your attention?</h2><p>Reviews, due work and the next seven days across the app and website.</p></div><a class="btn primary" href="#/coach/today">Open coaching dashboard</a>';root().prepend(entry);};

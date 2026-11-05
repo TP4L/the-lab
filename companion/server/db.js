@@ -828,7 +828,35 @@ INSERT INTO development_attempts (block_id,request_key,result,cue,confidence,med
 SELECT id,'legacy',athlete_reflection,coach_feedback,confidence,evidence_media_id,updated_at FROM development_blocks
 WHERE athlete_reflection <> '' OR evidence_media_id IS NOT NULL;
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT];
+const LESSON_PROGRAMS = `
+ALTER TABLE training_sessions ADD COLUMN source_plan_id INTEGER REFERENCES plans(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX one_run_per_plan ON training_sessions(source_plan_id);
+ALTER TABLE training_athletes ADD COLUMN lesson_cue TEXT NOT NULL DEFAULT '';
+CREATE TABLE companion_programs (
+  id INTEGER PRIMARY KEY,coach_id INTEGER NOT NULL REFERENCES users(id), client_key TEXT NOT NULL,
+  title TEXT NOT NULL,goal TEXT NOT NULL,steps TEXT NOT NULL,start_day TEXT NOT NULL,UNIQUE(coach_id,client_key)
+);
+ALTER TABLE development_blocks ADD COLUMN program_id INTEGER REFERENCES companion_programs(id);
+ALTER TABLE development_blocks ADD COLUMN program_step INTEGER;
+CREATE UNIQUE INDEX one_athlete_week ON development_blocks(athlete_id,program_id,program_step);
+ALTER TABLE development_attempts ADD COLUMN makes INTEGER;
+ALTER TABLE development_attempts ADD COLUMN attempts INTEGER;
+ALTER TABLE development_attempts ADD COLUMN game_makes INTEGER;
+ALTER TABLE development_attempts ADD COLUMN game_attempts INTEGER;
+CREATE TABLE program_session_results (
+ session_id TEXT NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
+ athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+ block_id INTEGER NOT NULL REFERENCES development_blocks(id) ON DELETE CASCADE,
+ item_idx INTEGER NOT NULL, cue TEXT NOT NULL, at TEXT NOT NULL,
+ PRIMARY KEY(session_id,athlete_id,block_id,item_idx)
+);
+CREATE INDEX program_results_by_week ON program_session_results(block_id);
+CREATE TABLE play_observations (
+ id INTEGER PRIMARY KEY, block_id INTEGER NOT NULL REFERENCES development_blocks(id) ON DELETE CASCADE,
+ client_key TEXT NOT NULL,body TEXT NOT NULL,makes INTEGER,attempts INTEGER,at TEXT NOT NULL,UNIQUE(block_id,client_key)
+);
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

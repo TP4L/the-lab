@@ -316,6 +316,8 @@ module.exports = function planning(r, ctx) {
     });
     return withStatus(201, planView(db.prepare('SELECT * FROM plans WHERE id = ?').get(id)));
   });
+  r.get('/api/coach/next-lesson',({user})=>{auth.require(user,'coach');return require('./lesson-brief').nextLesson(db,auth,user);});
+  r.get('/api/plans/:id/lesson',({user,params})=>{auth.require(user,'coach');return require('./lesson-brief').lessonBrief(db,auth,user,int(params.id,'plan',{min:1,required:true}));});
   r.get('/api/plans/:id', ({ user, params }) => planView(planRow(params.id, user)));
   r.put('/api/plans/:id', ({ user, params, body }) => {
     const p = planRow(params.id, user);

@@ -44,7 +44,7 @@
           if (res.status === 401) Lab.emit('signedout');
           throw new ApiError(data.error || 'Request failed (' + res.status + ').', res.status, data);
         }
-        if (method === 'GET' && CACHEABLE.test(path)) Store.set(key, { at: Date.now(), data: data });
+        if (method === 'GET' && CACHEABLE.test(path) && (path!=='/api/me' || data.user?.id===Store.get('me')?.user?.id)) Store.set(key, { at: Date.now(), data: data });
         return data;
       });
     }, function () {

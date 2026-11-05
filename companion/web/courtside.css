@@ -1,0 +1,61 @@
+/* Paper, evergreen and court markings carry from the member entrance to the scorecard. */
+:root{--court-green:#123d34;--court-light:#d9f39b;--court-rule:#63877d}
+.court-page,.coach-today{display:grid;gap:1.05rem;min-width:0}
+.court-page .back,.court-page .btn{justify-self:start}
+.court-page .card,.court-hero,.court-focus,.court-select span,.court-week{min-width:0}
+.court-page .card{padding:clamp(17px,3vw,30px);border-radius:16px}
+.court-page h1,.court-page h2,.court-page h3,.court-hero h1{margin:0;line-height:1.1;overflow-wrap:anywhere}
+.court-page h2{font:650 clamp(1.35rem,2.5vw,1.85rem)/1.1 var(--display)}
+.court-hero,.auth-court,.journey .today-focus{position:relative;isolation:isolate;overflow:hidden;border-radius:20px;background:linear-gradient(112deg,#102f29,#18493b);color:#f8f7ec;padding:clamp(22px,4vw,44px);border:1px solid #36594d;box-shadow:0 14px 34px -30px #142f24}
+.court-hero{display:grid;grid-template-columns:minmax(0,3fr) minmax(110px,1fr);align-items:center;gap:12px}
+.court-hero>div,.auth-court>div{z-index:1;position:relative}
+.court-hero h1,.journey .today-focus h2,.auth-court h1{color:inherit;font:500 clamp(32px,5.5vw,58px)/1.02 var(--body);letter-spacing:-.04em}
+.court-hero p,.auth-court p,.journey .today-focus p{color:#e1e9dd;max-width:55ch}
+.court-hero .court-kicker,.auth-court .court-kicker,.journey .today-focus .eyebrow{color:#d9f39b;font:600 .71rem/1.4 var(--mono);text-transform:uppercase;letter-spacing:.13em;margin:0 0 12px}
+.court-hero .row,.today-focus .btn{margin-top:14px}
+.court-hero .btn.primary,.journey .today-focus .btn.primary{background:var(--court-light);border-color:var(--court-light);color:#102f29}
+.court-hero .btn.ghost{background:transparent;color:#f7f9ef;border-color:#79998a}
+.court-art{width:100%;max-width:185px;justify-self:end;aspect-ratio:20/40;max-height:166px;border:1.6px solid #96bdae;position:relative;transform:rotate(23deg) skew(-3deg);opacity:.8;background:linear-gradient(to bottom,transparent calc(50% - 1px),#e2f4c6 50%,transparent calc(50% + 1px))}
+.court-art:before,.court-art:after{content:"";position:absolute;inset:0 0 67%;border-bottom:1px solid #93baaa;background:linear-gradient(90deg,transparent calc(50% - .8px),#a7c5b7 50%,transparent calc(50% + .8px))}
+.court-art:after{inset:67% 0 0;border-bottom:0;border-top:1px solid #93baaa}
+.court-art i{position:absolute;background:#dded9d;width:8px;height:8px;border-radius:100%;left:69%;top:25%}
+.court-focus{margin:0;padding:14px 17px;border:1px solid var(--rule-soft);border-radius:12px;color:var(--ink);background:var(--surface)}
+.court-focus b{color:var(--ok);margin-right:8px}
+.court-nav{display:flex;flex-wrap:wrap;gap:6px;padding:5px;border-radius:14px;background:var(--surface);border:1px solid var(--rule-soft);align-items:center}
+.court-nav a{font:600 .92rem/1 var(--display);color:var(--ink);text-decoration:none;padding:14px 17px;border-radius:10px}
+.court-nav [aria-current=page]{background:var(--court-green);color:white}
+.coach-today .coach-refresh{margin-left:auto;min-height:40px}
+.court-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.court-select{display:flex!important;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule-soft);cursor:pointer;text-align:left}
+.court-select input{flex:0 0 19px;width:19px!important;height:19px;min-height:0!important;margin:1px 0 0;accent-color:#357358}
+.court-select small,.court-weeks small,.court-observation small{display:block;color:var(--ink-soft);font:500 .76rem/1.5 var(--display);margin-top:3px}
+.court-score{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border:1px solid var(--rule-soft);padding:12px;border-radius:12px;margin:0}
+.court-score legend,.court-week legend{padding:0 6px;font:600 .87rem var(--display);color:var(--ink)}
+.court-score small{font-weight:400;color:var(--ink-soft)}
+.court-week-editor,.court-week,.court-weeks{display:grid;gap:12px}
+.court-week legend,.court-weeks li small{letter-spacing:.05em;text-transform:uppercase;font-family:var(--mono)}
+.court-weeks{list-style:none;margin:1.6rem 0 0;padding:0;gap:0}
+.court-weeks li{position:relative;padding:0 0 1.5rem 1.6rem;border-left:1px solid var(--rule)}
+.court-weeks li:last-child{padding-bottom:0;border-color:transparent}
+.court-weeks li:before{content:"";position:absolute;left:-5px;top:4px;width:9px;height:9px;border-radius:100%;background:var(--ok)}
+.court-weeks .upcoming:before{background:var(--surface);border:1px solid var(--ink-soft)}
+.court-weeks h3{margin:.35rem 0;font-size:1.18rem}
+.court-weeks blockquote{margin:10px 0;padding-left:10px;border-left:2px solid var(--ok)}
+.court-qr{display:grid;justify-items:center;gap:12px;text-align:center}
+.court-qr svg{width:min(100%,220px);height:auto;border-radius:8px}
+.court-qr .btn{justify-self:center}
+.court-history,.court-observation{border-bottom:1px solid var(--rule-soft);padding:12px 0}
+.court-heading,.court-roster,.court-player-switch,.court-chips{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.court-heading{justify-content:space-between}
+.court-roster .court-select{min-width:10rem}
+.court-player-switch button,.court-chips button{border:1px solid var(--rule);border-radius:18px;padding:9px 14px;background:var(--surface);color:var(--ink);font:600 .84rem var(--display);min-height:44px}
+.court-player-switch [aria-pressed=true]{background:var(--court-green);color:#fff;border-color:var(--court-green)}
+.court-live .pads{max-width:720px}
+.court-live .pad .who{flex-wrap:wrap}
+.court-live .who small{flex-basis:100%;padding:3px 0}
+.auth-court{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:24px}
+.auth-court .court-art{position:absolute;width:25%;max-height:85%;right:5%;top:10%;opacity:.35}
+.auth-court h1,.auth-court p{margin:0 0 .5rem}
+.court-chips{gap:6px}.court-chips button{padding:5px 10px;min-height:36px}
+.court-page :focus-visible,.court-nav :focus-visible,.court-player-switch :focus-visible{outline:3px solid #60a574;outline-offset:2px}
+@media(max-width:620px){.court-columns{grid-template-columns:minmax(0,1fr)}.court-hero{grid-template-columns:minmax(0,1fr);padding:24px 20px}.court-hero>div{padding-right:22px}.court-hero .court-art{position:absolute;width:85px;right:-36px;bottom:-25px;opacity:.32}.court-nav{gap:1px}.court-nav a{padding:13px 10px}.coach-today .coach-refresh{padding:6px 10px;font-size:.78rem}.court-page .btn{white-space:normal}.court-page .court-qr a{overflow-wrap:anywhere}}

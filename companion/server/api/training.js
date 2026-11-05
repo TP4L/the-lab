@@ -39,7 +39,7 @@ function loadSession(db, id) {
   const s = db.prepare('SELECT * FROM training_sessions WHERE id = ?').get(id);
   if (!s) return null;
   const items = db.prepare('SELECT * FROM training_items WHERE session_id = ? ORDER BY idx').all(id);
-  const athletes = db.prepare(`SELECT ta.slot, a.id, a.name, a.hand, a.side FROM training_athletes ta JOIN athletes a ON a.id = ta.athlete_id
+  const athletes = db.prepare(`SELECT ta.slot, ta.lesson_cue, a.id, a.name, a.hand, a.side FROM training_athletes ta JOIN athletes a ON a.id = ta.athlete_id
     WHERE ta.session_id = ? ORDER BY ta.slot`).all(id);
   const events = db.prepare('SELECT id, item_idx, athlete_id, kind, value, undoes, at FROM score_events WHERE session_id = ?').all(id);
   return { ...s, items, athletes, events, summary: summarize(items, athletes.map(a => a.id), events) };
@@ -100,24 +100,36 @@ module.exports = function training(r, { db, auth, notifier }) {
      returns the same session instead of making a second one. */
   r.post('/api/training/sessions', ({ user, body }) => {
     auth.require(user, 'coach');
+    const planId=body.source_plan_id ? int(body.source_plan_id,'plan',{min:1}) : null;
+    const brief=planId ? require('./lesson-brief').lessonBrief(db,auth,user,planId) : null;
+    if (brief?.session) return loadSession(db,brief.session.id);
+    if (brief && ['cancelled','done'].includes(brief.plan.status)) throw new HttpError(409,'This plan is closed.');
+    if (brief && brief.plan.version!==body.plan_version) throw new HttpError(409,'The lesson plan changed. Reopen it before starting.');
     const id = uuid(body.id, 'id');
     const prior = db.prepare('SELECT coach_id FROM training_sessions WHERE id = ?').get(id);
     if (prior) {
       if (prior.coach_id !== user.id) throw new HttpError(409, 'Session ID already used.');
       return withStatus(200, loadSession(db, id));
     }
-    const title = str(body.title, 'title', { required: true, max: 120 });
+    const title = str(brief ? brief.plan.title : body.title, 'title', { required: true, max: 120 });
     const athleteIds = [...new Set(list(body.athletes, 'athletes', { max: MAX_ATHLETES, item: (x, f) => int(x, f, { min: 1, required: true }) }))];
     if (!athleteIds.length) throw new HttpError(400, 'Add at least one athlete.');
     athleteIds.forEach(aid => { if (!auth.coachesAthlete(user, aid)) throw new HttpError(403, `You don’t coach athlete ${aid}.`); });
-    const items = list(body.items, 'items', { max: MAX_ITEMS, item: itemFields });
+    if (brief && athleteIds.some(id=>!brief.players.some(p=>p.id===id && p.eligible && !['out','waitlist'].includes(p.rsvp)))) throw new HttpError(400,'Select eligible players from the lesson roster.');
+    let drills=body.items;
+    if (brief) {
+      const choices=list(body.blocks,'drills',{max:MAX_ITEMS,item:(x,f)=>int(x,f,{required:true,min:1})});
+      if(new Set(choices).size!==choices.length || choices.some(id=>!brief.blocks.some(b=>b.id===id))) throw new HttpError(400,'Reopen the lesson to select its drills.');
+      drills=brief.blocks.filter(b=>choices.includes(b.id)).map(b=>({name:b.drill||b.instructions?.slice(0,120)||'Lesson block',measure:'reps',instructions:b.instructions}));
+    }
+    const items = list(drills, 'items', { max: MAX_ITEMS, item: itemFields });
     if (!items.length) throw new HttpError(400, 'Add at least one drill.');
     const startedAt = isoTime(body.started_at, 'started_at') || now();
     const assignment = body.assignment_id ? db.prepare('SELECT * FROM assignments WHERE id = ?').get(int(body.assignment_id, 'assignment_id', { min: 1 })) : null;
     if (body.assignment_id && (!assignment || !athleteIds.includes(assignment.athlete_id))) throw new HttpError(400, 'That assignment isn\u2019t for an athlete in this session.');
     tx(db, () => {
-      db.prepare('INSERT INTO training_sessions (id, coach_id, title, started_at) VALUES (?, ?, ?, ?)').run(id, user.id, title, startedAt);
-      athleteIds.forEach((aid, i) => db.prepare('INSERT INTO training_athletes (session_id, athlete_id, slot) VALUES (?, ?, ?)').run(id, aid, i + 1));
+      db.prepare('INSERT INTO training_sessions (id, coach_id, title, started_at,source_plan_id) VALUES (?, ?, ?, ?,?)').run(id, user.id, title, startedAt,planId);
+      athleteIds.forEach((aid, i) => db.prepare('INSERT INTO training_athletes (session_id, athlete_id, slot,lesson_cue) VALUES (?, ?, ?,?)').run(id, aid, i + 1,brief?.players.find(p=>p.id===aid)?.cue || ''));
       items.forEach((it, i) => db.prepare('INSERT INTO training_items (session_id, idx, name, measure, target, instructions) VALUES (?, ?, ?, ?, ?, ?)')
         .run(id, i, it.name, it.measure, it.target, it.instructions));
       if (assignment) {
@@ -130,6 +142,26 @@ module.exports = function training(r, { db, auth, notifier }) {
     return withStatus(201, loadSession(db, id));
   });
 
+  r.post('/api/training/sessions/:id/program-result',({user,params,body})=>{
+    const s=sessionAccess(user,uuid(params.id,'session'),{write:true});
+    const aid=int(body.athlete_id,'athlete',{required:true,min:1});
+    const week=int(body.block_id,'week',{required:true,min:1});
+    const idx=int(body.item_idx,'drill',{required:true,min:0,max:9});
+    const cue=str(body.cue,'cue',{max:1000});
+    const athlete=db.prepare('SELECT 1 FROM training_athletes WHERE session_id=? AND athlete_id=?').get(s.id,aid);
+    const block=db.prepare('SELECT program_id,status FROM development_blocks WHERE id=? AND athlete_id=?').get(week,aid);
+    if(!athlete || !auth.coachesAthlete(user,aid) || !block?.program_id)throw new HttpError(404,'Week unavailable for this athlete.');
+    const prior=db.prepare('SELECT 1 FROM program_session_results WHERE session_id=? AND athlete_id=? AND block_id=? AND item_idx=?').get(s.id,aid,week,idx);
+    if(prior)return {block_id:week};
+    if(s.status!=='complete' || block.status==='mastered')throw new HttpError(409,'Finish the session and choose an open program week.');
+    if(!db.prepare('SELECT 1 FROM training_items WHERE session_id=? AND idx=?').get(s.id,idx))throw new HttpError(400,'Choose a drill from this session.');
+    tx(db,()=>{
+      db.prepare('INSERT INTO program_session_results(session_id,athlete_id,block_id,item_idx,cue,at) VALUES(?,?,?,?,?,?)').run(s.id,aid,week,idx,cue,now());
+      db.prepare("UPDATE development_blocks SET status=CASE WHEN status='assigned' THEN 'in_progress' ELSE status END,updated_at=? WHERE id=?").run(now(),week);
+    });
+    notifier.notify(notifier.usersOfAthletes([aid]),'training','Lesson recap ready',cue||s.title,'#/development/'+week);
+    return {block_id:week};
+  });
   r.get('/api/training/sessions/:id', ({ user, params }) => {
     const s = sessionAccess(user, uuid(params.id, 'id'));
     const full = loadSession(db, s.id);
@@ -138,6 +170,10 @@ module.exports = function training(r, { db, auth, notifier }) {
     if (coachView) {
       full.athletes.forEach(a => {
         a.training_needs = JSON.parse(db.prepare('SELECT training_needs FROM athletes WHERE id=?').get(a.id).training_needs);
+        if(auth.coachesAthlete(user,a.id)) {
+          a.program_weeks=db.prepare("SELECT b.id,b.title,b.program_step,p.title AS program_title FROM development_blocks b JOIN companion_programs p ON p.id=b.program_id WHERE b.athlete_id=? AND b.status!='mastered' ORDER BY b.id DESC").all(a.id);
+          a.saved_results=db.prepare('SELECT block_id,item_idx FROM program_session_results WHERE athlete_id=? AND session_id=?').all(a.id,s.id);
+        }
         a.closeout_block_id = db.prepare('SELECT id FROM development_blocks WHERE source_session_id=? AND athlete_id=?').get(s.id, a.id)?.id;
       });
     }
@@ -179,6 +215,7 @@ module.exports = function training(r, { db, auth, notifier }) {
       }
       db.prepare('UPDATE training_sessions SET title = ?, status = ?, completed_at = ?, version = version + 1, updated_at = ? WHERE id = ?')
         .run(title, status, status === 'complete' ? (s.completed_at || now()) : null, now(), s.id);
+      if (status === 'complete' && s.source_plan_id) db.prepare("UPDATE plans SET status='done',version=version+1 WHERE id=? AND status IN ('draft','published')").run(s.source_plan_id);
       if (status === 'complete' && s.status !== 'complete') {
         db.prepare("UPDATE development_blocks SET status = 'coach_review', updated_at = ? WHERE retest_session_id = ?").run(now(), s.id);
       }

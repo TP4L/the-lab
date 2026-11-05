@@ -88,7 +88,7 @@
   };
 
   views.signin = function (_, query) {
-    app.innerHTML = '<div class="auth-wrap"><h1 class="brandmark">THE <span>LAB</span></h1><p class="muted">Know what to work on, do the work, record what happened, know what comes next.</p>' +
+    app.innerHTML = '<div class="auth-wrap"><header class="auth-court"><div><p class="court-kicker">THE LAB · Companion</p><h1>Back on court.</h1><p>Sign in for your lessons, scores and next practice.</p></div><span class="court-art" aria-hidden="true"><i></i></span></header>' +
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
       '<div class="card stack demo-card" id="democard" hidden><p class="section-title">Try the demo</p><p class="small">Sample players, a live event on courts 4 and 5, a double-elimination bracket, interest checks, a coached session plan and Field Notes. Nothing is emailed, and everything resets daily.</p>' +
       '<div class="demo-btns"><button class="btn primary" type="button" data-demo="host">Host and coach<span>Brett: runs events, plans, publishing</span></button><button class="btn" type="button" data-demo="player">Player<span>Jordan: courts, scores, notes, recap</span></button><button class="btn ghost" type="button" data-demo="coach">Assistant coach<span>Austin: roster and training</span></button></div></div>' +
@@ -362,10 +362,8 @@
 
   function sharedNeeds(athletes) {
     if (athletes.length < 2) return '';
-    var counts = new Map();
-    athletes.forEach(a => (a.training_needs || []).forEach(need => counts.set(need, (counts.get(need) || 0) + 1)));
-    var matches = [...counts].filter(entry => entry[1] > 1).sort((a,b) => b[1] - a[1]);
-    return matches.length ? 'Shared training needs: ' + matches.map(([need,n]) => need + ' (' + n + '/' + athletes.length + ')').join(' · ') : 'No shared training needs tagged yet.';
+    const matches = window.LabNeeds.shared(athletes);
+    return matches.length ? 'Shared training needs · ' + matches.map(([need,names]) => need + ' (' + names.join(' + ') + ')').join(' · ') : 'No shared training needs tagged yet.';
   }
 
   views.developmentNew = function (athleteId, query) {
@@ -471,9 +469,9 @@
       var webDelivery = b.delivery.website === 'delivered' ? 'Website delivered' : b.delivery.website === 'failed' ? 'Website needs retry' : b.delivery.website === 'pending' ? 'Website pending' : 'No website profile';
       app.innerHTML = '<a class="back" href="' + (coach ? '#/coach/' + b.athlete_id : '#/train') + '">← ' + (coach ? 'Athlete profile' : 'Training') + '</a>' +
         '<section class="dev-hero"><span class="dev-kicker">' + h(statusLabel) + '</span><h1>' + h(b.title) + '</h1><p>' + h(b.problem) + '</p><div class="dev-read"><b>' + h(reads) + '</b><span>' + h(state) + '</span></div></section>' +
-        (b.baseline_conditions || b.practice_minutes ? '<section class="card"><p class="section-title">Practice setup</p><p>' + h([b.practice_minutes && b.practice_minutes + ' minutes', b.baseline_conditions].filter(Boolean).join(' · ')) + '</p></section>' : '') +
-        ((b.attempts || []).length ? '<section class="card stack-sm"><p class="section-title">Result history</p>' + b.attempts.map((a,i) => '<article class="journey-note"><b>' + (i ? 'Retest ' + i : 'First result') + ' · ' + h(L.when(a.at)) + '</b><p>' + h(a.result || 'Media submitted') + '</p><p class="small">' + h(a.conditions || 'Setup unrecorded') + (a.cue ? ' · Cue: ' + h(a.cue) : '') + '</p>' + (a.media_id ? '<a target="_blank" rel="noopener" href="/api/media/'+h(a.media_id)+'">View evidence</a>' : '') + '</article>').join('') + '</section>' : '') +
-        '<div class="dev-steps"><span class="' + (b.lesson_id ? 'on' : '') + '">Learn</span><span class="' + (b.session_id ? 'on' : '') + '">Train</span><span class="' + (b.evidence_media_id || b.athlete_reflection ? 'on' : '') + '">Evidence</span><span class="' + (['coach_review','ready_retest','mastered'].includes(b.status) ? 'on' : '') + '">Review</span><span class="' + (b.retest_session_id || b.status === 'mastered' ? 'on' : '') + '">Retest</span></div>' +
+        (b.source_session_id ? '<a class="btn" href="#/train/'+h(b.source_session_id)+'">See original session scores</a>' : '') + (b.program_title ? '<p class="court-focus">'+h(b.program_title)+' · Week '+(b.program_step+1)+'</p>' : '') + (b.baseline_conditions || b.practice_minutes ? '<section class="card"><p class="section-title">Practice setup</p><p>' + h([b.practice_minutes && b.practice_minutes + ' minutes', b.baseline_conditions].filter(Boolean).join(' · ')) + '</p></section>' : '') +
+        ((b.attempts || []).length ? '<section class="card stack-sm"><p class="section-title">Result history</p>' + b.attempts.map((a,i) => '<article class="journey-note"><b>' + (i ? 'Retest ' + i : 'First result') + ' · ' + h(L.when(a.at)) + '</b><p>' + h([window.LabCourt.scores(a),a.result].filter(Boolean).join(' · ') || (a.media_id?'Media submitted':'Result saved')) + '</p><p class="small">' + h(a.conditions || 'Setup unrecorded') + (i && a.conditions && b.attempts[i-1].conditions && a.conditions.trim().toLowerCase()!==b.attempts[i-1].conditions.trim().toLowerCase()?' · Setup changed':'') + (a.cue ? ' · Cue: ' + h(a.cue) : '') + '</p>' + (a.media_id ? '<a target="_blank" rel="noopener" href="/api/media/'+h(a.media_id)+'">View evidence</a>' : '') + '</article>').join('') + '</section>' : '') +
+        '<div class="dev-steps"><span class="' + (b.lesson_id ? 'on' : '') + '">Learn</span><span class="' + (b.session_id ? 'on' : '') + '">Train</span><span class="' + (b.attempts?.length || b.evidence_media_id || b.athlete_reflection ? 'on' : '') + '">Evidence</span><span class="' + (['coach_review','ready_retest','mastered'].includes(b.status) ? 'on' : '') + '">Review</span><span class="' + (b.retest_session_id || b.status === 'mastered' ? 'on' : '') + '">Retest</span></div>' +
         (coach ? '<section class="card delivery-check"><div><p class="section-title">Delivery check</p><div class="row"><span class="tag">' + h(appDelivery) + '</span><span class="tag">' + h(webDelivery) + '</span></div>' + (b.delivery.website_error ? '<p class="small muted">' + h(b.delivery.website_error) + '</p>' : '') + '</div>' + (b.delivery.website !== 'not_linked' && b.delivery.website !== 'delivered' ? '<button class="btn ghost" id="resendDelivery">Retry website delivery</button>' : '') + '</section>' : '') +
         '<div class="grid-2"><div class="stack">' +
         '<div class="card dev-brief"><p class="section-title">The work</p><dl><div><dt>Error layer</dt><dd>' + h(b.error_layer) + '</dd></div><div><dt>Intensity</dt><dd>' + h(DEV_INTENSITY[b.intensity] || b.intensity) + '</dd></div><div><dt>Constraint</dt><dd>' + h(b.constraint_text || '—') + '</dd></div><div><dt>Expected ball</dt><dd>' + h(b.expected_ball || '—') + '</dd></div><div><dt>Success evidence</dt><dd>' + h(b.success_evidence || '—') + '</dd></div></dl></div>' +
@@ -485,22 +483,24 @@
         (b.evidence_media_id ? '<div class="card stack-sm"><p class="section-title">Athlete evidence</p>' + (String(b.evidence_mime || '').startsWith('image/') ? '<img class="lesson-video" alt="Athlete evidence for ' + h(b.title) + '" src="/api/media/' + h(b.evidence_media_id) + '">' : '<video class="lesson-video" controls playsinline preload="metadata" src="/api/media/' + h(b.evidence_media_id) + '"></video>') + '</div>' : '') +
         '</div><div class="stack">' +
         (coach ? '<form class="card form" id="reviewf"><p class="section-title">Coach review</p><div class="field"><label class="flabel" for="dbstatus">Next step</label><select id="dbstatus">' + Object.keys(DEV_STATUS).map(function (x) { return '<option value="' + x + '"' + (x === b.status ? ' selected' : '') + '>' + h(({ready_retest:'Repeat or adjust and retest',mastered:'Advance · close this block'})[x] || DEV_STATUS[x]) + '</option>'; }).join('') + '</select></div><div class="field"><label class="flabel" for="dbfeedback">Feedback shared with athlete</label><textarea id="dbfeedback" maxlength="4000">' + h(b.coach_feedback) + '</textarea></div><div class="field"><label class="flabel" for="dbretest">Retest plan</label><textarea id="dbretest" maxlength="4000">' + h(b.retest_notes) + '</textarea></div><div class="row"><button class="btn primary" type="submit">Save review</button></div></form>' :
-          ['mastered','coach_review','evidence_submitted'].includes(b.status) ? '<div class="card"><h2>' + (b.status === 'mastered' ? 'Practice complete' : 'Your result is with your coach') + '</h2></div>' : '<form class="card form" id="evidencef"><p class="section-title">Your evidence</p><p class="small">' + h(b.reflection_prompt || 'What changed when you applied this?') + '</p><div class="field"><label class="flabel" for="dbreflect">Your result</label><textarea id="dbreflect" maxlength="4000"></textarea></div><label>Test setup this time<input id="attemptSetup" maxlength="600" value="' + h(b.baseline_conditions || b.attempts?.[0]?.conditions || '') + '" placeholder="Feed, reps, position or changes"></label><div class="field"><label class="flabel" for="dbconfidence">Confidence</label><select id="dbconfidence"><option value="">Choose 1–5</option>' + [1,2,3,4,5].map(function (x) { return '<option value="' + x + '"' + (x === b.confidence ? ' selected' : '') + '>' + x + ' · ' + (x === 1 ? 'Unsure' : x === 5 ? 'Ready under pressure' : 'Building') + '</option>'; }).join('') + '</select></div><div class="field"><label class="flabel" for="dbevidencefile">Video or photo <span class="hint">optional</span></label><input type="file" id="dbevidencefile" accept="image/*,video/*"><div class="upload-row" id="dbprog" hidden><div class="progress"><i></i></div><span class="small muted" id="dbprogtext"></span></div></div><div class="row"><button class="btn primary" type="submit">' + (b.review_required ? 'Send result to coach' : 'Log practice') + '</button><span class="small" id="draftState" role="status"></span></div></form>') +
+          ['mastered','coach_review','evidence_submitted'].includes(b.status) ? '<div class="card"><h2>' + (b.status === 'mastered' ? 'Practice complete' : 'Your result is with your coach') + '</h2></div>' : '<form class="card form" id="evidencef"><p class="section-title">Your evidence</p>' + window.LabCourt.scoreFields() + window.LabCourt.scoreFields('game_','Game score') + '<p class="small">' + h(b.reflection_prompt || 'What changed when you applied this?') + '</p><div class="field"><label class="flabel" for="dbreflect">Your result</label><textarea id="dbreflect" maxlength="4000"></textarea></div><label>Test setup this time<input id="attemptSetup" maxlength="600" value="' + h(b.baseline_conditions || b.attempts?.[0]?.conditions || '') + '" placeholder="Feed, reps, position or changes"></label><div class="field"><label class="flabel" for="dbconfidence">Confidence</label><select id="dbconfidence"><option value="">Choose 1–5</option>' + [1,2,3,4,5].map(function (x) { return '<option value="' + x + '"' + (x === b.confidence ? ' selected' : '') + '>' + x + ' · ' + (x === 1 ? 'Unsure' : x === 5 ? 'Ready under pressure' : 'Building') + '</option>'; }).join('') + '</select></div><div class="field"><label class="flabel" for="dbevidencefile">Video or photo <span class="hint">optional</span></label><input type="file" id="dbevidencefile" accept="image/*,video/*"><div class="upload-row" id="dbprog" hidden><div class="progress"><i></i></div><span class="small muted" id="dbprogtext"></span></div></div><div class="row"><button class="btn primary" type="submit">' + (b.review_required ? 'Send result to coach' : 'Log practice') + '</button><span class="small" id="draftState" role="status"></span></div></form>') +
         ((b.coach_feedback || b.retest_notes) ? '<div class="card stack-sm"><p class="section-title">Coach feedback</p><p>' + h(b.coach_feedback) + '</p>' + (b.retest_notes ? '<p class="small"><b>Retest:</b> ' + h(b.retest_notes) + '</p>' : '') + '</div>' : '') + '</div></div>';
+      if(b.checkpoints?.length)app.querySelector('.dev-hero').insertAdjacentHTML('afterend','<section class="card"><h2>From your lesson</h2>'+b.checkpoints.map(c=>'<article class="court-observation"><small>'+h(L.when(c.at))+'</small><b>'+h(c.name)+'</b><p>'+h(c.measure==='reps'?(c.attempts?c.makes+' of '+c.attempts:'No reps recorded'):(c.last??'No value recorded'))+'</p>'+(c.cue?'<p>'+h(c.cue)+'</p>':'')+'<a href="#/train/'+h(c.session_id)+'">Session recap</a></article>').join('')+'</section>');
+      app.insertAdjacentHTML('beforeend',window.LabCourt.matchPanel(b,coach));window.LabCourt.bindMatch(b,route);
       if ($('#reviewf')) $('#reviewf').addEventListener('submit', function (e) { e.preventDefault(); api.request('PUT', '/api/development-blocks/' + b.id, { expected_status:b.status, expected_updated_at:b.updated_at, status: $('#dbstatus').value, coach_feedback: $('#dbfeedback').value, retest_notes: $('#dbretest').value }).then(function () { L.toast('Review saved'); route(); }, function (err) { L.formError($('#reviewf'), err.message); }); });
       if ($('#resendDelivery')) $('#resendDelivery').addEventListener('click', function () { var button = $('#resendDelivery'); button.disabled = true; button.textContent = 'Retrying…'; api.request('POST', '/api/development-blocks/' + b.id + '/deliver', {}).then(function (x) { L.toast(x.delivery.website === 'delivered' ? 'Website delivery confirmed' : 'Website delivery still needs attention'); route(); }, function (err) { button.disabled = false; button.textContent = 'Retry website delivery'; L.toast(err.message); }); });
       if ($('#evidencef')) {
         var form = $('#evidencef'), draftKey = 'practice-draft:' + ME.user.id + ':' + b.id + ':' + (b.attempts || []).length;
         var draft = Store.get(draftKey, {}), attemptId = draft.id || L.uuid();
-        if (draft.id) { $('#dbreflect').value = draft.result; $('#attemptSetup').value = draft.setup; $('#dbconfidence').value = draft.confidence; }
+        if (draft.id) { Object.entries(draft.scores || {}).forEach(([k,v])=>{if(form.elements[k])form.elements[k].value=v;}); $('#dbreflect').value = draft.result; $('#attemptSetup').value = draft.setup; $('#dbconfidence').value = draft.confidence; }
         function persist() {
-          var saved = Store.set(draftKey, {id: attemptId, result: $('#dbreflect').value, setup: $('#attemptSetup').value, confidence: $('#dbconfidence').value});
+          var saved = Store.set(draftKey, {id: attemptId, scores:window.LabCourt.scoreData(form), result: $('#dbreflect').value, setup: $('#attemptSetup').value, confidence: $('#dbconfidence').value});
           $('#draftState').textContent = saved ? 'Text draft saved on this device' : 'Device storage unavailable';
         }
         form.oninput = persist;
         form.onsubmit = async function (e) {
           e.preventDefault(); var file = $('#dbevidencefile').files[0], button = form.querySelector('button[type=submit]');
-          if (!file && !$('#dbreflect').value.trim()) return L.formError(form,'Enter a result or attach evidence.');
+          if (!file && !$('#dbreflect').value.trim() && !Object.keys(window.LabCourt.scoreData(form)).length) return L.formError(form,'Enter a score, write a result or attach evidence.');
           button.disabled = true; persist();
           try {
             var mediaId = null;
@@ -509,7 +509,7 @@
               var media = await api.upload(file,'athlete_id=' + b.athlete_id + '&visibility=shared',x => { $('i', prog).style.width = Math.round(x*100) + '%'; $('#dbprogtext').textContent = Math.round(x*100) + '%'; },attemptId);
               mediaId = media.id;
             }
-            await api.request('PUT','/api/development-blocks/' + b.id,{status:'evidence_submitted',attempt_id:attemptId,athlete_reflection:$('#dbreflect').value,conditions:$('#attemptSetup').value,confidence:$('#dbconfidence').value || undefined,evidence_media_id:mediaId});
+            await api.request('PUT','/api/development-blocks/' + b.id,{...window.LabCourt.scoreData(form),status:'evidence_submitted',attempt_id:attemptId,athlete_reflection:$('#dbreflect').value,conditions:$('#attemptSetup').value,confidence:$('#dbconfidence').value || undefined,evidence_media_id:mediaId});
             Store.del(draftKey); L.toast(b.review_required ? 'Result sent to your coach' : 'Practice logged'); route();
           } catch (err) { L.formError(form,err.message + ' Retry when connected.'); button.disabled = false; }
         };
@@ -674,7 +674,7 @@
     return api.get('/api/training/sessions/' + id).then(function (srv) {
       var seen = {}, events = [];
       srv.events.concat(local && local.coach_id === ME?.user?.id ? local.events : []).forEach(function (e) { if (!seen[e.id]) { seen[e.id] = 1; events.push(e); } });
-      var merged = { id: srv.id, viewer_id: ME.user.id, title: srv.title, status: srv.status, version: srv.version, started_at: srv.started_at, items: srv.items, athletes: srv.athletes, events: events, coach_id: srv.coach_id, notes: srv.notes || [], matches: srv.matches || [] };
+      var merged = { id: srv.id, source_plan_id:srv.source_plan_id, viewer_id: ME.user.id, title: srv.title, status: srv.status, version: srv.version, started_at: srv.started_at, items: srv.items, athletes: srv.athletes, events: events, coach_id: srv.coach_id, notes: srv.notes || [], matches: srv.matches || [] };
       if (local && local.coach_id === ME?.user?.id && local.status === 'complete' && srv.status === 'live') merged.status = 'complete';
       Store.set('session:' + id, merged);
       return merged;
@@ -690,16 +690,18 @@
       if (s.status === 'complete') { location.hash = '#/train/' + id; return; }
       var cur = Store.get('live-item:' + id, 0);
       if (cur >= s.items.length) cur = 0;
+      var selected=Store.get('live-player:'+id,s.athletes[0].id);
+      if(!s.athletes.some(a=>a.id===selected))selected=s.athletes[0].id;
       var wake = null;
       try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () {}); } catch (e) {}
       window.addEventListener('hashchange', function rel() { try { wake && wake.release(); } catch (e) {} window.removeEventListener('hashchange', rel); });
 
-      app.innerHTML = '<div class="live">' +
+      app.innerHTML = '<div class="live court-live">' +
         '<div class="live-head"><a class="back" href="#/train">← Train</a><span class="small muted mono" id="saved"></span></div>' +
         '<h1 style="font-size:22px">' + h(s.title) + '</h1>' +
         '<div class="drill-tabs" role="group" aria-label="Drills" id="tabs"></div>' +
         '<p class="drill-info" id="info"></p>' +
-        '<div id="board"></div>' +
+        '<div class="court-player-switch" id="courtPlayers" aria-label="Choose athlete"></div><div id="board"></div>' +
         voiceBar() +
         '<div class="live-bar"><button class="btn" type="button" id="undo">Undo last</button><button class="btn primary" type="button" id="finish">Finish session</button></div></div>';
 
@@ -711,10 +713,10 @@
       }
       function board() {
         var it = s.items[cur], cells = summarize(s.items, s.athletes.map(function (a) { return a.id; }), s.events);
-        var n = s.athletes.length;
-        $('#board').innerHTML = '<div class="pads n' + n + '">' + s.athletes.map(function (a) {
+        $('#courtPlayers').innerHTML=s.athletes.length>1?s.athletes.map(a=>'<button type="button" data-player="'+a.id+'" aria-pressed="'+(a.id===selected)+'">'+h(a.name)+'</button>').join(''):'';
+        $('#board').innerHTML = '<div class="pads n1">' + s.athletes.filter(a=>a.id===selected).map(function (a) {
           var c = cells[cur + ':' + a.id];
-          var top = '<div class="who"><span class="nm">' + h(a.name) + '</span><span class="pct">' + (it.measure === 'reps' && c.attempts ? c.pct + '%' : '') + '</span></div>';
+          var top = '<div class="who"><span class="nm">' + h(a.name) + '</span><span class="pct">' + (it.measure === 'reps' && c.attempts ? c.makes+'/'+c.attempts+' · '+c.pct + '%' : '') + '</span>'+(a.lesson_cue?'<small>'+h(a.lesson_cue)+'</small>':'')+'</div>';
           if (it.measure === 'reps') {
             return '<div class="pad" data-a="' + a.id + '">' + top +
               '<button type="button" class="make" data-kind="make" data-a="' + a.id + '" aria-label="Make for ' + h(a.name) + ', ' + c.makes + ' so far"><span class="num">' + c.makes + '</span><span class="lbl">Make</span></button>' +
@@ -726,7 +728,7 @@
           }
           if (it.measure === 'time') {
             return '<div class="pad" data-a="' + a.id + '">' + top + '<div class="valpad"><p class="big" data-clock="' + a.id + '">' + (c.last == null ? '0.0s' : fmtTime(c.last)) + '</p>' +
-              '<div class="row"><button class="btn primary" type="button" data-timer="' + a.id + '">Start</button></div><p class="small muted" style="text-align:center">Best ' + (c.best == null ? '—' : fmtTime(c.best)) + ' · ' + c.values.length + ' runs</p></div><span></span></div>';
+              '<div class="row"><button class="btn primary" type="button" data-timer="' + a.id + '">' + (timers[cur+':'+a.id]?'Stop':'Start') + '</button></div><p class="small muted" style="text-align:center">Best ' + (c.best == null ? '—' : fmtTime(c.best)) + ' · ' + c.values.length + ' runs</p></div><span></span></div>';
           }
           return '<div class="pad" data-a="' + a.id + '">' + top + '<div class="valpad"><p class="big">' + (c.last == null ? '—' : c.last) + '</p>' +
             '<div class="row"><input type="number" inputmode="numeric" aria-label="Score for ' + h(a.name) + '" data-in="' + a.id + '" style="max-width:110px"><button class="btn primary" type="button" data-rec="' + a.id + '">Record</button></div>' +
@@ -747,7 +749,7 @@
       function undo(target) {
         if (!target) {
           var undone = {}; s.events.forEach(function (e) { if (e.kind === 'undo') undone[e.undoes] = 1; });
-          for (var i = s.events.length - 1; i >= 0; i--) { var e = s.events[i]; if (e.kind !== 'undo' && !undone[e.id] && e.item_idx === cur) { target = e; break; } }
+          for (var i = s.events.length - 1; i >= 0; i--) { var e = s.events[i]; if (e.kind !== 'undo' && !undone[e.id] && e.item_idx === cur && e.athlete_id === selected) { target = e; break; } }
         }
         if (!target) { L.toast('Nothing to undo on this drill.'); return; }
         var ev = { id: L.uuid(), item_idx: target.item_idx, athlete_id: target.athlete_id, kind: 'undo', undoes: target.id, at: new Date().toISOString() };
@@ -757,6 +759,7 @@
       }
 
       var timers = {};
+      $('#courtPlayers').onclick=function(e){var b=e.target.closest('[data-player]');if(b){selected=+b.dataset.player;Store.set('live-player:'+id,selected);board();}};
       $('#board').addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         var aid = Number(b.getAttribute('data-a') || b.getAttribute('data-rec') || b.getAttribute('data-timer'));
@@ -768,12 +771,12 @@
           return record(aid, 'value', v);
         }
         if (b.getAttribute('data-timer')) {
-          var t = timers[aid];
+          var timerKey=cur+':'+aid, t = timers[timerKey];
           if (!t) {
-            timers[aid] = { start: performance.now(), tick: setInterval(function () { var c = $('[data-clock="' + aid + '"]'); if (c) c.textContent = fmtTime((performance.now() - timers[aid].start) / 1000); }, 100) };
+            timers[timerKey] = { start: performance.now(), tick: setInterval(function () { var c = $('[data-clock="' + aid + '"]'); if (c && timerKey===cur+':'+selected) c.textContent = fmtTime((performance.now() - timers[timerKey].start) / 1000); }, 100) };
             b.textContent = 'Stop';
           } else {
-            clearInterval(t.tick); delete timers[aid];
+            clearInterval(t.tick); delete timers[timerKey];
             record(aid, 'value', Math.round((performance.now() - t.start) / 100) / 10);
           }
         }
@@ -792,14 +795,17 @@
       bindVoice(s.athletes.map(function (a) { return a.name; }), 'counts', function (cmd) {
         if (cmd.action === 'undo') return undo();
         if (s.items[cur].measure !== 'reps') { L.toast('Voice scores make/miss drills. Enter this drill by hand.'); return; }
-        record(s.athletes[cmd.index].id, cmd.action);
+        selected=s.athletes[cmd.index].id; Store.set('live-player:'+id,selected); record(selected, cmd.action);
       });
-      window.addEventListener('hashchange', function offv() { stopVoice(); window.removeEventListener('hashchange', offv); });
+      window.addEventListener('hashchange', function offv() { Object.values(timers).forEach(t=>clearInterval(t.tick)); stopVoice(); window.removeEventListener('hashchange', offv); });
     });
   };
 
   function closeoutPanel(s) {
-    return '<section class="card stack"><div><p class="section-title">Session closeout</p><h2>Assign the next practice</h2><p>' + h(sharedNeeds(s.athletes)) + '</p></div>' +
+    const programSection=s.athletes.filter(a=>a.program_weeks?.length||a.saved_results?.length).map(a=>'<div class="card"><h3>'+h(a.name)+'</h3>'+
+      (a.saved_results||[]).map(r=>'<p><a href="#/development/'+r.block_id+'">'+h(s.items.find(it=>it.idx===r.item_idx)?.name||'Session result')+' · View saved score</a></p>').join('')+
+      (a.program_weeks?.length?'<form class="form" data-week-result="'+a.id+'"><label>Program week<select name="week">'+a.program_weeks.map(b=>'<option value="'+b.id+'">'+h(b.program_title)+' · Week '+(b.program_step+1)+' · '+h(b.title)+'</option>').join('')+'</select></label><label>Scored drill<select name="drill">'+s.items.map(it=>'<option value="'+it.idx+'">'+h(it.name)+'</option>').join('')+'</select></label><label>Cue for this athlete<input name="cue" maxlength="1000" value="'+h(a.lesson_cue||'')+'"></label><button class="btn primary">Save lesson to program</button><p role="status"></p></form>':'')+'</div>').join('');
+    return (programSection?'<section class="card stack"><h2>Update program weeks</h2>'+programSection+'</section>':'')+'<section class="card stack"><div><p class="section-title">Session closeout</p><h2>Assign the next practice</h2><p>' + h(sharedNeeds(s.athletes)) + '</p></div>' +
       '<label>Group drill<input id="groupDrill" maxlength="120" placeholder="Pitch &amp; Catch from lower transition"></label>' +
       '<label>How to score it<input id="groupTarget" maxlength="1000" placeholder="Land 7 of 10 resets in the kitchen"></label>' +
       s.athletes.map(a => a.closeout_block_id ? '<p>' + h(a.name) + ' · <a href="#/development/' + a.closeout_block_id + '">Open assigned practice</a></p>' :
@@ -807,10 +813,11 @@
         '<button type="submit" class="btn">Assign to ' + h(a.name.split(' ')[0]) + '</button><p role="status" class="small"></p></form>').join('') + '</section>';
   }
   function bindCloseout(s) {
+    $$('[data-week-result]').forEach(f=>{f.onsubmit=async e=>{e.preventDefault();const button=f.querySelector('button');button.disabled=true;try{const result=await api.request('POST','/api/training/sessions/'+s.id+'/program-result',{athlete_id:+f.dataset.weekResult,block_id:+f.elements.week.value,item_idx:+f.elements.drill.value,cue:f.elements.cue.value});f.innerHTML='<a href="#/development/'+result.block_id+'">Score saved · Open program week</a>';}catch(err){f.querySelector('[role=status]').textContent=err.message;button.disabled=false;}};});
     var key = 'closeout-draft:' + ME.user.id + ':' + s.id, draft = Store.get(key, {});
     var title = $('#groupDrill'), target = $('#groupTarget'), forms = $$('[data-close-athlete]');
     if (!forms.length) { title.closest('label').hidden = true; target.closest('label').hidden = true; Store.del(key); return; }
-    title.value = draft.title || ''; target.value = draft.target || '';
+    const lastDrill=s.items?.at(-1); title.value = draft.title ?? lastDrill?.name ?? ''; target.value = draft.target ?? lastDrill?.target ?? '';
     function saveDraft() {
       var cues = {}; forms.forEach(f => { if (f.elements.cue) cues[f.dataset.closeAthlete] = f.elements.cue.value; });
       Store.set(key, {title:title.value,target:target.value,cues:cues});
@@ -818,7 +825,7 @@
     title.oninput = target.oninput = saveDraft;
     forms.forEach(f => {
       var aid = f.dataset.closeAthlete, cue = f.elements.cue;
-      cue.value = draft.cues?.[aid] || ''; cue.oninput = saveDraft;
+      cue.value = draft.cues?.[aid] ?? s.athletes.find(a=>a.id===Number(aid))?.lesson_cue ?? ''; cue.oninput = saveDraft;
       f.onsubmit = async e => {
         e.preventDefault(); var button = f.querySelector('button'), status = f.querySelector('[role=status]');
         if (!title.value.trim() || !target.value.trim()) { status.textContent = 'Enter the group drill and scoring target first.'; return; }
@@ -1230,7 +1237,7 @@
       '<div class="row"><button class="btn" type="submit">Start my profile</button></div></form></div>' + settingsHTML();
     $('#claim').addEventListener('submit', function (e) {
       e.preventDefault();
-      api.request('POST', '/api/claim', { code: $('#code').value }).then(function () { L.toast('Profile claimed'); route(); }, function (err) { L.formError($('#claim'), err.status === 0 ? 'Claiming needs a connection.' : err.message); });
+      api.request('POST', '/api/claim', { code: $('#code').value }).then(function () { return api.request('GET','/api/me').then(function(m){setMe(m); L.toast('Profile connected'); location.hash='#/';}); }, function (err) { L.formError($('#claim'), err.status === 0 ? 'Claiming needs a connection.' : err.message); });
     });
     $('#own').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -1502,7 +1509,7 @@
         '<span>Hand <b>' + h(HANDS[a.hand] || '—') + '</b></span><span>Side <b>' + h(SIDES[a.side] || '—') + '</b></span><span>Rating <b>' + h(a.rating || '—') + '</b></span></p></div></div>' +
         '<div class="coach-athlete-actions"><a class="btn primary" href="#/coach/' + a.id + '/development/new">New Development Block</a><a class="btn" href="#/train/new?athlete=' + a.id + '">Start session</a><a class="btn ghost" href="#/train/new?quick=1&athlete=' + a.id + '">Counter</a></div>' +
         '<nav class="coach-athlete-tabs" aria-label="Athlete coaching workspace">' +
-        [['today','Today'],['plan','Plan'],['communication','Communication'],['notes','Notes'],['sessions','Sessions'],['media','Media'],['progress','Progress'],['access','Access']].map(function (x) { return '<button type="button" data-athlete-tab="' + x[0] + '" aria-pressed="' + (x[0] === 'today') + '">' + x[1] + '</button>'; }).join('') + '</nav>' +
+        [['today','Today'],['plan','Program'],['notes','History'],['access','Access']].map(function (x) { return '<button type="button" data-athlete-tab="' + x[0] + '" aria-pressed="' + (x[0] === 'today') + '">' + x[1] + '</button>'; }).join('') + '</nav>' +
         '<div class="coach-athlete-panels">' +
         '<section data-athlete-panel="today" class="stack"><div class="coach-athlete-today"><article class="coach-focus-card"><p class="eyebrow">CURRENT FOCUS</p><h2>' + h(a.focus || 'Set the next focus') + '</h2><p>' + h(a.plan || 'Add a simple development plan so every session has direction.') + '</p><a href="#" data-open-athlete-tab="progress">Edit development profile</a></article>' +
         '<div class="coach-athlete-glance"><div><strong>' + p.results.length + '</strong><span>Sessions</span></div><div><strong>' + p.media.length + '</strong><span>Media</span></div><div><strong>' + notes.length + '</strong><span>Notes</span></div><div><strong id="coach-open-count">—</strong><span>Open work</span></div></div></div>' +
@@ -1547,15 +1554,19 @@
         (!a.claimed ? '<div class="card stack"><p class="section-title">Account connection</p><p>This athlete has not claimed the profile yet.</p><button class="btn" type="button" id="newcode">Create a new claim code</button></div>' : '') +
         '<p class="small muted">Coaches: ' + h(p.coaches.map(function (c) { return c.name; }).join(', ')) + '</p></section></div>';
 
+      const needsInput=$('#trainingNeeds');
+      if(needsInput){const chips=document.createElement('div');chips.className='court-chips';chips.innerHTML=window.LabNeeds.terms.map(term=>'<button type="button">'+h(term)+'</button>').join('');needsInput.closest('label').after(chips);chips.onclick=e=>{if(e.target.tagName!=='BUTTON')return;const terms=needsInput.value.split(',').map(x=>x.trim()).filter(Boolean),term=e.target.textContent;if(!terms.some(t=>window.LabNeeds.canonical(t)===term)){terms.push(term);needsInput.value=terms.join(', ');}};}
       var athleteTab = Store.get('coach-athlete-tab:' + a.id, 'today');
       function showAthleteTab(name) {
         if (!document.querySelector('[data-athlete-panel="' + name + '"]')) name = 'today';
         athleteTab = name; Store.set('coach-athlete-tab:' + a.id, name);
-        $$('[data-athlete-tab]').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-athlete-tab') === name ? 'true' : 'false'); });
-        $$('[data-athlete-panel]').forEach(function (panel) { panel.hidden = panel.getAttribute('data-athlete-panel') !== name; });
+        const groups={today:['today'],plan:['plan','progress'],notes:['notes','sessions','communication','media'],access:['access']};
+        const group=Object.keys(groups).find(k=>groups[k].includes(name))||'today';
+        $$('[data-athlete-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.athleteTab===group)));
+        $$('[data-athlete-panel]').forEach(panel=>{panel.hidden=!groups[group].includes(panel.dataset.athletePanel);});
       }
       $$('[data-athlete-tab]').forEach(function (b) { b.addEventListener('click', function () { showAthleteTab(b.getAttribute('data-athlete-tab')); }); });
-      $$('[data-open-athlete-tab]').forEach(function (b) { b.addEventListener('click', function (e) { e.preventDefault(); showAthleteTab(b.getAttribute('data-open-athlete-tab')); window.scrollTo({ top: 0, behavior: 'smooth' }); }); });
+      $$('[data-open-athlete-tab]').forEach(function (b) { b.addEventListener('click', function (e) { e.preventDefault(); const panel=b.getAttribute('data-open-athlete-tab');showAthleteTab(panel);document.querySelector('[data-athlete-panel="'+panel+'"]').scrollIntoView({block:'start'}); }); });
       showAthleteTab(athleteTab);
 
       api.get('/api/templates').then(function (ts) { $('#atpl').innerHTML += ts.map(function (t) { return '<option value="' + t.id + '">' + h(t.name) + '</option>'; }).join(''); }, function () {});
@@ -2378,6 +2389,7 @@
 
   function route() {
     var p = parse();
+    if(ME && p && p.r[1]==='signin' && !p.query.error){location.hash='#/';return;}
     if (!p) { location.hash = '#/'; return; }
     if (!p.r[3] && !ME) { location.hash = '#/signin'; return; }
     $('#nav').hidden = !ME;
@@ -2405,7 +2417,6 @@
   function demoBar() { $('#demobar').hidden = !META.demo; if ($('#democard') && META.demo) $('#democard').hidden = false; }
   demoBar();
   api.request('GET', '/api/meta').then(function (m) { META = m; Store.set('meta', m); if (m.magic && $('#email-slot') && !$('#emailform')) { $('#email-slot').innerHTML = emailForm(); bindEmailForm(); } if ($('#gbtn') && m.google) $('#gbtn').hidden = false; demoBar(); }, function () {});
-  if (ME) api.request('GET', '/api/me').then(function (m) { setMe(m); }, function (err) { if (err.status === 401) setMe(null); }).then(function () { route(); pollBell(); });
-  else route();
+  api.request('GET', '/api/me').then(function (m) { setMe(m); }, function (err) { if (err.status === 401) setMe(null); }).then(function () { route(); pollBell(); });
   L.status(); L.flush();
 })();

@@ -55,7 +55,7 @@
   const training=feed?.assignments?.find(a=>a.status!=='resolved'),waiting=rows.find(b=>['evidence_submitted','coach_review'].includes(b.status));
   const retest=measurements.value?.measurements?.[0]?.retestOn;
   let item;
-  if(b) item={label:b.status==='ready_retest'?'Retest':'Next practice',title:b.title,cue:b.retest_notes||b.constraint_text||b.problem,target:b.success_evidence,meta:[b.practice_minutes&&b.practice_minutes+' min',b.due_on&&'Due '+b.due_on].filter(Boolean).join(' · '),action:'Open practice',href:'#/development/'+b.id};
+  if(b) item={label:b.status==='ready_retest'?'Retest':'Next practice',title:b.title,cue:b.retest_notes||b.constraint_text||b.problem,target:b.success_evidence,meta:[b.program_title && (b.program_title+' · Week '+(1+b.program_step)),b.practice_minutes&&b.practice_minutes+' min',b.due_on&&'Due '+b.due_on].filter(Boolean).join(' · '),action:'Open practice',href:'#/development/'+b.id};
   else if(task) item={label:'Assigned training',title:task.title,cue:task.note,action:'Open training',href:'#/train'};
   else if(focus) item={label:'Coach focus',title:focus.title,cue:focus.practice,target:focus.test,action:'Open assignment',href:'#/website'};
   else if(training) item={label:'Website training',title:training.title,cue:training.instructions,action:'Open training',href:'https://transcending-performance-lab.brettadamstp.chatgpt.site/members'};
@@ -63,8 +63,8 @@
   else if(!ctx.me()?.athlete_id) item={label:'Get started',title:'Connect your athlete profile',action:'Open profile',href:'#/profile'};
   else item={label:'Next practice',title:'Check in with your coach',cue:'Tell your coach what happened the last time you played.',action:'Ask your coach',href:'#/journey/feedback'};
   host.innerHTML=ctx.head('THE LAB','Today','')+'<article class="journey-note today-focus"><p class="eyebrow">'+h(item.label)+'</p><h2>'+h(item.title)+'</h2>'+
-   (item.cue?'<p>'+h(item.cue)+'</p>':'')+(item.target?'<p><b>How to score it</b><br>'+h(item.target)+'</p>':'')+(item.meta?'<p class="small">'+h(item.meta)+'</p>':'')+'<a class="btn primary" href="'+h(item.href)+'">'+h(item.action)+'</a></article>'+
-   '<nav class="row" aria-label="Athlete sections"><a class="btn" href="#/train">My program</a><a class="btn" href="#/progress">Progress</a><a class="btn ghost" href="#/journey/overview">Sessions &amp; tools</a></nav>'+
+   (item.cue?'<p>'+h(item.cue)+'</p>':'')+(b?.previous_feedback?'<p><b>From your coach</b><br>'+h(b.previous_feedback)+'</p>':'')+(item.target?'<p><b>How to score it</b><br>'+h(item.target)+'</p>':'')+(item.meta?'<p class="small">'+h(item.meta)+'</p>':'')+'<a class="btn primary" href="'+h(item.href)+'">'+h(item.action)+'</a></article>'+
+   '<nav class="row" aria-label="Athlete sections"><a class="btn" href="#/programs">My program</a><a class="btn ghost" href="#/train">Training</a><a class="btn" href="#/progress">Progress</a><a class="btn ghost" href="#/journey/overview">Sessions &amp; tools</a></nav>'+
    (retest?'<p><a href="#/progress">Measurement retest · '+h(retest)+'</a></p>':'')+
    ([blocks,assignments].some(r=>r.status==='rejected')?'<p role="status">Some app assignments could not load. <button class="btn" id="practiceRetry">Retry</button></p>':'')+
    (site.status==='rejected'?'<p class="small"><a href="#/website">Check website coaching connection</a></p>':'');

@@ -11,6 +11,12 @@ const STATUSES = ['assigned', 'in_progress', 'evidence_submitted', 'coach_review
 
 module.exports = function development(r, ctx) {
   const { db, auth, notifier } = ctx;
+  const programs=require('./programs')(r,ctx,deliverWebsite);
+  function score(makes,attempts) {
+    const m=int(makes,'successes',{min:0,max:10000}), a=int(attempts,'attempts',{min:1,max:10000});
+    if ((m===null)!==(a===null) || (a!==null && m>a)) throw new HttpError(400,'Enter successes and attempts together. Successes cannot exceed attempts.');
+    return [m,a];
+  }
   function shape(row) {
     if (!row) return row;
     return { ...row, read_targets: JSON.parse(row.read_targets || '[]'), scramble: !!row.scramble,
@@ -18,10 +24,10 @@ module.exports = function development(r, ctx) {
       delivery: { app: row.athlete_user_id ? 'delivered' : 'needs_connection', website: row.website_id ? (row.website_delivery_status || 'pending') : 'not_linked', website_error: row.website_delivery_error || '', website_attempts: row.website_delivery_attempts || 0 } };
   }
   function select(where) {
-    return `SELECT b.*, l.title AS lesson_title, c.title AS course_title, c.slug AS course_slug, m.mime AS evidence_mime,
+    return `SELECT b.*, cp.title AS program_title, (SELECT prior.coach_feedback FROM development_blocks prior WHERE prior.program_id=b.program_id AND prior.athlete_id=b.athlete_id AND prior.program_step=b.program_step-1) AS previous_feedback, l.title AS lesson_title, c.title AS course_title, c.slug AS course_slug, m.mime AS evidence_mime,
       t.name AS template_name, t.items AS template_items, u.name AS coach, a.user_id AS athlete_user_id, w.website_id,
       dd.status AS website_delivery_status, dd.error AS website_delivery_error, dd.attempts AS website_delivery_attempts
-      FROM development_blocks b
+      FROM development_blocks b LEFT JOIN companion_programs cp ON cp.id=b.program_id
       LEFT JOIN lessons l ON l.id = b.lesson_id LEFT JOIN courses c ON c.id = l.course_id
       LEFT JOIN media m ON m.id = b.evidence_media_id
       LEFT JOIN training_templates t ON t.id = b.template_id LEFT JOIN users u ON u.id = b.assigned_by
@@ -37,7 +43,14 @@ module.exports = function development(r, ctx) {
     return { row, level };
   }
   function detail(row) {
-    return { ...shape(row), attempts: db.prepare('SELECT result,conditions,cue,confidence,media_id,at FROM development_attempts WHERE block_id=? ORDER BY id').all(row.id) };
+    const checkpoints=db.prepare(`SELECT p.session_id,p.item_idx,p.cue,p.at,t.name,t.measure
+      FROM program_session_results p JOIN training_items t ON t.session_id=p.session_id AND t.idx=p.item_idx
+      WHERE p.block_id=? ORDER BY p.at DESC LIMIT 50`).all(row.id).map(r=>{
+      const events=db.prepare('SELECT id,item_idx,athlete_id,kind,undoes,at,value FROM score_events WHERE session_id=? AND athlete_id=? AND item_idx=?').all(r.session_id,row.athlete_id,r.item_idx);
+      const [totals]=require('./training').summarize([{idx:r.item_idx}],[row.athlete_id],events);
+      return {...r,makes:totals.makes,attempts:totals.attempts,last:totals.last};
+    });
+    return { ...shape(row),checkpoints, observations:db.prepare('SELECT body,makes,attempts,at FROM play_observations WHERE block_id=? ORDER BY id DESC LIMIT 30').all(row.id), attempts: db.prepare('SELECT result,conditions,cue,confidence,media_id,at,makes,attempts,game_makes,game_attempts FROM development_attempts WHERE block_id=? ORDER BY id').all(row.id) };
   }
   function due(value) {
     if (!value) return null;
@@ -192,7 +205,16 @@ module.exports = function development(r, ctx) {
     return shape(db.prepare(select('WHERE b.id = ?')).get(row.id));
   });
 
-  r.put('/api/development-blocks/:id', ({ user, params, body }) => {
+  r.post('/api/development-blocks/:id/observations',({user,params,body})=>{
+    const {row}=block(user,params.id);
+    if(auth.ownAthleteId(user)!==row.athlete_id)throw new HttpError(403,'Only this athlete can add a match observation.');
+    const key=uuid(body.client_key,'client_key'),note=str(body.body,'observation',{required:true,max:1000});
+    const [m,a]=score(body.makes,body.attempts);
+    const saved=db.prepare('INSERT INTO play_observations(block_id,client_key,body,makes,attempts,at) VALUES(?,?,?,?,?,?) ON CONFLICT(block_id,client_key) DO NOTHING').run(row.id,key,note,m,a,now());
+    if(saved.changes && row.assigned_by)notifier.notify([row.assigned_by],'feedback','Match observation · '+row.title,note.slice(0,200),'#/development/'+row.id);
+    return detail(row);
+  });
+  r.put('/api/development-blocks/:id', async ({ user, params, body }) => {
     const { row, level } = block(user, params.id);
     const isCoach = level === 'coach';
     if (isCoach && ((body.expected_status && row.status !== body.expected_status) || (body.expected_updated_at && row.updated_at !== body.expected_updated_at))) throw new HttpError(409, 'This practice changed. Reopen it before saving your decision.');
@@ -202,6 +224,9 @@ module.exports = function development(r, ctx) {
     if (key && db.prepare('SELECT 1 FROM development_attempts WHERE block_id=? AND request_key=?').get(row.id, key)) return detail(row);
     if (!isCoach && ['mastered','evidence_submitted','coach_review'].includes(row.status)) throw new HttpError(409, 'This result is saved. Your coach can open a new attempt.');
     if (!isCoach && !['assigned', 'in_progress', 'evidence_submitted'].includes(status)) throw new HttpError(403, 'Your coach advances review and retest stages.');
+    if (row.program_id && row.status==='mastered' && status!=='mastered') throw new HttpError(409,'This program week has already closed.');
+    const [makes,attempts]=score(body.makes,body.attempts),[gameMakes,gameAttempts]=score(body.game_makes,body.game_attempts);
+    let nextWeek;
     const reflection = body.athlete_reflection === undefined ? row.athlete_reflection : str(body.athlete_reflection, 'athlete_reflection', { max: 4000 });
     const confidence = body.confidence === undefined || body.confidence === null || body.confidence === '' ? row.confidence : int(body.confidence, 'confidence', { min: 1, max: 5 });
     const feedback = body.coach_feedback === undefined || !isCoach ? row.coach_feedback : str(body.coach_feedback, 'coach_feedback', { max: 4000 });
@@ -216,14 +241,14 @@ module.exports = function development(r, ctx) {
       }
     }
     const conditions = submitting ? str(body.conditions, 'test conditions', { max: 600 }) : '';
-    if (submitting && !str(body.athlete_reflection, 'result', {max:4000}) && !body.evidence_media_id) throw new HttpError(400, 'Enter your result or attach evidence.');
+    if (submitting && !str(body.athlete_reflection, 'result', {max:4000}) && !body.evidence_media_id && attempts===null && gameAttempts===null) throw new HttpError(400, 'Enter your result or attach evidence.');
     if (submitting && !row.review_required) status = 'mastered';
     if (!isCoach && status === 'assigned' && (reflection || confidence)) status = 'in_progress';
     let retestAssignmentId = row.retest_assignment_id;
     tx(db, () => {
       if (submitting) {
-        db.prepare('INSERT INTO development_attempts(block_id,request_key,result,conditions,cue,confidence,media_id,at) VALUES(?,?,?,?,?,?,?,?)')
-          .run(row.id, key || crypto.randomUUID(), reflection, conditions, row.retest_notes || row.coach_feedback || row.constraint_text, confidence, evidenceId, now());
+        db.prepare('INSERT INTO development_attempts(block_id,request_key,result,conditions,cue,confidence,media_id,at,makes,attempts,game_makes,game_attempts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+          .run(row.id, key || crypto.randomUUID(), str(body.athlete_reflection,'result',{max:4000}), conditions, row.retest_notes || row.coach_feedback || row.constraint_text, confidence, evidenceId, now(),makes,attempts,gameMakes,gameAttempts);
       }
       if (isCoach && status === 'ready_retest' && row.template_id && (!retestAssignmentId || (row.retest_session_id && row.status !== 'ready_retest'))) {
         retestAssignmentId = Number(db.prepare('INSERT INTO assignments (athlete_id, template_id, title, note, assigned_by) VALUES (?, ?, ?, ?, ?)')
@@ -232,9 +257,11 @@ module.exports = function development(r, ctx) {
       }
       db.prepare('UPDATE development_blocks SET athlete_reflection = ?, confidence = ?, coach_feedback = ?, retest_notes = ?, session_id = ?, evidence_media_id = ?, retest_assignment_id = ?, status = ?, updated_at = ? WHERE id = ?')
         .run(reflection, confidence, feedback, retest, sessionId, evidenceId, retestAssignmentId, status, now(), row.id);
+      if(status==='mastered' && row.status!=='mastered') nextWeek=programs.advance(row);
     });
+    if(nextWeek) await programs.announce(user,nextWeek);
     if (isCoach && status === 'ready_retest' && retestAssignmentId && !row.retest_assignment_id) notifier.notify(notifier.usersOfAthletes([row.athlete_id]), 'training', `Retest ready: ${row.title}`, retest || row.success_evidence, '#/train');
     if (isCoach && body.status && body.status !== row.status) notifier.notify(notifier.usersOfAthletes([row.athlete_id]), 'training', `${row.title}: ${body.status.replaceAll('_', ' ')}`, feedback, `#/development/${row.id}`);
-    return shape(db.prepare(select('WHERE b.id = ?')).get(row.id));
+    return detail(db.prepare(select('WHERE b.id = ?')).get(row.id));
   });
 };
