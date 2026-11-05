@@ -21,7 +21,7 @@ function drillBlocks(plan){
 }
 module.exports=function invitationals(r,{db,auth},publicKey=PRODUCTION_KEY){
   const key=crypto.createPublicKey({key:publicKey,format:'jwk'});
-  r.post('/api/invitationals/receive',({body})=>{
+  function accept(body){
     const {payload,signature}=body;
     if(typeof payload!=='string'||payload.length>100000||!/^([a-f0-9]{128})$/.test(signature||'')||
       !crypto.verify('sha256',Buffer.from(payload),{key,dsaEncoding:'ieee-p1363'},Buffer.from(signature,'hex')))fail(403,'Invitationals signature required.');
@@ -40,6 +40,13 @@ module.exports=function invitationals(r,{db,auth},publicKey=PRODUCTION_KEY){
       db.prepare('INSERT INTO invitational_tickets(token_hash,nonce,event_key,coach_email,revision,payload,expires) VALUES(?,?,?,?,?,?,?)').run(hash(ticket),p.nonce,e.id,emailKey(p.coach),p.revision,payload,Date.now()+ttl);
     });
     return {ticket};
+  }
+  r.post('/api/invitationals/receive',({body})=>accept(body));
+  r.post('/api/invitationals/enter',({body,res})=>{
+    const result=accept(body);
+    if(result.connected)return result;
+    res.writeHead(303,{Location:'/#/invitational/'+result.ticket,'Referrer-Policy':'no-referrer','Cache-Control':'no-store'});
+    res.end();
   });
   function access(user,token){
     auth.require(user,'coach');

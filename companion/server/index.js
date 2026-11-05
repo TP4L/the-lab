@@ -169,13 +169,15 @@ function createApp(opts = {}) {
       const hit = r.match(method, pathname);
       if (!hit.route) throw new HttpError(hit.pathHit ? 405 : 404, hit.pathHit ? 'Method not allowed.' : 'Not found.');
       const write = method !== 'GET';
-      if (write && !sameOrigin(req)) throw new HttpError(403, 'Cross-site request blocked.');
+      const invitationForm=method==='POST' && pathname==='/api/invitationals/enter';
+      const fromInvitations=invitationForm && req.headers.origin==='https://invitationals-court-club.brettadamstp.chatgpt.site';
+      if (write && !sameOrigin(req) && !fromInvitations) throw new HttpError(403, 'Cross-site request blocked.');
       if (write && !hit.route.raw && req.headers['content-length'] !== '0' && req.headers['content-length'] !== undefined) {
         const ct = String(req.headers['content-type'] || '');
-        if (!ct.startsWith('application/json')) throw new HttpError(415, 'Send JSON with Content-Type: application/json.');
+        if (!(invitationForm ? ct.startsWith('application/x-www-form-urlencoded') : ct.startsWith('application/json'))) throw new HttpError(415, 'Send JSON with Content-Type: application/json.');
       }
       const user = auth.currentUser(req);
-      const body = write && !hit.route.raw ? await readJson(req) : {};
+      const body = write && !hit.route.raw ? await readJson(req,invitationForm) : {};
       const out = await hit.route.handler({ params: hit.params, body, query: url.searchParams, req, res, user });
       if (res.headersSent) return;
       return out && out[STATUS] ? send(res, out[STATUS], out.body) : send(res, 200, out);

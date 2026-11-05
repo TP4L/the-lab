@@ -84,7 +84,7 @@ function createRouter() {
 }
 
 /* ---------- request/response ---------- */
-function readJson(req) {
+function readJson(req, invitationForm=false) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
     req.on('data', c => {
@@ -96,7 +96,12 @@ function readJson(req) {
       if (size > MAX_JSON) return reject(new HttpError(413, 'Request body is too large.'));
       if (!chunks.length) return resolve({});
       try {
-        const v = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        const raw=Buffer.concat(chunks).toString('utf8');
+        if(invitationForm){
+          const fields=new URLSearchParams(raw);
+          return resolve({payload:fields.get('payload'),signature:fields.get('signature')});
+        }
+        const v = JSON.parse(raw);
         if (!v || typeof v !== 'object' || Array.isArray(v)) return reject(new HttpError(400, 'Body must be a JSON object.'));
         resolve(v);
       } catch { reject(new HttpError(400, 'Body is not valid JSON.')); }

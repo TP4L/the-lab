@@ -18,7 +18,13 @@ test('signed event handoff links returning athletes and guests, reopens the same
   assert.equal((await receive(tampered)).status,403);
   assert.equal((await receive(packet({iat:Date.now()-200000}))).status,400);
   assert.deepEqual((await receive(packet({type:'connection'}))).body,{connected:true});
-  const ticket=(await receive(initial)).body.ticket;
+  const formPost=(signed,origin)=>fetch(s.base+'/api/invitationals/enter',{method:'POST',redirect:'manual',headers:{Origin:origin},body:new URLSearchParams(signed)});
+  const source='https://invitationals-court-club.brettadamstp.chatgpt.site';
+  assert.equal((await formPost(initial,'https://unrelated.invalid')).status,403);
+  assert.deepEqual(await (await formPost(packet({type:'connection'}),source)).json(),{connected:true});
+  const opened=await formPost(initial,source);
+  assert.equal(opened.status,303);
+  const ticket=opened.headers.get('location').split('/').at(-1);
   assert.equal((await receive(initial)).status,409);
   const url='/api/invitationals/open/'+ticket;
   assert.equal((await anon.get(url)).status,401);
