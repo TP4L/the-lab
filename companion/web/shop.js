@@ -89,7 +89,7 @@
 
  /* ---------- entry points ---------- */
  const origCoachAthlete=ctx.views.coachAthlete;
- if(origCoachAthlete)ctx.views.coachAthlete=async function(id,...rest){const hash=location.hash;await origCoachAthlete(id,...rest);if(location.hash!==hash)return;try{const c=await api.request('GET','/api/athletes/'+id+'/credits');if(location.hash!==hash)return;const row=document.createElement('a');row.className='banner shop-credit-banner';row.href='#/coach/'+id+'/credits';row.innerHTML='<span><b>Credits:</b> '+h(creditLine(c.balance,'this'))+'</span><span class="btn sm">Manage</span>';const first=root().querySelector('.head-row,.head,.pcard');(first||root().firstChild).insertAdjacentElement('afterend',row);}catch{}};
+ if(origCoachAthlete)ctx.views.coachAthlete=async function(id,...rest){const hash=location.hash;await origCoachAthlete(id,...rest);if(location.hash!==hash)return;try{const c=await api.request('GET','/api/athletes/'+id+'/credits');if(location.hash!==hash)return;const line=root().querySelector('#coach-credit-line');if(line){line.hidden=false;line.innerHTML='<b>Credits:</b> '+h(creditLine(c.balance,'this'))+' · <a href="#/coach/'+id+'/credits">Manage</a>';}}catch{}};
  const origLearn=ctx.views.learn;
  if(origLearn)ctx.views.learn=async function(...a){const hash=location.hash;await origLearn(...a);if(location.hash!==hash||ctx.me())return;const bar=document.createElement('div');bar.className='banner shop-join';bar.innerHTML='<span><b>Train with THE LAB.</b> Coaching, sessions and the app that keeps your progress.</span><a class="btn sm primary" href="#/join">Join</a>';root().prepend(bar);};
 });})();

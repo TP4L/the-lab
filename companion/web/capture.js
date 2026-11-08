@@ -190,12 +190,5 @@
  /* ---------- entry points ---------- */
  const origCoachAthlete=ctx.views.coachAthlete;
  if(origCoachAthlete)ctx.views.coachAthlete=async function(id,...rest){const hash=location.hash;await origCoachAthlete(id,...rest);if(location.hash!==hash)return;
-  // One toolbar for the athlete record: gather the links other modules prepended and lay them out in a fixed order.
-  const r=root(),back=r.querySelector('.back');const links=new Map();
-  const wanted=[['#/coach/'+id+'/thread','Thread','primary'],['#/coach/capture/new?athlete='+id,'Capture session',''],['#/skills/'+id,'Skill progress',''],['#/coach/'+id+'/skills/rate','Rate skills',''],['#/coach/'+id+'/practices','Practices',''],['#/coach/'+id+'/report','Report','ghost'],['#/coach/'+id+'/credits','Credits','ghost'],['#/progress/app/'+id,'Measurements','ghost'],['#/timeline/app/'+id,'Timeline','ghost']];
-  for(const el of [...r.children]){if(el===back)break;el.querySelectorAll('a[href]').forEach(a=>links.set(a.getAttribute('href'),a));if(!el.matches('.card,.list,form,.banner,.head,.head-row')&&!el.querySelector('.card,.list,form,.banner'))el.remove();}
-  const bar=document.createElement('nav');bar.className='row record-actions';bar.setAttribute('aria-label','Athlete record actions');
-  for(const [href,label,cls] of wanted){const found=links.get(href)||[...links.entries()].find(([k])=>k.startsWith(href.split('?')[0]))?.[1];const a=document.createElement('a');a.className='btn sm'+(cls?' '+cls:'');a.href=found?found.getAttribute('href'):href;a.textContent=label;bar.appendChild(a);}
-  (back||r.firstChild).insertAdjacentElement('afterend',bar);
   try{const c=await api.request('GET','/api/athletes/'+id+'/captures');if(location.hash!==hash||!c.captures.length)return;const sec=document.createElement('details');sec.className='sk-done';sec.innerHTML='<summary>'+c.captures.length+' captured session'+(c.captures.length===1?'':'s')+'</summary><div class="list">'+c.captures.slice(0,20).map(x=>'<a class="li" href="#/coach/capture/'+x.id+'/next"><span class="main-col"><span class="t small">'+h(x.name||x.format_label)+'</span><span class="d">'+h(day(x.occurred_on))+(x.attributes.length?' · '+x.attributes.map(h).join(', '):'')+(x.observation?'<br>'+h(x.observation):'')+'</span></span></a>').join('')+'</div>';root().appendChild(sec);}catch{}};
 });})();

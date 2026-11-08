@@ -70,6 +70,4 @@
  }
 
  /* entry points */
- const origCoachAthlete=ctx.views.coachAthlete;
- if(origCoachAthlete)ctx.views.coachAthlete=async function(id,...rest){const hash=location.hash;await origCoachAthlete(id,...rest);if(location.hash!==hash)return;const nav=root().querySelector('.row');const a=document.createElement('a');a.className='btn primary';a.href='#/coach/'+id+'/thread';a.textContent='Thread';if(nav)nav.prepend(a);else{const row=document.createElement('div');row.className='row';row.appendChild(a);root().prepend(row);}};
 });})();

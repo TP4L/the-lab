@@ -65,8 +65,6 @@
  };
 
  /* entry points */
- const origCoachAthlete=ctx.views.coachAthlete;
- if(origCoachAthlete)ctx.views.coachAthlete=async function(id,...rest){const hash=location.hash;await origCoachAthlete(id,...rest);if(location.hash!==hash)return;const nav=root().querySelector('.row');const a=document.createElement('a');a.className='btn ghost';a.href='#/coach/'+id+'/report';a.textContent='Report';if(nav)nav.appendChild(a);};
  const origMySkills=ctx.views.mySkills;
  if(origMySkills)ctx.views.mySkills=async function(...a){const hash=location.hash;await origMySkills(...a);if(location.hash!==hash)return;try{const d=await api.request('GET','/api/me/reports');if(location.hash!==hash||!d.reports.length)return;const sec=document.createElement('section');sec.className='stack';sec.innerHTML='<p class="section-title">Reports<a href="#/reports">All</a></p><div class="list">'+d.reports.slice(0,2).map(x=>'<a class="li" href="#/report/'+h(x.token)+'"><span class="main-col"><span class="t">'+h(x.title)+'</span><span class="d">'+h(fmt(x.period_from))+' – '+h(fmt(x.period_to))+'</span></span></a>').join('')+'</div>';const legend=root().querySelector('.sk-legend');if(legend)legend.insertAdjacentElement('beforebegin',sec);else root().firstChild.appendChild(sec);}catch{}};
  const origAthleteSkills=ctx.views.athleteSkills;

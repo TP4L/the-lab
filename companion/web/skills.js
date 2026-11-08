@@ -119,6 +119,4 @@
  };
 
  /* ---------- entry points ---------- */
- const origCoachAthlete=ctx.views.coachAthlete;
- if(origCoachAthlete)ctx.views.coachAthlete=async function(id,...rest){const hash=location.hash;await origCoachAthlete(id,...rest);if(location.hash!==hash)return;const nav=document.createElement('div');nav.className='row';nav.innerHTML='<a class="btn" href="#/skills/'+h(id)+'">Skill progress</a><a class="btn ghost" href="#/coach/'+h(id)+'/skills/rate">Rate skills</a>';root().prepend(nav);};
 });})();

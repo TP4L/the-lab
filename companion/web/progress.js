@@ -35,7 +35,7 @@
    section.querySelectorAll('[data-done]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await send({...open.find(t=>t.id===b.dataset.done),status:'done'});ctx.route();}catch(e){b.parentElement.querySelector('[role=status]').textContent=e.message;b.disabled=false;}});
   });
  };
- for(const [key,link]of [['coachAthlete',id=>'#/progress/app/'+id],['workspaceAthlete',id=>'#/progress/website/'+id],['profile',()=> '#/progress'],['workspace',()=> '#/followups']]){
+ for(const [key,link]of [['workspaceAthlete',id=>'#/progress/website/'+id],['profile',()=> '#/progress'],['workspace',()=> '#/followups']]){
   const old=ctx.views[key];ctx.views[key]=async function(...args){const hash=location.hash;await old(...args);if(location.hash!==hash)return;const nav=document.createElement('div');nav.className='row';nav.innerHTML='<a class="btn primary" href="'+link(args[0])+'">'+(key==='workspace'?'Coach follow-ups':'Measurements & progress')+'</a>';root().prepend(nav);};
  }
  ctx.views.journeyOverview=ctx.views.home;
