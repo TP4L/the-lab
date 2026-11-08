@@ -14,6 +14,7 @@ const SCALE = [
   { value: 5, label: 'Weapon', meaning: 'Wins points on its own. Opponents plan around it.' }
 ];
 const GOAL_STATUS = ['not_started', 'in_progress', 'completed'];
+const SETTINGS = { lesson: 'Lesson', drill: 'Drill', conditioned_play: 'Conditioned play', match: 'Match' };
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 function day(v, label, optional = false) {
   if (optional && !v) return '';
@@ -84,26 +85,30 @@ module.exports = function (r, ctx) {
     const attributes = db.prepare('SELECT * FROM skill_attributes WHERE archived_at IS NULL ORDER BY sort,id').all();
     const ratings = db.prepare('SELECT r.*, u.name AS coach FROM skill_ratings r LEFT JOIN users u ON u.id=r.coach_id WHERE r.athlete_id=? ORDER BY r.rated_on DESC, r.id DESC').all(a.id);
     const byAttr = new Map();
-    for (const x of ratings) { if (!byAttr.has(x.attribute_id)) byAttr.set(x.attribute_id, []); byAttr.get(x.attribute_id).push({ id: x.id, rating: x.rating, label: SCALE[x.rating - 1].label, comment: x.comment, rated_on: x.rated_on, coach: x.coach || '' }); }
+    for (const x of ratings) { if (!byAttr.has(x.attribute_id)) byAttr.set(x.attribute_id, []); byAttr.get(x.attribute_id).push({ id: x.id, rating: x.rating, label: SCALE[x.rating - 1].label, comment: x.comment, rated_on: x.rated_on, coach: x.coach || '', setting: x.setting || '', setting_label: SETTINGS[x.setting] || '', capture_id: x.capture_id || null }); }
     // Attributes that were rated but have since been archived still show, so history is never lost.
     const archivedRated = [...byAttr.keys()].filter(id => !attributes.some(x => x.id === id));
     const extra = archivedRated.length ? db.prepare('SELECT * FROM skill_attributes WHERE id IN (' + archivedRated.map(() => '?').join(',') + ')').all(...archivedRated) : [];
     const skills = [...attributes, ...extra].map(x => {
       const h = byAttr.get(x.id) || [];
       const latest = h[0] || null, previous = h[1] || null;
-      return { id: x.id, name: x.name, category: x.category, description: x.description, reads: lab.parse(x.reads, []), level_min: x.level_min, level_max: x.level_max, archived: !!x.archived_at, latest, previous, delta: latest && previous ? latest.rating - previous.rating : null, history: h };
+      const delta = latest && previous ? latest.rating - previous.rating : null;
+      return { id: x.id, name: x.name, category: x.category, description: x.description, reads: lab.parse(x.reads, []), level_min: x.level_min, level_max: x.level_max, archived: !!x.archived_at, latest, previous, delta, change: !latest ? 'unassessed' : !previous ? 'baseline' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'same', history: h };
     });
     const assessed = skills.filter(s => s.latest);
     // The LAB lens: how each read is holding up, averaged across the assessed attributes mapped to it.
     const readSummary = {};
     for (const r of lab.READS) { const rows = assessed.filter(s => s.reads.includes(r)); readSummary[r] = { label: lab.LABELS.reads[r], count: rows.length, avg: rows.length ? Math.round(rows.reduce((a, s) => a + s.latest.rating, 0) / rows.length * 10) / 10 : null, trend: rows.reduce((a, s) => a + (s.delta || 0), 0) }; }
-    const goals = db.prepare("SELECT g.*, sa.name AS attribute_name FROM skill_goals g LEFT JOIN skill_attributes sa ON sa.id=g.attribute_id WHERE g.athlete_id=? ORDER BY CASE g.status WHEN 'in_progress' THEN 0 WHEN 'not_started' THEN 1 ELSE 2 END, COALESCE(g.target_on,'9999'), g.id").all(a.id)
-      .map(g => ({ id: g.id, title: g.title, note: g.note, status: g.status, target_on: g.target_on || '', completed_at: g.completed_at || '', attribute_id: g.attribute_id, attribute_name: g.attribute_name || '', reads: lab.parse(g.reads, []), coach: coachName(g.coach_id), created_at: g.created_at }));
+    const goals = db.prepare("SELECT g.*, sa.name AS attribute_name, b.title AS block_title, b.draft AS block_draft FROM skill_goals g LEFT JOIN skill_attributes sa ON sa.id=g.attribute_id LEFT JOIN development_blocks b ON b.id=g.block_id WHERE g.athlete_id=? ORDER BY CASE g.status WHEN 'in_progress' THEN 0 WHEN 'not_started' THEN 1 ELSE 2 END, COALESCE(g.target_on,'9999'), g.id").all(a.id)
+      .map(g => ({ id: g.id, title: g.title, note: g.note, status: g.status, target_on: g.target_on || '', completed_at: g.completed_at || '', attribute_id: g.attribute_id, attribute_name: g.attribute_name || '', reads: lab.parse(g.reads, []), block_id: g.block_id && !(g.block_draft && !viewerIsCoach) ? g.block_id : null, block_title: g.block_id && !(g.block_draft && !viewerIsCoach) ? (g.block_title || '') : '', coach: coachName(g.coach_id), created_at: g.created_at }));
+    const practice = db.prepare("SELECT id, title, reason, constraint_text, success_evidence, due_on, resource_url, status, shared_at, coach_feedback FROM development_blocks WHERE athlete_id=? AND draft=0 AND status IN ('assigned','in_progress','evidence_submitted','coach_review','ready_retest') ORDER BY CASE status WHEN 'ready_retest' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'assigned' THEN 2 ELSE 3 END, COALESCE(due_on,'9999'), updated_at DESC LIMIT 1").get(a.id);
     return {
       athlete: { id: a.id, name: a.name },
+      context: 'Pickleball skills. Internal coach observations, separate from DUPR and from your own self-ratings.',
+      practice: practice ? { id: practice.id, title: practice.title, reason: practice.reason, practice: practice.constraint_text, next_check: practice.success_evidence, due_on: practice.due_on || '', resource_url: practice.resource_url, status: practice.status, shared_at: practice.shared_at, feedback: practice.coach_feedback } : null,
       viewer: viewerIsCoach ? 'coach' : 'athlete',
-      summary: { assessed: assessed.length, improved_last: assessed.filter(s => s.delta > 0).length, slipped_last: assessed.filter(s => s.delta < 0).length, unassessed: skills.filter(s => !s.latest && !s.archived).length, goals_open: goals.filter(g => g.status !== 'completed').length, goals_completed: goals.filter(g => g.status === 'completed').length, last_rated_on: assessed.map(s => s.latest.rated_on).sort().pop() || '' },
-      skills, goals, scale: SCALE, reads: readSummary, vocab: lab.vocab()
+      summary: { assessed: assessed.length, reassessed: assessed.filter(s => s.previous).length, baselines: assessed.filter(s => !s.previous).length, same_last: assessed.filter(s => s.change === 'same').length, improved_last: assessed.filter(s => s.delta > 0).length, slipped_last: assessed.filter(s => s.delta < 0).length, unassessed: skills.filter(s => !s.latest && !s.archived).length, goals_open: goals.filter(g => g.status !== 'completed').length, goals_completed: goals.filter(g => g.status === 'completed').length, last_rated_on: assessed.map(s => s.latest.rated_on).sort().pop() || '' },
+      skills, goals, scale: SCALE, settings: SETTINGS, reads: readSummary, vocab: lab.vocab()
     };
   }
   r.get('/api/me/skills', ({ user }) => {
@@ -119,18 +124,21 @@ module.exports = function (r, ctx) {
     const a = coachOf(user, params.id);
     const ratedOn = body.rated_on ? day(body.rated_on, 'Rating date') : today();
     if (ratedOn > today()) throw new HttpError(400, 'Rating date cannot be in the future.');
+    const setting = body.setting ? oneOf(body.setting, Object.keys(SETTINGS), 'setting') : '';
+    let captureId = null;
+    if (body.capture_id) { const cap = db.prepare('SELECT id, coach_id FROM captures WHERE id=?').get(String(body.capture_id)); if (!cap || (cap.coach_id !== user.id && !auth.has(user, 'admin'))) throw new HttpError(404, 'Capture not found.'); if (!db.prepare('SELECT 1 FROM capture_players WHERE capture_id=? AND athlete_id=?').get(cap.id, a.id)) throw new HttpError(400, 'That capture does not include this athlete.'); captureId = cap.id; }
     const items = list(body.ratings, 'ratings', { max: 60, item: x => ({ attribute_id: int(x && x.attribute_id, 'attribute', { min: 1, required: true }), rating: int(x && x.rating, 'rating', { min: 1, max: 5, required: true }), comment: str(x && x.comment, 'comment', { max: 600 }) }) });
     if (!items.length) throw new HttpError(400, 'Rate at least one skill.');
     const clientKey = body.client_id ? str(body.client_id, 'client_id', { max: 80 }) : '';
     if (clientKey && db.prepare('SELECT 1 FROM skill_ratings WHERE client_id=?').get(clientKey + ':' + items[0].attribute_id)) return { ok: true, duplicate: true };
-    const ins = db.prepare('INSERT INTO skill_ratings(athlete_id,attribute_id,rating,comment,rated_on,coach_id,client_id,created_at) VALUES(?,?,?,?,?,?,?,?)');
+    const ins = db.prepare('INSERT INTO skill_ratings(athlete_id,attribute_id,rating,comment,rated_on,coach_id,client_id,created_at,setting,capture_id) VALUES(?,?,?,?,?,?,?,?,?,?)');
     let improved = 0, saved = 0;
     tx(db, () => {
       for (const it of items) {
         attr(it.attribute_id);
         const prev = db.prepare('SELECT rating FROM skill_ratings WHERE athlete_id=? AND attribute_id=? ORDER BY rated_on DESC,id DESC LIMIT 1').get(a.id, it.attribute_id);
         if (prev && prev.rating > 0 && it.rating > prev.rating) improved++;
-        ins.run(a.id, it.attribute_id, it.rating, it.comment || '', ratedOn, user.id, clientKey ? clientKey + ':' + it.attribute_id : null, now());
+        ins.run(a.id, it.attribute_id, it.rating, it.comment || '', ratedOn, user.id, clientKey ? clientKey + ':' + it.attribute_id : null, now(), setting, captureId);
         saved++;
       }
     });
@@ -155,13 +163,15 @@ module.exports = function (r, ctx) {
     if (body.target_on !== undefined) f.target_on = day(body.target_on, 'Target date', true) || null;
     if (body.status !== undefined) f.status = oneOf(body.status, GOAL_STATUS, 'status');
     if (body.reads !== undefined) f.reads = JSON.stringify(lab.reads(body.reads));
+    if (body.block_id !== undefined) f.block_id = body.block_id ? int(body.block_id, 'block_id', { min: 1 }) : null;
     return f;
   }
   r.post('/api/athletes/:id/skill-goals', ({ user, params, body }) => {
     const a = coachOf(user, params.id), f = goalFields(body);
+    if (f.block_id && !db.prepare('SELECT 1 FROM development_blocks WHERE id=? AND athlete_id=?').get(f.block_id, a.id)) throw new HttpError(400, 'That practice belongs to another athlete.');
     const inheritReads = f.reads === undefined && f.attribute_id ? (attr(f.attribute_id).reads || '[]') : null;
-    const id = db.prepare('INSERT INTO skill_goals(athlete_id,attribute_id,title,note,status,target_on,reads,coach_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
-      .run(a.id, f.attribute_id || null, f.title, f.note || '', f.status || 'not_started', f.target_on || null, f.reads || inheritReads || '[]', user.id, now(), now()).lastInsertRowid;
+    const id = db.prepare('INSERT INTO skill_goals(athlete_id,attribute_id,title,note,status,target_on,reads,block_id,coach_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+      .run(a.id, f.attribute_id || null, f.title, f.note || '', f.status || 'not_started', f.target_on || null, f.reads || inheritReads || '[]', f.block_id || null, user.id, now(), now()).lastInsertRowid;
     notifier.notify(notifier.usersOfAthletes([a.id]), 'feedback', `New goal from ${user.name}: ${f.title}`, 'Open My Progress to see it alongside your skills.', '#/skills');
     return db.prepare('SELECT * FROM skill_goals WHERE id=?').get(id);
   });
@@ -171,7 +181,7 @@ module.exports = function (r, ctx) {
     if (!g) throw new HttpError(404, 'Goal not found.');
     const a = athlete(user, g.athlete_id);
     let f;
-    if (a.level === 'coach') f = goalFields(body, true);
+    if (a.level === 'coach') { f = goalFields(body, true); if (f.block_id && !db.prepare('SELECT 1 FROM development_blocks WHERE id=? AND athlete_id=?').get(f.block_id, g.athlete_id)) throw new HttpError(400, 'That practice belongs to another athlete.'); }
     else { // athletes may move their own goal between not started and in progress
       f = {}; if (body.status !== undefined) { f.status = oneOf(body.status, ['not_started', 'in_progress'], 'status'); if (g.status === 'completed') throw new HttpError(403, 'Ask your coach to reopen a completed goal.'); }
     }

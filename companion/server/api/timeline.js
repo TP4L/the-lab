@@ -32,7 +32,7 @@ module.exports=function(r,{db,auth,config}){
    "SELECT 'training' kind,CAST(id AS TEXT) id,COALESCE(NULLIF(due_on,''),created_at) at,json_object('title',title,'body',note,'status',status,'due',due_on) data FROM assignments WHERE athlete_id=?",
    "SELECT 'event' kind,CAST(e.id AS TEXT) id,e.starts_at at,json_object('title',e.title,'body',e.location,'status',e.status,'state',p.state) data FROM events e JOIN event_people p ON p.event_id=e.id WHERE p.athlete_id=? AND p.state<>'withdrawn' AND e.status<>'draft'",
    "SELECT 'checkin' kind,CAST(id AS TEXT) id,created_at at,json_object('title','Pre-session check-in','body',focus,'status',status) data FROM pre_session_checkins WHERE athlete_id=?",
-   "SELECT 'development' kind,CAST(id AS TEXT) id,COALESCE(NULLIF(due_on,''),created_at) at,json_object('title',title,'body',problem,'status',status,'due',due_on) data FROM development_blocks WHERE athlete_id=?",
+   "SELECT 'development' kind,CAST(id AS TEXT) id,COALESCE(NULLIF(due_on,''),created_at) at,json_object('title',title,'body',problem,'status',status,'due',due_on) data FROM development_blocks WHERE athlete_id=? AND (draft=0 OR "+(includePrivate?'1':'0')+")",
    "SELECT 'communication' kind,CAST(n.id AS TEXT) id,n.created_at at,json_object('title',n.title,'body',n.body,'status',n.email_state) data FROM notifications n JOIN athletes a ON a.user_id=n.user_id WHERE a.id=?"
   ];
   let c=null;try{c=before?JSON.parse(before):null;}catch{throw new HttpError(400,'Invalid history cursor.');}

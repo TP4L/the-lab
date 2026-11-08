@@ -19,13 +19,13 @@ module.exports = function development(r, ctx) {
   }
   function shape(row) {
     if (!row) return row;
-    return { ...row, read_targets: JSON.parse(row.read_targets || '[]'), scramble: !!row.scramble,
+    return { ...row, draft: !!row.draft, read_targets: JSON.parse(row.read_targets || '[]'), scramble: !!row.scramble,
       template_items: row.template_items ? JSON.parse(row.template_items) : null,
       delivery: { app: row.athlete_user_id ? 'delivered' : 'needs_connection', website: row.website_id ? (row.website_delivery_status || 'pending') : 'not_linked', website_error: row.website_delivery_error || '', website_attempts: row.website_delivery_attempts || 0 } };
   }
   function select(where) {
     return `SELECT b.*, cp.title AS program_title, (SELECT prior.coach_feedback FROM development_blocks prior WHERE prior.program_id=b.program_id AND prior.athlete_id=b.athlete_id AND prior.program_step=b.program_step-1) AS previous_feedback, l.title AS lesson_title, c.title AS course_title, c.slug AS course_slug, m.mime AS evidence_mime,
-      t.name AS template_name, t.items AS template_items, u.name AS coach, a.user_id AS athlete_user_id, w.website_id,
+      t.name AS template_name, t.items AS template_items, u.name AS coach, a.user_id AS athlete_user_id, a.name AS athlete_name, w.website_id,
       dd.status AS website_delivery_status, dd.error AS website_delivery_error, dd.attempts AS website_delivery_attempts
       FROM development_blocks b LEFT JOIN companion_programs cp ON cp.id=b.program_id
       LEFT JOIN lessons l ON l.id = b.lesson_id LEFT JOIN courses c ON c.id = l.course_id
@@ -39,7 +39,7 @@ module.exports = function development(r, ctx) {
     auth.require(user);
     const row = db.prepare(select('WHERE b.id = ?')).get(int(id, 'id', { min: 1, required: true }));
     const level = row && auth.athleteAccess(user, row.athlete_id);
-    if (!level) throw new HttpError(404, 'Development Block not found.');
+    if (!level || (row.draft && level !== 'coach')) throw new HttpError(404, 'Development Block not found.');
     return { row, level };
   }
   function detail(row) {
@@ -144,15 +144,16 @@ module.exports = function development(r, ctx) {
   r.get('/api/me/development-blocks', ({ user }) => {
     auth.require(user);
     const aid = auth.ownAthleteId(user);
-    return aid ? db.prepare(select("WHERE b.athlete_id = ? ORDER BY CASE b.status WHEN 'mastered' THEN 1 ELSE 0 END, b.updated_at DESC")).all(aid).map(shape) : [];
+    return aid ? db.prepare(select("WHERE b.athlete_id = ? AND b.draft = 0 ORDER BY CASE b.status WHEN 'mastered' THEN 1 ELSE 0 END, b.updated_at DESC")).all(aid).map(shape).map(b => { delete b.coach_context; delete b.capture_id; return b; }) : [];
   });
   r.get('/api/athletes/:id/development-blocks', ({ user, params }) => {
     auth.require(user);
     const aid = int(params.id, 'id', { min: 1, required: true });
-    if (!auth.athleteAccess(user, aid)) throw new HttpError(404, 'Athlete not found.');
-    return db.prepare(select("WHERE b.athlete_id = ? ORDER BY CASE b.status WHEN 'mastered' THEN 1 ELSE 0 END, b.updated_at DESC")).all(aid).map(shape);
+    const level = auth.athleteAccess(user, aid);
+    if (!level) throw new HttpError(404, 'Athlete not found.');
+    return db.prepare(select("WHERE b.athlete_id = ? " + (level === 'coach' ? '' : 'AND b.draft = 0 ') + "ORDER BY CASE b.status WHEN 'mastered' THEN 1 ELSE 0 END, b.updated_at DESC")).all(aid).map(shape);
   });
-  r.get('/api/development-blocks/:id', ({ user, params }) => detail(block(user, params.id).row));
+  r.get('/api/development-blocks/:id', ({ user, params }) => { const { row, level } = block(user, params.id); const d = detail(row); if (level !== 'coach') { delete d.coach_context; delete d.capture_id; } return d; });
 
   r.post('/api/athletes/:id/development-blocks', async ({ user, params, body }) => {
     auth.require(user, 'coach');
@@ -177,8 +178,18 @@ module.exports = function development(r, ctx) {
       desired: oneOf(body.desired_state || 'offensive', STATES, 'desired_state'), layer: oneOf(body.error_layer || 'decision', LAYERS, 'error_layer'),
       intensity: oneOf(body.intensity || 'training', INTENSITIES, 'intensity'), constraint: str(body.constraint_text, 'constraint_text', { max: 1000 }),
       expected: str(body.expected_ball, 'expected_ball', { max: 1000 }), evidence: str(body.success_evidence, 'success_evidence', { max: 1000 }),
-      reflection: str(body.reflection_prompt, 'reflection_prompt', { max: 1000 }), due: due(body.due_on)
+      reflection: str(body.reflection_prompt, 'reflection_prompt', { max: 1000 }), due: due(body.due_on),
+      reason: str(body.reason, 'reason', { max: 2000 }), resource: str(body.resource_url, 'resource_url', { max: 500 }), context: str(body.coach_context, 'coach_context', { max: 4000 })
     };
+    if (f.resource && !/^https?:\/\//i.test(f.resource)) throw new HttpError(400, 'Resource must be a full link starting with http:// or https://.');
+    const draft = body.draft === true || body.draft === 1 || body.draft === 'true';
+    let captureId = null;
+    if (body.capture_id) {
+      const cap = db.prepare('SELECT c.id, c.coach_id FROM captures c WHERE c.id=?').get(String(body.capture_id));
+      if (!cap || (cap.coach_id !== user.id && !auth.has(user, 'admin'))) throw new HttpError(404, 'Capture not found.');
+      if (!db.prepare('SELECT 1 FROM capture_players WHERE capture_id=? AND athlete_id=?').get(cap.id, aid)) throw new HttpError(400, 'That capture does not include this athlete.');
+      captureId = cap.id;
+    }
     let blockId, assignmentId = null;
     tx(db, () => {
       if (templateId) assignmentId = Number(db.prepare('INSERT INTO assignments (athlete_id, template_id, title, note, due_on, assigned_by) VALUES (?, ?, ?, ?, ?, ?)')
@@ -188,12 +199,44 @@ module.exports = function development(r, ctx) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(aid, lessonId, templateId, assignmentId, title, f.problem, JSON.stringify([...new Set(reads)]), f.start, f.desired, body.scramble ? 1 : 0,
           f.layer, f.intensity, f.constraint, f.expected, f.evidence, f.reflection, f.due, user.id).lastInsertRowid);
-      db.prepare('UPDATE development_blocks SET baseline_conditions=?,practice_minutes=?,review_required=?,client_key=?,source_session_id=? WHERE id=?')
-        .run(conditions, minutes, body.review_required === false ? 0 : 1, key, source, blockId);
+      db.prepare('UPDATE development_blocks SET baseline_conditions=?,practice_minutes=?,review_required=?,client_key=?,source_session_id=?,reason=?,resource_url=?,coach_context=?,capture_id=?,draft=?,shared_at=? WHERE id=?')
+        .run(conditions, minutes, body.review_required === false ? 0 : 1, key, source, f.reason, f.resource, f.context, captureId, draft ? 1 : 0, draft ? null : now(), blockId);
     });
+    if (draft) return withStatus(201, shape(db.prepare(select('WHERE b.id = ?')).get(blockId)));
     notifier.notify(notifier.usersOfAthletes([aid]), 'training', `New Development Block from ${user.name}: ${title}`, f.due ? `Due ${f.due}.` : 'Your learning and training are connected in one path.', `#/development/${blockId}`);
     await deliverWebsite(user, blockId);
     return withStatus(201, shape(db.prepare(select('WHERE b.id = ?')).get(blockId)));
+  });
+
+  // Approve and share a draft: the athlete is notified now, not when the draft was written.
+  r.post('/api/development-blocks/:id/approve', async ({ user, params, body }) => {
+    const { row, level } = block(user, params.id);
+    if (level !== 'coach') throw new HttpError(403, 'Only a coach can approve a practice.');
+    if (body && body.expected_updated_at && row.updated_at !== body.expected_updated_at) throw new HttpError(409, 'This practice changed since you opened it. Reload and approve again.');
+    if (!row.draft) return detail(row);
+    if (!String(row.constraint_text || '').trim()) throw new HttpError(400, 'Write the practice before sharing it.');
+    db.prepare("UPDATE development_blocks SET draft=0, shared_at=?, status='assigned', updated_at=? WHERE id=?").run(now(), now(), row.id);
+    notifier.notify(notifier.usersOfAthletes([row.athlete_id]), 'training', `New practice from ${user.name}: ${row.title}`, row.due_on ? `Review by ${row.due_on}.` : 'Open it to see the focus, the practice and what to notice.', '#/development/' + row.id);
+    await deliverWebsite(user, row.id);
+    return detail(db.prepare(select('WHERE b.id = ?')).get(row.id));
+  });
+  // Edit the practice text (coach). Allowed while draft or shared; athlete-facing text only.
+  r.put('/api/development-blocks/:id/practice', ({ user, params, body }) => {
+    const { row, level } = block(user, params.id);
+    if (level !== 'coach') throw new HttpError(403, 'Only a coach can edit a practice.');
+    if (body.expected_updated_at && row.updated_at !== body.expected_updated_at) throw new HttpError(409, 'This practice changed since you opened it. Reload and make your edit again.');
+    const f = {};
+    if (body.title !== undefined) f.title = str(body.title, 'title', { required: true, max: 120 });
+    if (body.reason !== undefined) f.reason = str(body.reason, 'reason', { max: 2000 });
+    if (body.constraint_text !== undefined) f.constraint_text = str(body.constraint_text, 'constraint_text', { max: 1000 });
+    if (body.success_evidence !== undefined) f.success_evidence = str(body.success_evidence, 'success_evidence', { max: 1000 });
+    if (body.due_on !== undefined) f.due_on = due(body.due_on);
+    if (body.resource_url !== undefined) { f.resource_url = str(body.resource_url, 'resource_url', { max: 500 }); if (f.resource_url && !/^https?:\/\//i.test(f.resource_url)) throw new HttpError(400, 'Resource must be a full link starting with http:// or https://.'); }
+    if (body.coach_context !== undefined) f.coach_context = str(body.coach_context, 'coach_context', { max: 4000 });
+    if (body.read_targets !== undefined) f.read_targets = JSON.stringify([...new Set(list(body.read_targets, 'read_targets', { max: 3, item: (x, ff) => oneOf(x, READS, ff) }))]);
+    const keys = Object.keys(f);
+    if (keys.length) db.prepare('UPDATE development_blocks SET ' + keys.map(k => k + '=?').join(',') + ', updated_at=? WHERE id=?').run(...keys.map(k => f[k]), now(), row.id);
+    return detail(db.prepare(select('WHERE b.id = ?')).get(row.id));
   });
 
   r.post('/api/development-blocks/:id/deliver', async ({ user, params }) => {

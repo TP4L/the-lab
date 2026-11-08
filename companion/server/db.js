@@ -1014,7 +1014,58 @@ CREATE TABLE athlete_reports(
 );
 CREATE INDEX athlete_reports_athlete ON athlete_reports(athlete_id,published_at DESC);
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS, INVITATIONALS_HANDOFF, SKILL_PROGRESS, SHOP_AND_CREDITS, LAB_TAGS, PROGRESS_REPORTS];
+
+/* Fast session capture: format, date, players (roster or name-only), session
+   focus tags, per-player attributes and observations. Private to coaches. */
+const SESSION_CAPTURE = `
+CREATE TABLE captures(
+  id TEXT PRIMARY KEY,
+  coach_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  format TEXT NOT NULL CHECK(format IN ('private_lesson','clinic','group_class','group_lesson','drill_with_pro')),
+  occurred_on TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  sport TEXT NOT NULL DEFAULT 'pickleball',
+  duration_min INTEGER,
+  focus_tags TEXT NOT NULL DEFAULT '[]',
+  notes TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'saved' CHECK(status IN ('saved','complete')),
+  version INTEGER NOT NULL DEFAULT 1,
+  client_key TEXT UNIQUE,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX captures_coach ON captures(coach_id, occurred_on DESC);
+CREATE TABLE capture_players(
+  id INTEGER PRIMARY KEY,
+  capture_id TEXT NOT NULL REFERENCES captures(id) ON DELETE CASCADE,
+  athlete_id INTEGER REFERENCES athletes(id) ON DELETE SET NULL,
+  guest_name TEXT NOT NULL DEFAULT '',
+  attributes TEXT NOT NULL DEFAULT '[]',
+  observation TEXT NOT NULL DEFAULT '',
+  sort INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX capture_players_athlete ON capture_players(athlete_id);
+CREATE INDEX capture_players_capture ON capture_players(capture_id);
+CREATE TABLE capture_tags(
+  coach_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tag TEXT NOT NULL,
+  scope TEXT NOT NULL CHECK(scope IN ('focus','player')),
+  uses INTEGER NOT NULL DEFAULT 0,
+  last_used TEXT NOT NULL,
+  PRIMARY KEY(coach_id, tag, scope)
+);
+ALTER TABLE skill_ratings ADD COLUMN setting TEXT NOT NULL DEFAULT '' CHECK(setting IN ('','lesson','drill','conditioned_play','match'));
+ALTER TABLE skill_ratings ADD COLUMN capture_id TEXT REFERENCES captures(id) ON DELETE SET NULL;
+ALTER TABLE development_blocks ADD COLUMN reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE development_blocks ADD COLUMN resource_url TEXT NOT NULL DEFAULT '';
+ALTER TABLE development_blocks ADD COLUMN coach_context TEXT NOT NULL DEFAULT '';
+ALTER TABLE development_blocks ADD COLUMN capture_id TEXT REFERENCES captures(id) ON DELETE SET NULL;
+ALTER TABLE development_blocks ADD COLUMN shared_at TEXT;
+ALTER TABLE development_blocks ADD COLUMN draft INTEGER NOT NULL DEFAULT 0;
+UPDATE development_blocks SET shared_at = created_at WHERE shared_at IS NULL;
+ALTER TABLE skill_goals ADD COLUMN block_id INTEGER REFERENCES development_blocks(id) ON DELETE SET NULL;
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS, INVITATIONALS_HANDOFF, SKILL_PROGRESS, SHOP_AND_CREDITS, LAB_TAGS, PROGRESS_REPORTS, SESSION_CAPTURE];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

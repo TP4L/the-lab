@@ -398,3 +398,61 @@
 .pulse-fill{display:block;height:5px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-top:6px;max-width:220px;}
 .pulse-fill i{display:block;height:100%;background:var(--court);}
 .pulse-fill i.ok{background:var(--ok);}.pulse-fill i.low{background:var(--warn);}
+
+/* ---------- capture & practice ---------- */
+.cap-page{gap:18px;}
+.cap-formats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:6px;}
+.cap-formats button{min-height:48px;border-radius:var(--r-sm);}
+.tagbox{display:flex;flex-direction:column;gap:8px;}
+.tagbox-head{display:flex;justify-content:space-between;align-items:baseline;}
+.tagchip{min-height:36px;}
+.tagchip.recent{border-style:dashed;}
+.tagchip[aria-pressed="true"]{background:var(--court);color:var(--court-ink);border-color:var(--court);border-style:solid;}
+.tagbox-add{gap:6px;}
+.tagbox-add input{flex:1;min-width:140px;min-height:40px;padding:8px 12px;}
+.cap-addrow{gap:6px;}
+.cap-addrow select{flex:1;min-width:160px;}
+.cap-addrow input{flex:1;min-width:140px;}
+.cap-players{display:flex;flex-direction:column;gap:12px;margin-top:8px;}
+.cap-player{border:1px solid var(--rule-soft);border-radius:var(--r-lg);padding:14px 16px 16px;margin:0;display:flex;flex-direction:column;gap:10px;background:var(--surface);min-width:0;}
+.cap-player legend{display:flex;align-items:center;gap:8px;padding:0 6px;font-family:var(--display);font-weight:650;font-size:16px;}
+.cap-player legend .th-act{margin-left:auto;color:var(--ink-faint);font-weight:500;font-size:13px;}
+.cap-obs{min-height:42px;}
+.cap-save{position:sticky;bottom:calc(68px + env(safe-area-inset-bottom,0px));background:var(--surface);padding:12px 0 4px;border-top:1px solid var(--rule-soft);z-index:3;}
+@media(min-width:900px){.cap-save{bottom:0;}}
+.cap-next .main-col{gap:8px;}
+.cap-next-actions{margin-top:4px;}
+.cap-next .lab-pill{font-size:12px;}
+.cap-context{background:repeating-linear-gradient(135deg,var(--surface) 0 10px,var(--surface-2) 10px 11px);border-style:dashed;border-color:var(--ink-faint);gap:6px;}
+.cap-context ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:14.5px;}
+.cap-context p{font-size:14.5px;}
+.cap-filters .row + .row{margin-top:8px;}
+.prac-form .hint{font-weight:500;color:var(--ink-faint);font-size:12.5px;}
+.prac-card{gap:10px;}
+.prac-dl{margin:0;display:flex;flex-direction:column;gap:10px;}
+.prac-dl div{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;}
+.prac-dl dt{font-family:var(--ui);font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);padding-top:3px;}
+.prac-dl dd{margin:0;font-size:15.5px;line-height:1.5;}
+@media(max-width:520px){.prac-dl div{grid-template-columns:1fr;gap:2px;}}
+.prac-now{background:linear-gradient(112deg,var(--court-deep),var(--court));color:var(--court-ink);border-color:var(--court);gap:10px;}
+.prac-now .eyebrow{color:var(--court-light);}
+.prac-now h2{font-size:clamp(22px,5vw,30px);letter-spacing:-.025em;}
+.prac-now p{color:color-mix(in srgb,var(--court-ink) 85%,transparent);}
+.prac-now .prac-check{color:var(--court-ink);}
+.prac-now .btn.primary{background:var(--court-light);border-color:var(--court-light);color:var(--court-deep);}
+.prac-now .small.muted{color:color-mix(in srgb,var(--court-ink) 70%,transparent);}
+.sk-latest{margin:0;padding:12px 16px;border-left:3px solid var(--court);background:var(--surface-2);border-radius:0 var(--r) var(--r) 0;}
+.sk-latest p{font-size:15px;}
+.sk-latest footer{font-size:12.5px;color:var(--ink-faint);margin-top:4px;}
+.sk-change{font-size:14px;color:var(--ink-soft);}
+.sk-context{margin-top:-8px;}
+.tagbox-more{display:contents;}
+.tagbox-more summary{list-style:none;cursor:pointer;color:var(--ink-faint);border-style:dotted;}
+.tagbox-more summary::-webkit-details-marker{display:none;}
+.tagbox-more[open] summary{display:none;}
+.tagbox-more>.chips{display:contents;}
+/* development block hero in the system palette */
+.dev-hero{background:linear-gradient(112deg,var(--court-deep),var(--court)) !important;color:var(--court-ink) !important;border-radius:var(--r-xl) !important;}
+.dev-hero .dev-kicker{color:var(--court-light) !important;}
+.dev-hero .dev-read b{color:var(--court-light) !important;}
+.dev-hero::after,.dev-hero::before{opacity:.25;}

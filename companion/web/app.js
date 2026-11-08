@@ -299,9 +299,9 @@
     return cells;
   }
   function cellText(it, c) {
-    if (!c) return '—';
-    if (it.measure === 'reps') return c.attempts ? c.makes + '/' + c.attempts + ' (' + c.pct + '%)' : '—';
-    if (!c.values.length) return '—';
+    if (!c) return 'Not recorded';
+    if (it.measure === 'reps') return c.attempts ? c.makes + '/' + c.attempts + ' (' + c.pct + '%)' : 'Not recorded';
+    if (!c.values.length) return 'Not recorded';
     if (it.measure === 'time') return fmtTime(c.best) + ' best';
     if (it.measure === 'feel') return c.last + '/5';
     return c.best + ' best · ' + c.values.length + ' entr' + (c.values.length === 1 ? 'y' : 'ies');
@@ -475,7 +475,7 @@
     return api.get('/api/development-blocks/' + id).then(function (b) {
       var coach = has('coach');
       var statusLabel = b.status === 'in_progress' && b.session_id ? 'Training complete · Add evidence' : (DEV_STATUS[b.status] || b.status);
-      var reads = (b.read_targets || []).map(function (x) { return x.toUpperCase(); }).join(' · ') || 'No read selected';
+      var reads = (b.read_targets || []).map(function (x) { return x.toUpperCase(); }).join(' · ') || 'No read chosen yet';
       var state = (b.start_state[0].toUpperCase() + b.start_state.slice(1)) + ' → ' + (b.desired_state[0].toUpperCase() + b.desired_state.slice(1)) + (b.scramble ? ' · Scramble overlay' : '');
       var appDelivery = b.delivery.app === 'delivered' ? 'App delivered' : 'App profile not claimed';
       var webDelivery = b.delivery.website === 'delivered' ? 'Website delivered' : b.delivery.website === 'failed' ? 'Website needs retry' : b.delivery.website === 'pending' ? 'Website pending' : 'No website profile';
@@ -486,7 +486,7 @@
         '<div class="dev-steps"><span class="' + (b.lesson_id ? 'on' : '') + '">Learn</span><span class="' + (b.session_id ? 'on' : '') + '">Train</span><span class="' + (b.attempts?.length || b.evidence_media_id || b.athlete_reflection ? 'on' : '') + '">Evidence</span><span class="' + (['coach_review','ready_retest','mastered'].includes(b.status) ? 'on' : '') + '">Review</span><span class="' + (b.retest_session_id || b.status === 'mastered' ? 'on' : '') + '">Retest</span></div>' +
         (coach ? '<section class="card delivery-check"><div><p class="section-title">Delivery check</p><div class="row"><span class="tag">' + h(appDelivery) + '</span><span class="tag">' + h(webDelivery) + '</span></div>' + (b.delivery.website_error ? '<p class="small muted">' + h(b.delivery.website_error) + '</p>' : '') + '</div>' + (b.delivery.website !== 'not_linked' && b.delivery.website !== 'delivered' ? '<button class="btn ghost" id="resendDelivery">Retry website delivery</button>' : '') + '</section>' : '') +
         '<div class="grid-2"><div class="stack">' +
-        '<div class="card dev-brief"><p class="section-title">The work</p><dl><div><dt>Error layer</dt><dd>' + h(b.error_layer) + '</dd></div><div><dt>Intensity</dt><dd>' + h(DEV_INTENSITY[b.intensity] || b.intensity) + '</dd></div><div><dt>Constraint</dt><dd>' + h(b.constraint_text || '—') + '</dd></div><div><dt>Expected ball</dt><dd>' + h(b.expected_ball || '—') + '</dd></div><div><dt>Success evidence</dt><dd>' + h(b.success_evidence || '—') + '</dd></div></dl></div>' +
+        '<div class="card dev-brief"><p class="section-title">The work</p><dl><div><dt>Error layer</dt><dd>' + h(b.error_layer) + '</dd></div><div><dt>Intensity</dt><dd>' + h(DEV_INTENSITY[b.intensity] || b.intensity) + '</dd></div><div><dt>Constraint</dt><dd>' + h(b.constraint_text || 'Not set') + '</dd></div><div><dt>Expected ball</dt><dd>' + h(b.expected_ball || 'Not set') + '</dd></div><div><dt>Success evidence</dt><dd>' + h(b.success_evidence || 'Not set') + '</dd></div></dl></div>' +
         '<div class="card stack-sm"><p class="section-title">Linked work</p>' +
         (b.lesson_id ? '<a class="li" href="#/learn/course/' + h(b.course_slug) + '/' + b.lesson_id + '"><span class="main-col"><span class="t small">Learn · ' + h(b.lesson_title) + '</span><span class="d">' + h(b.course_title) + '</span></span></a>' : '<p class="small muted">No learning lesson linked yet.</p>') +
         (b.assignment_id ? '<a class="li" href="' + (coach ? '#/train/new?athlete=' + b.athlete_id + '&assignment=' + b.assignment_id : '#/train') + '"><span class="main-col"><span class="t small">Train · ' + h(b.template_name || b.title) + '</span><span class="d">' + (coach ? 'Run this situation' : 'Open your assigned training') + '</span></span></a>' : '<p class="small muted">No training situation linked yet.</p>') + '</div>' +
@@ -735,16 +735,16 @@
               '<button type="button" class="miss" data-kind="miss" data-a="' + a.id + '" aria-label="Miss for ' + h(a.name) + ', ' + c.misses + ' so far"><span class="num">' + c.misses + '</span><span class="lbl">Miss</span></button></div>';
           }
           if (it.measure === 'feel') {
-            return '<div class="pad" data-a="' + a.id + '">' + top + '<div class="valpad"><p class="big">' + (c.last == null ? '—' : c.last) + '</p><div class="feel">' +
+            return '<div class="pad" data-a="' + a.id + '">' + top + '<div class="valpad"><p class="big">' + (c.last == null ? 'Not set' : c.last) + '</p><div class="feel">' +
               [1, 2, 3, 4, 5].map(function (v) { return '<button type="button" data-val="' + v + '" data-a="' + a.id + '" aria-pressed="' + (c.last === v) + '" aria-label="Feel ' + v + ' for ' + h(a.name) + '">' + v + '</button>'; }).join('') + '</div></div><span></span></div>';
           }
           if (it.measure === 'time') {
             return '<div class="pad" data-a="' + a.id + '">' + top + '<div class="valpad"><p class="big" data-clock="' + a.id + '">' + (c.last == null ? '0.0s' : fmtTime(c.last)) + '</p>' +
-              '<div class="row"><button class="btn primary" type="button" data-timer="' + a.id + '">' + (timers[cur+':'+a.id]?'Stop':'Start') + '</button></div><p class="small muted" style="text-align:center">Best ' + (c.best == null ? '—' : fmtTime(c.best)) + ' · ' + c.values.length + ' runs</p></div><span></span></div>';
+              '<div class="row"><button class="btn primary" type="button" data-timer="' + a.id + '">' + (timers[cur+':'+a.id]?'Stop':'Start') + '</button></div><p class="small muted" style="text-align:center">Best ' + (c.best == null ? 'Not set' : fmtTime(c.best)) + ' · ' + c.values.length + ' runs</p></div><span></span></div>';
           }
-          return '<div class="pad" data-a="' + a.id + '">' + top + '<div class="valpad"><p class="big">' + (c.last == null ? '—' : c.last) + '</p>' +
+          return '<div class="pad" data-a="' + a.id + '">' + top + '<div class="valpad"><p class="big">' + (c.last == null ? 'Not set' : c.last) + '</p>' +
             '<div class="row"><input type="number" inputmode="numeric" aria-label="Score for ' + h(a.name) + '" data-in="' + a.id + '" style="max-width:110px"><button class="btn primary" type="button" data-rec="' + a.id + '">Record</button></div>' +
-            '<p class="small muted" style="text-align:center">Best ' + (c.best == null ? '—' : c.best) + ' · ' + c.values.length + ' entries</p></div><span></span></div>';
+            '<p class="small muted" style="text-align:center">Best ' + (c.best == null ? 'none' : c.best) + ' · ' + c.values.length + ' entries</p></div><span></span></div>';
         }).join('') + '</div>';
       }
       function record(aid, kind, value) {
@@ -866,7 +866,7 @@
         }).join('') + '</tbody></table></div>' +
         (s.items.some(function (it) { return it.measure === 'reps'; }) ? '<div class="tiles">' + s.athletes.map(function (a) {
           var m = 0, t = 0; s.items.forEach(function (it) { if (it.measure === 'reps') { var c = cells[it.idx + ':' + a.id]; m += c.makes; t += c.attempts; } });
-          return '<div class="tile"><span class="l">' + h(a.name) + '</span><span class="n">' + (t ? Math.round(m / t * 100) + '%' : '—') + '</span><span class="s">' + m + ' of ' + t + ' makes</span></div>';
+          return '<div class="tile"><span class="l">' + h(a.name) + '</span><span class="n">' + (t ? Math.round(m / t * 100) + '%' : 'Not set') + '</span><span class="s">' + m + ' of ' + t + ' makes</span></div>';
         }).join('') + '</div>' : '') +
         (coach && s.status === 'complete' ? closeoutPanel(s) : '') +
         '<div class="stack"><p class="section-title">Games from this session</p>' + ((s.matches || []).length ? '<div class="list">' + s.matches.map(function (m) {
@@ -1048,7 +1048,7 @@
       app.innerHTML = '<a class="back" href="#/learn">← Learn</a><section class="membership-hero"><div><span class="path-label">' + (m.active ? 'ACTIVE MEMBER' : 'LAB ESSENTIALS') + '</span><h1>Your development library, always moving forward.</h1><p>Learn the concept, train the read, save the evidence and know what comes next.</p></div><div class="membership-price"><strong>$8</strong><span>/ month</span>' + side + '</div></section>' +
         (query && query.checkout === 'success' ? '<div class="banner"><span>Payment received. Your membership will unlock as soon as the secure confirmation arrives.</span></div>' : '') +
         '<section class="member-includes"><article><span>01</span><h2>Monthly focus</h2><p>A clear LAB concept to build into your game.</p></article><article><span>02</span><h2>Member library</h2><p>Full courses, videos, diagrams and practice cards.</p></article><article><span>03</span><h2>Your learning path</h2><p>Continue where you stopped and see your completed work.</p></article></section>' +
-        '<div class="card member-boundary"><h2>What membership is—and is not</h2><p>LAB Essentials is self-guided learning access. Individual programming, private coaching and cohort work stay separate so every offer remains clear.</p>' + (!m.checkout_enabled && ME && !m.active ? '<p class="small muted">Online checkout is being connected. Your coach can still activate membership manually.</p>' : '') + '</div>';
+        '<div class="card member-boundary"><h2>What membership is, and is not</h2><p>LAB Essentials is self-guided learning access. Individual programming, private coaching and cohort work stay separate so every offer remains clear.</p>' + (!m.checkout_enabled && ME && !m.active ? '<p class="small muted">Online checkout is being connected. Your coach can still activate membership manually.</p>' : '') + '</div>';
       function redirect(path) { api.request('POST', path, {}).then(function (x) { location.href = x.url; }, function (err) { L.toast(err.message); }); }
       if ($('#startMembership')) $('#startMembership').addEventListener('click', function () { redirect('/api/billing/checkout'); });
       if ($('#manageMembership')) $('#manageMembership').addEventListener('click', function () { redirect('/api/billing/portal'); });
@@ -1287,7 +1287,7 @@
     var reflections = notes.filter(function (n) { return n.kind === 'reflection'; });
     app.innerHTML = offlineNote(p) + (p.shared_profile?'<p class="small muted">Shared THE LAB profile · player details update on your website and app.</p>':p.shared_profile_unavailable?'<p role="status">Shared player details are temporarily unavailable. Showing saved app details; reconnect before editing.</p>':'') +
       '<div class="pcard">' + avatar(a) + '<div><p class="pid">' + playerId(a.id) + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
-      '<span>Hand <b>' + h(HANDS[a.hand] || '—') + '</b></span><span>Side <b>' + h(SIDES[a.side] || '—') + '</b></span><span>Rating <b>' + h(a.rating || '—') + '</b></span></p></div></div>' +
+      '<span>Hand <b>' + h(HANDS[a.hand] || 'Not set') + '</b></span><span>Side <b>' + h(SIDES[a.side] || 'Not set') + '</b></span><span>Rating <b>' + h(a.rating || 'Not set') + '</b></span></p></div></div>' +
       '<details class="more" id="qrbox"><summary>Check-in QR \u00b7 ' + playerId(a.id) + '</summary><div class="qr-wrap" id="qr"><p class="small muted">Loading\u2026</p></div></details>' +
       '<div class="row"><a class="btn ghost" href="#/play">Match history</a><a class="btn ghost" href="#/play/leaderboard">Leaderboard</a></div>' +
       '<div class="grid-2">' +
@@ -1297,8 +1297,8 @@
       '<form class="card form" id="me-f" novalidate><p class="section-title">About me</p>' +
       athleticFields(a) +
       '<div class="field"><label class="flabel" for="goals">Goals</label><textarea id="goals" maxlength="2000">' + h(a.goals) + '</textarea></div>' +
-      '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Playing hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
-      '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
+      '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Playing hand</label><select id="hand"><option value="">Not set</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
+      '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">Not set</option>' + opts(SIDES, a.side) + '</select></div>' +
       '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20" value="' + h(a.rating) + '" placeholder="e.g. 4.0"></div></div>' +
       '<div class="row"><button class="btn" type="submit">Save</button></div></form>' +
       '<div class="field"><label class="flabel" for="photo">Profile photo</label><input type="file" id="photo" accept="image/*"><div class="upload-row" id="photo-prog" hidden><div class="progress"><i></i></div></div></div>' +
@@ -1477,8 +1477,8 @@
       '<form class="card form" id="f" novalidate>' +
       '<div class="field"><label class="flabel" for="nm">Name</label><input type="text" id="nm" maxlength="80"></div>' +
       '<div class="field"><label class="flabel" for="em">Athlete’s email <span class="hint">optional, locks the claim to this email</span></label><input type="email" id="em"></div>' +
-      '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Playing hand</label><select id="hand"><option value="">—</option>' + opts(HANDS) + '</select></div>' +
-      '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">—</option>' + opts(SIDES) + '</select></div>' +
+      '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Playing hand</label><select id="hand"><option value="">Not set</option>' + opts(HANDS) + '</select></div>' +
+      '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">Not set</option>' + opts(SIDES) + '</select></div>' +
       '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20"></div></div>' +
       '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" placeholder="e.g. Third-shot drop depth"></div>' +
       athleticFields({}) +
@@ -1518,13 +1518,13 @@
         (p.membership_history.length ? '<details class="membership-history"><summary>Membership history</summary><div class="list">' + p.membership_history.map(function (x) { return '<div class="li"><span class="main-col"><span class="t small">' + h(x.status === 'active' ? 'Access activated' : x.status === 'none' ? 'Access removed' : 'Access lapsed') + '</span><span class="d">' + h(x.changed_by || (x.source === 'stripe' ? 'Stripe' : 'Administrator')) + (x.note ? ' · ' + h(x.note) : '') + '</span></span><span class="side">' + h(L.when(x.created_at)) + '</span></div>'; }).join('') + '</div></details>' : '') + '</section>';
       app.innerHTML = '<a class="back" href="#/coach">← Athletes</a>' + offlineNote(p) +
         '<div class="pcard coach-athlete-head">' + avatar(a) + '<div><p class="pid">' + playerId(a.id) + (a.claimed ? ' · claimed' : ' · not claimed yet') + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
-        '<span>Hand <b>' + h(HANDS[a.hand] || '—') + '</b></span><span>Side <b>' + h(SIDES[a.side] || '—') + '</b></span><span>Rating <b>' + h(a.rating || '—') + '</b></span></p></div></div>' +
+        '<span>Hand <b>' + h(HANDS[a.hand] || 'Not set') + '</b></span><span>Side <b>' + h(SIDES[a.side] || 'Not set') + '</b></span><span>Rating <b>' + h(a.rating || 'Not set') + '</b></span></p></div></div>' +
         '<div class="coach-athlete-actions"><a class="btn primary" href="#/coach/' + a.id + '/development/new">New Development Block</a><a class="btn" href="#/train/new?athlete=' + a.id + '">Start session</a><a class="btn ghost" href="#/train/new?quick=1&athlete=' + a.id + '">Counter</a></div>' +
         '<nav class="coach-athlete-tabs" aria-label="Athlete coaching workspace">' +
         [['today','Today'],['plan','Program'],['notes','History'],['access','Access']].map(function (x) { return '<button type="button" data-athlete-tab="' + x[0] + '" aria-pressed="' + (x[0] === 'today') + '">' + x[1] + '</button>'; }).join('') + '</nav>' +
         '<div class="coach-athlete-panels">' +
         '<section data-athlete-panel="today" class="stack"><div class="coach-athlete-today"><article class="coach-focus-card"><p class="eyebrow">CURRENT FOCUS</p><h2>' + h(a.focus || 'Set the next focus') + '</h2><p>' + h(a.plan || 'Add a simple development plan so every session has direction.') + '</p><a href="#" data-open-athlete-tab="progress">Edit development profile</a></article>' +
-        '<div class="coach-athlete-glance"><div><strong>' + p.results.length + '</strong><span>Sessions</span></div><div><strong>' + p.media.length + '</strong><span>Media</span></div><div><strong>' + notes.length + '</strong><span>Notes</span></div><div><strong id="coach-open-count">—</strong><span>Open work</span></div></div></div>' +
+        '<div class="coach-athlete-glance"><div><strong>' + p.results.length + '</strong><span>Sessions</span></div><div><strong>' + p.media.length + '</strong><span>Media</span></div><div><strong>' + notes.length + '</strong><span>Notes</span></div><div><strong id="coach-open-count">0</strong><span>Open work</span></div></div></div>' +
         '<form class="card form coach-capture" id="nf" novalidate><div class="coach-capture-head"><div><p class="eyebrow">QUICK CAPTURE</p><h2>Record what you noticed</h2></div><span class="small muted">Private by default</span></div>' +
         '<div class="form-grid"><div class="field"><label class="flabel" for="ntype">Capture type</label><select id="ntype"><option>Coaching note</option><option>What is working</option><option>What is not working</option><option>Next focus</option><option>Athlete question</option><option>Video review</option><option>Follow-up</option></select></div><div class="field"><label class="flabel" for="nbody">Observation</label><textarea id="nbody" maxlength="5000" placeholder="Keep it specific and useful."></textarea></div></div>' +
         '<div class="field"><span class="flabel">Who can see it</span><div class="seg-btns" id="vis"><button type="button" data-v="private" aria-pressed="true">Private · coaches only</button><button type="button" data-v="shared" aria-pressed="false">Shared with athlete</button></div></div>' +
@@ -1558,8 +1558,8 @@
         '<div class="field"><label class="flabel" for="plan">Development plan</label><textarea id="plan" maxlength="4000">' + h(a.plan) + '</textarea></div>' +
         athleticFields(a) +
         '<div class="field"><label class="flabel" for="goals">Athlete goals</label><textarea id="goals" maxlength="2000">' + h(a.goals) + '</textarea></div>' +
-        '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Hand</label><select id="hand"><option value="">—</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
-        '<div class="field"><label class="flabel" for="side">Side</label><select id="side"><option value="">—</option>' + opts(SIDES, a.side) + '</select></div>' +
+        '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Hand</label><select id="hand"><option value="">Not set</option>' + opts(HANDS, a.hand) + (a.hand && !HANDS[a.hand] ? '<option selected value="'+h(a.hand)+'">'+h(a.hand)+'</option>' : '') + '</select></div>' +
+        '<div class="field"><label class="flabel" for="side">Side</label><select id="side"><option value="">Not set</option>' + opts(SIDES, a.side) + '</select></div>' +
         '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20" value="' + h(a.rating) + '"></div></div>' +
         '<div class="row"><button class="btn primary" type="submit">Save development profile</button></div></form></section>' +
         '<section data-athlete-panel="access" class="stack" hidden><section class="card form coach-ownership"><div class="coach-capture-head"><div><p class="eyebrow">COACH OWNERSHIP</p><h2>Who can coach this athlete?</h2></div></div><div class="ownership-list">' + p.coaches.map(function (c) { return '<span class="tag">' + h(c.name) + '</span>'; }).join('') + '</div><form id="addCoachForm"><label class="flabel" for="coachEmail">Add Brett, Austin or another coach by account email</label><div class="row"><input id="coachEmail" type="email" required placeholder="coach@example.com"><button class="btn" type="submit">Add coach</button></div><p class="small muted">Added coaches can see private notes, assign work and manage the athlete workspace.</p></form></section>' + membershipPanel +

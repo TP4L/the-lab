@@ -60,7 +60,7 @@ module.exports = function (r, ctx) {
       .map(n => ({ body: n.body, at: n.created_at, author: n.author || 'Coach', tags: lab.parse(n.tags, {}) }));
     const reflections = db.prepare("SELECT body, created_at FROM notes WHERE athlete_id=? AND kind='reflection' AND created_at BETWEEN ? AND ? ORDER BY created_at").all(a.id, fromStart, toEnd).map(n => ({ body: n.body.replace(/^(Question|Video review)\n/, ''), at: n.created_at }));
     const checkins = db.prepare('SELECT COUNT(*) AS n FROM pre_session_checkins WHERE athlete_id=? AND created_at BETWEEN ? AND ?').get(a.id, fromStart, toEnd).n;
-    const blocks = db.prepare("SELECT title, status FROM development_blocks WHERE athlete_id=? AND updated_at BETWEEN ? AND ?").all(a.id, fromStart, toEnd);
+    const blocks = db.prepare("SELECT title, status FROM development_blocks WHERE athlete_id=? AND draft=0 AND updated_at BETWEEN ? AND ?").all(a.id, fromStart, toEnd);
     const credits = db.prepare("SELECT COUNT(*) AS n FROM credit_ledger WHERE athlete_id=? AND ref_type='session' AND created_at BETWEEN ? AND ?").get(a.id, fromStart, toEnd).n;
     const matches = db.prepare("SELECT COUNT(*) AS n FROM match_players mp JOIN matches m ON m.id=mp.match_id WHERE mp.athlete_id=? AND m.created_at BETWEEN ? AND ?").get(a.id, fromStart, toEnd);
     const improved = skills.filter(s => s.delta > 0).length, slipped = skills.filter(s => s.delta < 0).length;

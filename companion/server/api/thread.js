@@ -40,7 +40,7 @@ module.exports = function (r, ctx) {
     const ratings = db.prepare('SELECT r.rated_on, r.coach_id, r.created_at, r.rating, r.comment, sa.name FROM skill_ratings r JOIN skill_attributes sa ON sa.id=r.attribute_id WHERE r.athlete_id=? ORDER BY r.created_at DESC LIMIT 200').all(a.id);
     const byDay = new Map();
     for (const x of ratings) { const k = x.rated_on + ':' + x.coach_id; if (!byDay.has(k)) byDay.set(k, { at: x.created_at, coach: x.coach_id, on: x.rated_on, rows: [] }); byDay.get(k).rows.push(x); }
-    for (const g of byDay.values()) items.push({ id: 'rating:' + g.on + ':' + g.coach, type: 'rating', side: 'coach', author: name(g.coach) || 'Coach', title: 'Skill assessment · ' + g.rows.length + ' skill' + (g.rows.length === 1 ? '' : 's'), body: g.rows.map(x => x.name + ': ' + x.rating + ' ' + SCALE[x.rating - 1].label + (x.comment ? ' — ' + x.comment : '')).join('\n'), link: coachView ? '#/skills/' + a.id : '#/skills', at: g.on < g.at.slice(0, 10) ? g.on + 'T17:00:00.000Z' : g.at });
+    for (const g of byDay.values()) items.push({ id: 'rating:' + g.on + ':' + g.coach, type: 'rating', side: 'coach', author: name(g.coach) || 'Coach', title: 'Skill assessment · ' + g.rows.length + ' skill' + (g.rows.length === 1 ? '' : 's'), body: g.rows.map(x => x.name + ': ' + x.rating + ' ' + SCALE[x.rating - 1].label + (x.comment ? ': ' + x.comment : '')).join('\n'), link: coachView ? '#/skills/' + a.id : '#/skills', at: g.on < g.at.slice(0, 10) ? g.on + 'T17:00:00.000Z' : g.at });
     const goals = db.prepare('SELECT g.*, sa.name AS attribute_name FROM skill_goals g LEFT JOIN skill_attributes sa ON sa.id=g.attribute_id WHERE g.athlete_id=? ORDER BY g.created_at DESC LIMIT 40').all(a.id);
     for (const g of goals) {
       items.push({ id: 'goal:' + g.id, type: 'goal', side: 'coach', author: name(g.coach_id) || 'Coach', title: 'New goal', tags: { reads: lab.parse(g.reads, []) }, body: g.title + (g.attribute_name ? ' · ' + g.attribute_name : '') + (g.note ? '\n' + g.note : ''), link: coachView ? '#/skills/' + a.id : '#/skills', at: g.created_at });
@@ -48,9 +48,9 @@ module.exports = function (r, ctx) {
     }
     const sessions = db.prepare("SELECT s.id, s.title, s.status, s.started_at, s.completed_at FROM training_sessions s JOIN training_athletes ta ON ta.session_id=s.id WHERE ta.athlete_id=? AND s.status!='live' ORDER BY s.started_at DESC LIMIT 30").all(a.id);
     for (const s of sessions) items.push({ id: 'session:' + s.id, type: 'session', side: 'system', title: 'Session', body: s.title, link: '#/train/' + s.id, at: s.completed_at || s.started_at });
-    const blocks = db.prepare("SELECT id, title, status, coach_feedback, athlete_reflection, updated_at, created_at FROM development_blocks WHERE athlete_id=? ORDER BY updated_at DESC LIMIT 30").all(a.id);
+    const blocks = db.prepare("SELECT id, title, status, draft, coach_feedback, athlete_reflection, updated_at, created_at FROM development_blocks WHERE athlete_id=? " + (coachView ? '' : 'AND draft=0 ') + "ORDER BY updated_at DESC LIMIT 30").all(a.id);
     for (const b of blocks) {
-      items.push({ id: 'block:' + b.id, type: 'block', side: 'coach', author: 'Coach', title: 'Development Block', body: b.title, link: '#/development/' + b.id, at: b.created_at });
+      items.push({ id: 'block:' + b.id, type: 'block', side: 'coach', author: 'Coach', title: b.draft ? 'Practice draft (not shared)' : 'Practice', body: b.title, link: '#/development/' + b.id, at: b.created_at, private: !!b.draft });
       if (b.coach_feedback) items.push({ id: 'block-fb:' + b.id, type: 'note', side: 'coach', author: 'Coach', title: 'Feedback · ' + b.title, body: b.coach_feedback, link: '#/development/' + b.id, at: b.updated_at });
     }
     const orders = coachView ? db.prepare("SELECT o.id, o.paid_at, o.amount_cents, p.name FROM orders o JOIN products p ON p.id=o.product_id WHERE o.athlete_id=? AND o.status='paid' ORDER BY o.paid_at DESC LIMIT 20").all(a.id) : [];
