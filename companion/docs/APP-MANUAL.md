@@ -136,6 +136,15 @@ Athletes buy private sessions and packs at `#/shop`. Each product grants credits
 - `#/join` is the public entry: Field Notes (free) → LAB Essentials ($8/month) → coaching packs. Signed-out visitors to Field Notes see a Join banner.
 - Athletes are notified when a payment lands, when a coach records a sale, and when they are down to one credit.
 
+## The thread
+
+Every athlete has one thread: coach notes and replies, the athlete's reflections, questions and videos, pre-session check-ins and the coach's plan, skill assessments, goals, completed sessions and Development Blocks, in one chronological place. Athletes open it from Home → Thread (`#/thread`); coaches open it from the athlete's page (`#/coach/:id/thread`).
+
+- Either side writes at the bottom. Coaches can mark a note Private (coach only); shared notes notify the athlete.
+- A coach can Reply to an athlete message, which also clears it from the review queue, or use Mark seen to clear without replying.
+- Filters: Messages, Check-ins, Assessments, Activity. Items that live elsewhere (a check-in, an assessment, a session) link out with Open.
+- Review items on Coach Today now open the thread.
+
 ## Membership
 
 Membership and paywall controls are built in but not activated for general use. Current access should remain complimentary until the business is ready to turn billing on. Admins can view an athlete’s membership state without charging them.

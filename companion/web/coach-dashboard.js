@@ -24,6 +24,7 @@
     if(item.kind==='event')return '#/play/events/'+item.recordId;
     if(item.kind==='session')return '#/train/'+item.recordId;
     if(item.kind==='development')return '#/development/'+item.recordId;
+    if(item.kind==='review'&&item.athleteId)return '#/coach/'+item.athleteId+'/thread';
     return item.athleteId?'#/coach/'+item.athleteId:'#/coach/today';
    }
    if(item.kind==='review'&&String(item.title).startsWith('Review training response'))return 'https://transcending-performance-lab.brettadamstp.chatgpt.site/coach-review';
