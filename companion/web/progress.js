@@ -40,34 +40,55 @@
  }
  ctx.views.journeyOverview=ctx.views.home;
  ctx.routes.push([/^\/journey\/overview$/,'journeyOverview','home']);
- ctx.views.home=async function(){
-  const host=document.createElement('section');host.className='journey stack';root().replaceChildren(host);
-  host.innerHTML=ctx.head('THE LAB','Today','Your next practice and how to score it.')+'<p role="status">Checking your program…</p>';
-  const [blocks,assignments,site,measurements]=await Promise.allSettled([
+ ctx.views.home=async function(_,query){
+  if(ctx.has('coach')&&!(query&&query.me)){location.hash='#/coach/today';return;}
+  const host=document.createElement('section');host.className='journey stack athlete-home';root().replaceChildren(host);
+  const me=ctx.me(),first=me?.user?.name?.split(' ')[0]||'';
+  const hour=new Date().getHours(),hi=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
+  host.innerHTML=ctx.head(hi,first,'')+'<p role="status" class="muted small">Checking your program…</p>';
+  const [blocks,assignments,site,measurements,home,learning]=await Promise.allSettled([
    api.get('/api/me/development-blocks'),api.get('/api/me/assignments'),api.request('GET','/api/site-bridge/feed'),
-   ctx.me()?.athlete_id ? api.get('/api/athletes/'+ctx.me().athlete_id+'/progress') : Promise.resolve(null)
+   me?.athlete_id ? api.get('/api/athletes/'+me.athlete_id+'/progress') : Promise.resolve(null),
+   api.get('/api/home'),api.get('/api/me/learning')
   ]);
   if(!host.isConnected)return;
   const rows=blocks.value||[], rank={ready_retest:0,in_progress:1,assigned:2};
   const active=rows.filter(b=>b.status in rank).sort((a,b)=>rank[a.status]-rank[b.status]||(a.due_on||'9999').localeCompare(b.due_on||'9999'));
-  const b=active[0],task=assignments.value?.find(a=>a.status==='open'),feed=site.value;
+  const openTasks=(assignments.value||[]).filter(a=>a.status==='open');
+  const b=active[0],task=openTasks[0],feed=site.value,d=home.value;
   const focus=feed?.records?.find(r=>r.kind==='focus'&&r.data.status==='approved')?.data;
   const training=feed?.assignments?.find(a=>a.status!=='resolved'),waiting=rows.find(b=>['evidence_submitted','coach_review'].includes(b.status));
   const retest=measurements.value?.measurements?.[0]?.retestOn;
+  const live=d?.sessions?.find(s=>s.status==='live');
   let item;
-  if(b) item={label:b.status==='ready_retest'?'Retest':'Next practice',title:b.title,cue:b.retest_notes||b.constraint_text||b.problem,target:b.success_evidence,meta:[b.program_title && (b.program_title+' · Week '+(1+b.program_step)),b.practice_minutes&&b.practice_minutes+' min',b.due_on&&'Due '+b.due_on].filter(Boolean).join(' · '),action:'Open practice',href:'#/development/'+b.id};
+  if(live) item={label:'Live now',title:live.title,cue:'Your coach has the scorecard open.',action:'Open session',href:'#/train/'+live.id};
+  else if(b) item={label:b.status==='ready_retest'?'Retest':'Next practice',title:b.title,cue:b.retest_notes||b.constraint_text||b.problem,target:b.success_evidence,meta:[b.program_title && (b.program_title+' · Week '+(1+b.program_step)),b.practice_minutes&&b.practice_minutes+' min',b.due_on&&'Due '+b.due_on].filter(Boolean).join(' · '),action:'Open practice',href:'#/development/'+b.id};
   else if(task) item={label:'Assigned training',title:task.title,cue:task.note,action:'Open training',href:'#/train'};
   else if(focus) item={label:'Coach focus',title:focus.title,cue:focus.practice,target:focus.test,action:'Open assignment',href:'#/website'};
   else if(training) item={label:'Website training',title:training.title,cue:training.instructions,action:'Open training',href:'https://transcending-performance-lab.brettadamstp.chatgpt.site/members'};
   else if(waiting) item={label:'Coach review',title:waiting.title,cue:'Your result is with your coach.',action:'See your result',href:'#/development/'+waiting.id};
-  else if(!ctx.me()?.athlete_id) item={label:'Get started',title:'Connect your athlete profile',action:'Open profile',href:'#/profile'};
+  else if(!me?.athlete_id) item={label:'Get started',title:'Connect your athlete profile',action:'Open profile',href:'#/profile'};
   else item={label:'Next practice',title:'Check in with your coach',cue:'Tell your coach what happened the last time you played.',action:'Ask your coach',href:'#/journey/feedback'};
-  host.innerHTML=ctx.head('THE LAB','Today','')+'<article class="journey-note today-focus"><p class="eyebrow">'+h(item.label)+'</p><h2>'+h(item.title)+'</h2>'+
-   (item.cue?'<p>'+h(item.cue)+'</p>':'')+(b?.previous_feedback?'<p><b>From your coach</b><br>'+h(b.previous_feedback)+'</p>':'')+(item.target?'<p><b>How to score it</b><br>'+h(item.target)+'</p>':'')+(item.meta?'<p class="small">'+h(item.meta)+'</p>':'')+'<a class="btn primary" href="'+h(item.href)+'">'+h(item.action)+'</a></article>'+
-   '<nav class="row" aria-label="Athlete sections"><a class="btn" href="#/programs">My program</a><a class="btn ghost" href="#/train">Training</a><a class="btn" href="#/progress">Progress</a><a class="btn ghost" href="#/journey/overview">Sessions &amp; tools</a></nav>'+
-   (retest?'<p><a href="#/progress">Measurement retest · '+h(retest)+'</a></p>':'')+
-   ([blocks,assignments].some(r=>r.status==='rejected')?'<p role="status">Some app assignments could not load. <button class="btn" id="practiceRetry">Retry</button></p>':'')+
-   (site.status==='rejected'?'<p class="small"><a href="#/website">Check website coaching connection</a></p>':'');
-  if(host.querySelector('#practiceRetry'))host.querySelector('#practiceRetry').onclick=()=>ctx.views.home();
+  const more=active.length+openTasks.length-1;
+  const dateOf=v=>v?new Date(v).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
+  const list=(inner,empty)=>inner?'<div class="list">'+inner+'</div>':'<div class="list"><p class="empty">'+empty+'</p></div>';
+  const title=(t,href,label)=>'<p class="section-title">'+t+(href?'<a href="'+href+'">'+label+'</a>':'')+'</p>';
+  const upcoming=d?[...d.events,...d.open_events.filter(o=>!d.events.some(e=>e.id===o.id)).map(o=>Object.assign({status:'published'},o))]:[];
+  const going=(learning.value?.courses||[]).filter(c=>c.completed<c.lessons);
+  host.innerHTML=ctx.head(hi,first,'')+
+   '<article class="journey-note today-focus"><p class="eyebrow">'+h(item.label)+'</p><h2>'+h(item.title)+'</h2>'+
+   (item.cue?'<p>'+h(item.cue)+'</p>':'')+(b?.previous_feedback?'<p><b>From your coach</b><br>'+h(b.previous_feedback)+'</p>':'')+(item.target?'<p><b>How to score it</b><br>'+h(item.target)+'</p>':'')+(item.meta?'<p class="small">'+h(item.meta)+'</p>':'')+
+   '<div class="row"><a class="btn primary" href="'+h(item.href)+'">'+h(item.action)+'</a>'+(more>0?'<span class="small today-more">+'+more+' more assigned</span>':'')+'</div></article>'+
+   (d?.to_confirm?'<div class="banner"><span>'+d.to_confirm+' match score'+(d.to_confirm>1?'s need':' needs')+' your confirmation.</span><a class="btn sm primary" href="#/play">Review</a></div>':'')+
+   '<nav class="quick" aria-label="Athlete sections"><a href="#/programs"><b>My program</b><span>Blocks, weeks, retests</span></a><a href="#/train"><b>Training</b><span>Assignments and sessions</span></a><a href="#/progress"><b>Progress</b><span>Measurements'+(retest?' · retest '+h(retest):'')+'</span></a><a href="#/check-in"><b>Pre-session check-in</b><span>Tell your coach what you need</span></a><a href="#/play/match/new"><b>Record a match</b><span>Score, partners, result</span></a><a href="#/timeline"><b>Player timeline</b><span>Sessions · videos · notes</span></a></nav>'+
+   ([blocks,assignments].some(r=>r.status==='rejected')?'<p role="status" class="small">Some app assignments could not load. <button class="btn sm" id="practiceRetry">Retry</button></p>':'')+
+   (site.status==='rejected'?'<p class="small muted"><a href="#/website">Check website coaching connection</a></p>':'')+
+   (d?'<div class="stack">'+title('Upcoming play','#/play/events','All events')+list(upcoming.slice(0,4).map(e=>ctx.eventRow(Object.assign({},e,{my_state:e.state}))).join(''),'No upcoming events. <a href="#/play/events">Browse events</a>.')+'</div>'+
+    '<div class="grid-2"><div class="stack">'+title('From your coach','#/journey/notes','All notes')+list(d.shared_notes.slice(0,3).map(n=>'<div class="note"><p class="body">'+h(n.body)+'</p><p class="meta"><span class="vis shared">Shared with you</span><span>'+h(n.author||'Coach')+'</span><span>'+h(L.when(n.created_at))+'</span></p></div>').join(''),'Nothing shared yet. Feedback from your coach lands here.')+'</div>'+
+    '<div class="stack">'+title('Recent sessions','#/journey/sessions','All sessions')+list(d.sessions.slice(0,4).map(s=>'<a class="li" href="#/train/'+h(s.id)+'"><span class="main-col"><span class="t">'+h(s.title)+'</span><span class="d">'+h(L.when(s.started_at))+'</span></span><span class="side"><span class="tag'+(s.status==='live'?' call':'')+'">'+(s.status==='live'?'Live':'Done')+'</span></span></a>').join(''),'No sessions yet. They appear here after your coach records one.')+'</div></div>'+
+    (going.length?'<div class="stack">'+title('Continue learning','#/learn','Learn')+'<div class="course-grid">'+going.slice(0,2).map(ctx.courseCard).join('')+'</div></div>':'')+
+    (d.posts?.length?'<div class="stack">'+title('New in Field Notes','#/learn','All posts')+'<div class="list">'+d.posts.slice(0,3).map(p=>'<a class="post-card" href="#/learn/'+h(p.slug)+'"><div><p class="lane">'+h(p.lane_name||'')+'</p><p class="t">'+h(p.title)+'</p>'+(p.summary?'<p class="d">'+h(p.summary)+'</p>':'')+'</div><div class="thumb">'+(p.thumbnail_media_id?'<img alt="" loading="lazy" src="/api/media/'+h(p.thumbnail_media_id)+'">':'')+'</div></a>').join('')+'</div></div>':'')
+   :'');
+  if(host.querySelector('#practiceRetry'))host.querySelector('#practiceRetry').onclick=()=>ctx.views.home(_,query);
  };
 });})();

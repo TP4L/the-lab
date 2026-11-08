@@ -1,5 +1,5 @@
 /* Paper, evergreen and court markings carry from the member entrance to the scorecard. */
-:root{--court-green:#123d34;--court-light:#d9f39b;--court-rule:#63877d}
+/* tokens live in styles.css */
 .court-page,.coach-today{display:grid;gap:1.05rem;min-width:0}
 .court-page .back,.court-page .btn{justify-self:start}
 .court-page .card,.court-hero,.court-focus,.court-select span,.court-week{min-width:0}
@@ -60,3 +60,87 @@
 .court-chips{gap:6px}.court-chips button{padding:5px 10px;min-height:36px}
 .court-page :focus-visible,.court-nav :focus-visible,.court-player-switch :focus-visible{outline:3px solid #60a574;outline-offset:2px}
 @media(max-width:620px){.court-columns{grid-template-columns:minmax(0,1fr)}.court-hero{grid-template-columns:minmax(0,1fr);padding:24px 20px}.court-hero>div{padding-right:22px}.court-hero .court-art{position:absolute;width:85px;right:-36px;bottom:-25px;opacity:.32}.court-nav{gap:1px}.court-nav a{padding:13px 10px}.coach-today .coach-refresh{padding:6px 10px;font-size:.78rem}.court-page .btn{white-space:normal}.court-page .court-qr a{overflow-wrap:anywhere}}
+
+/* ---------- layer fixes: coach today / journey harmonised with the system ---------- */
+.coach-pulse button{background:var(--surface);border-color:var(--rule-soft);border-radius:var(--r);box-shadow:var(--shadow-1);min-height:64px;}
+.coach-pulse strong{font-family:var(--display);color:var(--ink);font-size:1.6rem;letter-spacing:-.03em;}
+.coach-pulse button.is-hot strong{color:var(--warn);}
+.coach-pulse button[data-pulse="overdue"].is-hot strong{color:var(--accent);}
+.coach-pulse button[aria-pressed="true"]{border-color:var(--court);background:var(--court-soft);}
+.coach-filter-row [aria-pressed=true]{border-color:var(--court);color:var(--court);background:var(--court-soft);}
+.coach-priority{font-family:var(--ui);font-weight:650;font-size:11px;letter-spacing:.04em;}
+.coach-priority.today{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
+.coach-work{border-radius:var(--r-lg);border-color:var(--rule-soft);box-shadow:var(--shadow-1);}
+.coach-work.urgent{border-left:3px solid var(--accent);}
+.coach-work h3{font-size:1.1rem;letter-spacing:-.015em;}
+.coach-workspace-bar{border-radius:var(--r-lg);border-color:var(--rule-soft);box-shadow:var(--shadow-1);}
+.coach-systems{font-size:.85rem;}
+.coach-actions{grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem;padding:0;}
+.coach-actions a{border-radius:var(--r-lg);border-color:var(--rule-soft);box-shadow:var(--shadow-1);padding:1rem 1.05rem;gap:.3rem;min-height:104px;transition:transform .14s,border-color .14s,box-shadow .14s;}
+.coach-actions a:hover,.coach-actions a:focus-visible{border-color:var(--ink-faint);box-shadow:var(--shadow);}
+.coach-actions a span{font-family:var(--ui);font-size:11.5px;letter-spacing:.06em;color:var(--ink-faint);}
+.coach-actions a b{font-size:1.02rem;letter-spacing:-.012em;}
+.coach-actions a.assign{background:var(--court);border-color:var(--court);color:var(--court-ink);}
+.coach-actions a.assign span,.coach-actions a.assign small{color:color-mix(in srgb,var(--court-ink) 75%,transparent);}
+.coach-actions a.assign:hover{background:var(--court-deep);}
+.coach-more-tools{border-bottom:0;padding-bottom:0;margin:0;}
+.coach-more-tools summary{font-family:var(--ui);font-weight:600;font-size:.9rem;color:var(--ink-soft);min-height:40px;display:flex;align-items:center;}
+.coach-more-tools>div a{font-size:.9rem;font-weight:500;color:var(--ink);text-decoration:none;padding:9px 12px;border:1px solid var(--rule-soft);border-radius:99px;background:var(--surface);}
+.coach-more-tools>div a:hover{border-color:var(--ink-faint);}
+.coach-queue-head h2{font-size:1.35rem;letter-spacing:-.02em;}
+.court-nav{border-radius:var(--r-lg);border-color:var(--rule-soft);box-shadow:var(--shadow-1);}
+.court-nav a{font-weight:600;padding:12px 16px;min-height:44px;display:inline-flex;align-items:center;}
+.court-nav [aria-current=page]{background:var(--court);color:var(--court-ink);}
+.court-hero,.auth-court,.journey .today-focus{border-radius:var(--r-xl);box-shadow:var(--shadow);}
+.court-hero .court-kicker,.auth-court .court-kicker,.journey .today-focus .eyebrow{font-family:var(--ui);font-weight:650;font-size:11.5px;letter-spacing:.09em;}
+.court-hero h1,.journey .today-focus h2,.auth-court h1{font-weight:600;letter-spacing:-.035em;}
+.court-hero .btn.primary,.journey .today-focus .btn.primary{background:var(--court-light);border-color:var(--court-light);color:var(--court-deep);}
+.court-hero .btn.primary:hover{background:#e6f7b3;}
+.court-hero .btn.ghost{background:rgba(255,255,255,.06);color:var(--court-ink);border-color:rgba(255,255,255,.28);}
+.court-hero .btn.ghost:hover{background:rgba(255,255,255,.12);}
+.journey-tabs a[aria-current]{background:var(--court);color:var(--court-ink);}
+.journey-focus{border-top-color:var(--court);}
+.journey-session-dot{background:var(--court);box-shadow:0 0 0 5px var(--court-soft);}
+.journey-hero .primary{background:var(--court-light);color:var(--court-deep);border-color:var(--court-light);}
+.journey-hero .eyebrow{color:var(--court-light);}
+.history-card{border-left-color:var(--court);}
+.coach-today-entry{border-color:var(--rule-soft);background:var(--surface);border-left:4px solid var(--court);border-radius:var(--r-lg);box-shadow:var(--shadow-1);}
+.workspace-entry{border-left-color:var(--court);border-radius:var(--r-lg);}
+.card.form,.form .card{gap:16px;}
+.list .empty{padding:22px 18px;font-size:14.5px;}
+.empty{color:var(--ink-soft);}
+
+/* consistent rhythm */
+#app > .court-nav,#app > .journey,#app > .court-page{min-width:0;}
+
+/* ---------- athlete home ---------- */
+.focus-card{border-radius:var(--r-xl);padding:clamp(22px,4vw,36px);gap:10px;box-shadow:var(--shadow);position:relative;overflow:hidden;isolation:isolate;}
+.focus-card::after{content:"";position:absolute;right:-40px;top:-30px;width:220px;height:260px;border:1.5px solid rgba(217,243,155,.35);border-radius:4px;transform:rotate(22deg);background:linear-gradient(to bottom,transparent calc(50% - 1px),rgba(217,243,155,.4) 50%,transparent calc(50% + 1px));z-index:-1;}
+.focus-card p.big{font-size:clamp(24px,5.6vw,34px);font-weight:600;letter-spacing:-.03em;max-width:22ch;}
+.focus-card .small{color:color-mix(in srgb,var(--court-ink) 78%,transparent);max-width:52ch;}
+.focus-card .row{margin-top:8px;}
+.focus-card .btn.primary{background:var(--court-light);border-color:var(--court-light);color:var(--court-deep);}
+.focus-card .btn.primary:hover{background:#e6f7b3;}
+.quick{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));}
+.quick a b{font-weight:650;}
+.staff{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));}
+/* athlete home: today-focus hero shares the court hero language */
+.athlete-home .today-focus{border-left:0;}
+.athlete-home .today-focus h2{font-size:clamp(26px,5.6vw,40px);}
+.athlete-home .today-more{color:color-mix(in srgb,var(--court-ink) 75%,transparent);}
+.athlete-home .quick a{min-height:72px;}
+/* coach actions: two-up on phones */
+@media(max-width:760px){.coach-actions{grid-template-columns:repeat(2,minmax(0,1fr));}.coach-actions a{min-height:92px;}.coach-actions a small{display:block;}}
+.court-nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
+.court-nav::-webkit-scrollbar{display:none;}
+.court-nav a{white-space:nowrap;}
+.coach-more-tools summary::before{content:"";width:8px;height:8px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(-45deg);margin-right:10px;transition:transform .15s;}
+.coach-more-tools[open] summary::before{transform:rotate(45deg);}
+.coach-more-tools summary{list-style:none;}.coach-more-tools summary::-webkit-details-marker{display:none;}
+.note .meta{font-family:var(--ui);font-size:12.5px;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .coach-filter-row [aria-pressed=true],:root:not([data-theme="light"]) .coach-pulse button[aria-pressed="true"]{color:var(--court-light);border-color:var(--court-light);}}
+:root[data-theme="dark"] .coach-filter-row [aria-pressed=true],:root[data-theme="dark"] .coach-pulse button[aria-pressed="true"]{color:var(--court-light);border-color:var(--court-light);}
+.classics-folder{border-radius:var(--r-lg);background:linear-gradient(112deg,var(--court-deep),var(--court));border-color:transparent;box-shadow:var(--shadow);}
+.classics-folder>summary small{color:var(--court-light);font-size:11.5px;font-weight:650;letter-spacing:.08em;}
+.classics-folder .btn.primary{background:var(--court-light);border-color:var(--court-light);color:var(--court-deep);}
+.classics-folder .btn.primary:hover{background:#e6f7b3;}

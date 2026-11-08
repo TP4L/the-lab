@@ -157,50 +157,62 @@
   };
 
   /* ================= home ================= */
-  views.home = function () {
-    return api.get('/api/home').then(function (d) {
+  views.home = function (_, query) {
+    // Coaches land on their operating view; athletes get "your next step". #/?me=1 shows a coach their own athlete view.
+    if (has('coach') && !(query && query.me)) { location.hash = '#/coach/today'; return; }
+    return Promise.all([
+      api.get('/api/home'),
+      ME.athlete_id ? api.get('/api/me/assignments').catch(function () { return []; }) : Promise.resolve([]),
+      api.get('/api/me/learning').catch(function () { return { courses: [] }; })
+    ]).then(function (res) {
+      var d = res[0], assignments = res[1] || [], lr = res[2] || { courses: [] };
       var a = d.athlete, live = d.sessions.filter(function (s) { return s.status === 'live'; })[0];
+      var open = assignments.filter(function (x) { return x.status === 'open'; });
       var hour = new Date().getHours();
       var hi = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+      var first = ME.user.name.split(' ')[0];
+
+      // One next step, chosen in priority order.
+      var step;
+      if (live) step = { k: 'Live now', t: live.title, d: 'Your coach has the scorecard open.', href: '#/train/' + live.id, cta: 'Open session' };
+      else if (open.length) { var o = open[0]; step = { k: 'Your next step', t: o.title, d: (o.due_on ? 'Due ' + new Date(o.due_on + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Assigned by your coach') + (o.template_items ? ' · ' + o.template_items.length + ' drills' : ''), href: '#/train', cta: 'Open training' }; }
+      else if (a && a.focus) step = { k: 'Current focus', t: a.focus, d: a.goals ? 'Goal: ' + a.goals : 'Tell your coach what you need before the next session.', href: '#/check-in', cta: 'Pre-session check-in' };
+      else if (a) step = { k: 'Your next step', t: 'Set a focus with your coach', d: 'A pre-session check-in gives your coach a starting point.', href: '#/check-in', cta: 'Start check-in' };
+      else step = { k: 'Get connected', t: 'Connect your athlete profile', d: 'See your focus, notes and results in one place.', href: '#/profile', cta: 'Set up profile' };
+
       var staffTiles = '';
-      if (has('coach')) staffTiles += '<a href="#/coach"><b>Coach Workspace</b><span>' + d.coach.athletes + ' athletes · ' + d.coach.live + ' live session' + (d.coach.live === 1 ? '' : 's') + '</span></a>';
-      if (has('coach')) staffTiles += '<a href="#/coach/desk"><b>Events desk</b><span>Pending Interest · Team Planner · Events</span></a>';
+      if (has('coach')) staffTiles += '<a href="#/coach/today"><b>Coach today</b><span>' + d.coach.athletes + ' athletes · ' + d.coach.live + ' live session' + (d.coach.live === 1 ? '' : 's') + '</span></a>';
       if (has('contributor', 'editor')) staffTiles += '<a href="#/studio"><b>Publishing Studio</b><span>' + d.studio.drafts + ' draft' + (d.studio.drafts === 1 ? '' : 's') + (has('editor') ? ' · ' + d.studio.in_review + ' to review' : '') + '</span></a>';
       if (has('admin')) staffTiles += '<a href="#/admin"><b>Admin</b><span>People and permissions</span></a>';
 
+      var going = lr.courses.filter(function (c) { return c.completed < c.lessons; });
+
       app.innerHTML = offlineNote(d) +
-        '<div class="head"><p class="eyebrow">' + h(hi) + '</p><h1>' + h(ME.user.name.split(' ')[0]) + '</h1></div>' +
-        (staffTiles ? '<div class="staff">' + staffTiles + '</div>' : '') +
+        '<div class="head"><p class="eyebrow">' + h(hi) + '</p><h1>' + h(first) + '</h1></div>' +
+        '<section class="focus-card next-step"><p class="eyebrow">' + h(step.k) + '</p><p class="big">' + h(step.t) + '</p><p class="small">' + h(step.d) + '</p><div class="row"><a class="btn primary" href="' + h(step.href) + '">' + h(step.cta) + '</a>' + (open.length > 1 ? '<span class="small" style="opacity:.8">+' + (open.length - 1) + ' more assigned</span>' : '') + '</div></section>' +
         (d.to_confirm ? '<div class="banner"><span>' + d.to_confirm + ' match score' + (d.to_confirm > 1 ? 's need' : ' needs') + ' your confirmation.</span><a class="btn sm primary" href="#/play">Review</a></div>' : '') +
-        (a ? '<div class="focus-card"><p class="eyebrow">Current focus</p><p class="big">' + h(a.focus || 'No focus set yet') + '</p>' + (a.goals ? '<p class="small" style="opacity:.8">Goal: ' + h(a.goals) + '</p>' : '') + '</div>'
-          : '<div class="banner"><span>Connect your athlete profile to see your focus, notes and results.</span><a class="btn sm primary" href="#/profile">Set up profile</a></div>') +
-        '<div class="stack"><p class="section-title">Quick actions</p><div class="quick">' +
-        (has('coach') ? '<a href="#/train/new">Start a session</a><a href="#/train/new?quick=1">Make / miss counter</a>' : '') +
-        (a ? '<a href="#/check-in"><b>Pre-session check-in</b><span>Tell your coach what you need</span></a><a href="#/profile#reflect">Add a reflection</a>' : '') +
-        (has('contributor', 'editor') ? '<a href="#/studio/new">Write a post</a>' : '') +
-        '<a href="#/play/match/new">Record a match</a><a href="#/learn">Field Notes</a></div></div>' +
-        '<div class="grid-2">' +
-        '<div class="stack"><p class="section-title">' + (live ? 'Live now' : 'Recent sessions') + '</p>' + (d.sessions.length ? '<div class="list">' + d.sessions.map(function (s) {
-          return '<a class="li" href="#/train/' + h(s.id) + (s.status === 'live' && has('coach') ? '/live' : '') + '"><span class="main-col"><span class="t">' + h(s.title) + '</span><span class="d">' + h(L.when(s.started_at)) + '</span></span><span class="side"><span class="tag' + (s.status === 'live' ? ' call' : '') + '">' + (s.status === 'live' ? 'Live' : 'Done') + '</span></span></a>';
-        }).join('') + '</div>' : '<div class="list"><p class="empty">No sessions yet.' + (has('coach') ? ' <a href="#/train/new">Start one</a>.' : ' They’ll appear here after your coach records one.') + '</p></div>') + '</div>' +
-        '<div class="stack"><p class="section-title">From your coach</p>' + (d.shared_notes.length ? '<div class="list">' + d.shared_notes.map(function (n) {
-          return '<div class="note"><p class="body">' + h(n.body) + '</p><p class="meta"><span class="vis shared">Shared with you</span><span>' + h(n.author || 'Coach') + '</span><span>' + h(L.when(n.created_at)) + '</span></p></div>';
-        }).join('') + '</div>' : '<div class="list"><p class="empty">Nothing shared yet.</p></div>') + '</div>' +
+        '<div class="quick">' +
+        (a ? '<a href="#/check-in"><b>Pre-session check-in</b><span>Tell your coach what you need</span></a><a href="#/profile#reflect"><b>Add a reflection</b><span>What you noticed on court</span></a>' : '') +
+        '<a href="#/play/match/new"><b>Record a match</b><span>Score, partners, result</span></a>' +
+        (has('contributor', 'editor') ? '<a href="#/studio/new"><b>Write a post</b><span>Field Notes</span></a>' : '') +
         '</div>' +
-        '<div class="stack"><p class="section-title">Upcoming events</p>' + ((d.events.length || d.open_events.length) ? '<div class="list">' +
+        (staffTiles ? '<div class="staff">' + staffTiles + '</div>' : '') +
+        (open.length ? '<div class="stack"><p class="section-title">Assigned to you<a href="#/train">All training</a></p>' + assignmentList(open, false) + '</div>' : '') +
+        '<div class="stack"><p class="section-title">Upcoming play<a href="#/play/events">All events</a></p>' + ((d.events.length || d.open_events.length) ? '<div class="list">' +
           d.events.map(function (e) { return eventRow({ id: e.id, title: e.title, starts_at: e.starts_at, location: e.location, status: e.status, my_state: e.state }); }).join('') +
-          d.open_events.filter(function (o) { return !d.events.some(function (e) { return e.id === o.id; }); }).map(function (e) { return eventRow(Object.assign({ status: 'published' }, e)); }).join('') + '</div>'
+          d.open_events.filter(function (o) { return !d.events.some(function (e) { return e.id === o.id; }); }).slice(0, 3).map(function (e) { return eventRow(Object.assign({ status: 'published' }, e)); }).join('') + '</div>'
           : '<div class="list"><p class="empty">No upcoming events. <a href="#/play/events">Browse events</a>.</p></div>') + '</div>' +
-        '<div class="stack" id="assignedHome"></div><div class="stack" id="learning"></div>' +
-        '<div class="stack"><p class="section-title">New in Field Notes</p>' + postList(d.posts) + '</div>';
-      if (ME.athlete_id) api.get('/api/me/assignments').then(function (as) {
-        var open = as.filter(function (a) { return a.status === 'open'; });
-        if (open.length && $('#assignedHome')) { $('#assignedHome').innerHTML = '<p class="section-title">Assigned to you</p>' + assignmentList(open, false); bindAssignments($('#assignedHome')); }
-      }, function () {});
-      api.get('/api/me/learning').then(function (lr) {
-        var going = lr.courses.filter(function (c) { return c.completed < c.lessons; });
-        if (going.length && $('#learning')) $('#learning').innerHTML = '<p class="section-title">Continue learning</p><div class="course-grid">' + going.slice(0, 2).map(courseCard).join('') + '</div>';
-      }, function () {});
+        '<div class="grid-2">' +
+        '<div class="stack"><p class="section-title">From your coach</p>' + (d.shared_notes.length ? '<div class="list">' + d.shared_notes.slice(0, 3).map(function (n) {
+          return '<div class="note"><p class="body">' + h(n.body) + '</p><p class="meta"><span class="vis shared">Shared with you</span><span>' + h(n.author || 'Coach') + '</span><span>' + h(L.when(n.created_at)) + '</span></p></div>';
+        }).join('') + '</div>' : '<div class="list"><p class="empty">Nothing shared yet. Feedback from your coach lands here.</p></div>') + '</div>' +
+        '<div class="stack"><p class="section-title">Recent sessions<a href="#/train">All sessions</a></p>' + (d.sessions.length ? '<div class="list">' + d.sessions.slice(0, 4).map(function (s) {
+          return '<a class="li" href="#/train/' + h(s.id) + (s.status === 'live' && has('coach') ? '/live' : '') + '"><span class="main-col"><span class="t">' + h(s.title) + '</span><span class="d">' + h(L.when(s.started_at)) + '</span></span><span class="side"><span class="tag' + (s.status === 'live' ? ' call' : '') + '">' + (s.status === 'live' ? 'Live' : 'Done') + '</span></span></a>';
+        }).join('') + '</div>' : '<div class="list"><p class="empty">No sessions yet. They’ll appear here after your coach records one.</p></div>') + '</div>' +
+        '</div>' +
+        (going.length ? '<div class="stack"><p class="section-title">Continue learning<a href="#/learn">Learn</a></p><div class="course-grid">' + going.slice(0, 2).map(courseCard).join('') + '</div></div>' : '') +
+        '<div class="stack"><p class="section-title">New in Field Notes<a href="#/learn">All posts</a></p>' + postList(d.posts.slice(0, 3)) + '</div>';
+      bindAssignments(app);
     });
   };
 
@@ -2373,7 +2385,7 @@
   var PLUGIN_CTX = {
     views: views, routes: ROUTES, head: head, has: has, me: function () { return ME; }, setMe: setMe, meta: function () { return META; },
     route: function () { return route(); }, offlineNote: offlineNote, forbidden: forbidden, needsNet: needsNet, playerId: playerId, avatar: avatar,
-    statusPill: statusPill, teamNames: teamNames, scoreLine: scoreLine, matchRow: matchRow, eventRow: eventRow, fmtEventTime: fmtEventTime,
+    statusPill: statusPill, teamNames: teamNames, scoreLine: scoreLine, matchRow: matchRow, eventRow: eventRow, fmtEventTime: fmtEventTime, courseCard: courseCard,
     startScanner: startScanner, scoreForm: scoreForm, readScore: readScore, opts: opts, pollBell: function (x) { return pollBell(x); }
   };
   (window.LabPlugins || []).forEach(function (plugin) { plugin(PLUGIN_CTX); });
