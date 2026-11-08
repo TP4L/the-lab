@@ -63,6 +63,19 @@ async function seedDemo(base) {
   await host.post(`/api/athletes/${jordan}/notes`, { body: 'Drops are landing. Next: keep the paddle up after the drop so the reset is ready.', visibility: 'shared' });
   await host.post(`/api/athletes/${jordan}/notes`, { body: 'Tends to rush the kitchen after a short drop. Watch in games, not drills.', visibility: 'private' });
   await player.post(`/api/athletes/${jordan}/notes`, { body: 'Felt calmer at the line tonight. Dinks cross-court were solid.', visibility: 'shared' });
+  /* ---------- skill progress: ratings over time and goals ---------- */
+  const attrs = (await host.get('/api/skill-attributes')).attributes, byName = Object.fromEntries(attrs.map(x => [x.name, x.id]));
+  const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  const rate = (n, rows) => host.post(`/api/athletes/${jordan}/skill-ratings`, { rated_on: daysAgo(n), ratings: rows.map(([name, rating, comment]) => ({ attribute_id: byName[name], rating, comment: comment || '' })) });
+  await rate(80, [['Serving & returning', 3], ['Third-shot drops', 1], ['Drives', 3], ['Dinking', 3], ['Transition-zone play', 2], ['Consistency', 2]]);
+  await rate(52, [['Third-shot drops', 2], ['Dinking', 3], ['Transition-zone play', 2]]);
+  await rate(24, [['Third-shot drops', 2, 'Still lifting from the wrist under pressure.'], ['Consistency', 3, 'Fewer gifts in the first four points.']]);
+  await rate(5, [['Third-shot drops', 3, 'Landing 6 of 10 in games now. Paddle face much steadier.'], ['Drives', 2, 'Driving balls that should be dropped.'], ['Dinking', 4, 'Owns the cross-court dink.'], ['Transition-zone play', 3, 'Split-step is showing up.']]);
+  await rate(3, [['Third-shot drops', 3, 'Better depth today']]);
+  await host.post(`/api/athletes/${jordan}/skill-goals`, { title: 'Win a dink rally against a 4.0 player', attribute_id: byName['Dinking'] });
+  await host.post(`/api/athletes/${jordan}/skill-goals`, { title: 'Split-step before every opponent contact', attribute_id: byName['Court positioning & movement'], status: 'in_progress' });
+  const doneGoal = await host.post(`/api/athletes/${jordan}/skill-goals`, { title: 'Land 5 of 10 third-shot drops in a game', attribute_id: byName['Third-shot drops'] });
+  await host.put(`/api/skill-goals/${doneGoal.id}`, { status: 'completed' });
   const tpl = await host.post('/api/templates', { name: 'Kitchen line basics', items: [{ name: 'Cross-court dinks', measure: 'reps', target: 20 }, { name: 'Third-shot drops', measure: 'reps', target: 15 }, { name: 'Reset from transition', measure: 'feel' }] });
   await host.post(`/api/athletes/${jordan}/assignments`, { template_id: tpl.id, title: 'Kitchen line basics, twice this week', due_on: at(5).slice(0, 10), note: 'Twenty good dinks before moving on.' });
   const sid = crypto.randomUUID();

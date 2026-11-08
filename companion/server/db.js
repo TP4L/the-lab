@@ -866,7 +866,58 @@ ALTER TABLE plan_players ADD COLUMN invitational_key TEXT;
 ALTER TABLE plan_players ADD COLUMN invitational_arrival TEXT NOT NULL DEFAULT '';
 CREATE UNIQUE INDEX invitational_roster_slot ON plan_players(plan_id,invitational_key);
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS, INVITATIONALS_HANDOFF];
+
+/* Skill progress: coach-defined attributes rated 1-5 over time, with goals. */
+const SKILL_PROGRESS = `
+CREATE TABLE skill_attributes(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  sort INTEGER NOT NULL DEFAULT 0,
+  archived_at TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE skill_ratings(
+  id INTEGER PRIMARY KEY,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  attribute_id INTEGER NOT NULL REFERENCES skill_attributes(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+  comment TEXT NOT NULL DEFAULT '',
+  rated_on TEXT NOT NULL,
+  coach_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  client_id TEXT UNIQUE,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX skill_ratings_athlete ON skill_ratings(athlete_id,attribute_id,rated_on,id);
+CREATE TABLE skill_goals(
+  id INTEGER PRIMARY KEY,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  attribute_id INTEGER REFERENCES skill_attributes(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','completed')),
+  target_on TEXT,
+  completed_at TEXT,
+  coach_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX skill_goals_athlete ON skill_goals(athlete_id,status);
+INSERT INTO skill_attributes(name,category,description,sort) VALUES
+ ('Serving & returning','Start of point','Depth, placement and consistency on the two shots that begin every rally.',1),
+ ('Third-shot drops','Transition','Landing the drop in the kitchen under pressure so the team can move up.',2),
+ ('Drives','Transition','Choosing the right ball to drive, and keeping it low and in.',3),
+ ('Dinking','Kitchen line','Height, patience and placement in the dink rally.',4),
+ ('Resets','Kitchen line','Taking pace off a hard ball and putting it back in the kitchen.',5),
+ ('Speed-ups & counters','Kitchen line','Picking the right ball to attack, and answering the attack.',6),
+ ('Transition-zone play','Transition','Moving through the middle of the court with balance and a plan.',7),
+ ('Court positioning & movement','Movement','Split-step timing, partner spacing and recovery after each shot.',8),
+ ('Lobs & overheads','Finishing','Using the lob on purpose, and putting overheads away.',9),
+ ('Consistency','Mindset','Unforced errors under pressure and the ability to stay in the point.',10);
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS, INVITATIONALS_HANDOFF, SKILL_PROGRESS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

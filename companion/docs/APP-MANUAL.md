@@ -117,6 +117,15 @@ Events desk supports event setup, registration, brackets, court assignments, tim
 
 As soon as the first person registers, the event page and that player’s personal event screen display an Event Board Preview. Registered players fill the numbered positions and the remaining positions appear as Open spots. The preview uses the selected courts, event capacity, and format; players beyond the active court positions appear in the Rotation / waiting deck. It is a visualization only—not a final draw. Real partners, opponents, courts, and brackets are generated or confirmed when the host starts the event.
 
+## Skill progress (My Progress)
+
+Coaches rate each athlete on a set of skill attributes from 1 to 5 (Learning, Developing, Consistent, Strong, Weapon) and set goals. Ratings are kept as history, so the athlete sees the trend for each skill, the change since the last assessment, and every comment.
+
+- Athletes open My Progress from the home screen or `#/skills`. Goals sit at the top; each skill expands to a chart and the rating history. "What the 1–5 ratings mean" explains the scale.
+- Coaches open an athlete, then Skill progress or Rate skills. On Rate skills, tap a number for each skill observed today and add an optional comment; unrated skills are skipped. Goals are added on the same screen and can be started, completed, reopened or removed.
+- Attributes (the skills being rated) are managed by coaches at Coaching tools → Skill attributes. Add new ones, rename, or retire. Retired attributes keep their past ratings visible.
+- The athlete is notified when ratings are saved, a goal is added, or a goal is completed.
+
 ## Membership
 
 Membership and paywall controls are built in but not activated for general use. Current access should remain complimentary until the business is ready to turn billing on. Admins can view an athlete’s membership state without charging them.

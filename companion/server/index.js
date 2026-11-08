@@ -70,6 +70,7 @@ function createApp(opts = {}) {
   require('./api/workspace.js')(r, ctx);
   require('./api/training.js')(r, ctx);
   require('./api/progress.js')(r, ctx);
+  require('./api/skills.js')(r, ctx);
   require('./api/athletes.js')(r, ctx);
   require('./api/timeline.js')(r, ctx);
   require('./api/publishing.js')(r, ctx);
