@@ -149,6 +149,10 @@ Every athlete has one thread: coach notes and replies, the athlete's reflections
 
 The decision-engine vocabulary runs through the app. Every skill attribute is mapped to the read it depends on (Height, Time, Balance) and a LAB level band (1–13); goals inherit the reads of their skill; notes and replies in the thread can be tagged with a read, state, need, error layer and call. My Progress opens with "The LAB lens": the athlete's average rating per read across the skills mapped to it, with the trend since the last assessment. Coaches set reads and level bands on Coaching tools → Skill attributes.
 
+## Progress reports
+
+A report is a snapshot of a period for one athlete: coached sessions, skills with start/now/change and the latest comment, the LAB lens, goals completed and open, shared coach notes, and a summary written by the coach. Open an athlete → Report, pick the period (this month, last month, 30/90 days or custom), edit the summary (a draft is pre-written from the data), and Publish. Publishing freezes the numbers and creates a share link (`#/report/<token>`) that opens without signing in and prints cleanly; it can be revoked later. The athlete is notified and sees reports under My Progress → Reports. Private notes never appear in a report.
+
 ## Membership
 
 Membership and paywall controls are built in but not activated for general use. Current access should remain complimentary until the business is ready to turn billing on. Admins can view an athlete’s membership state without charging them.
