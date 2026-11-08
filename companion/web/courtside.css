@@ -298,3 +298,49 @@
 .th-toggle input{accent-color:var(--court);width:18px;height:18px;}
 .th-replying{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:13px;color:var(--ink-soft);padding:0 2px;}
 .th-replying span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ---------- LAB tags ---------- */
+.lab-pills{display:inline-flex;flex-wrap:wrap;gap:4px;vertical-align:middle;}
+.lab-pill{display:inline-flex;align-items:center;font-family:var(--ui);font-size:11px;font-weight:650;letter-spacing:.03em;padding:2px 7px;border-radius:99px;background:var(--surface-2);color:var(--ink-soft);line-height:1.4;white-space:nowrap;}
+.lab-pill.read{text-transform:uppercase;letter-spacing:.06em;}
+.lab-pill.read.height{background:#E4EFE7;color:#1F6B45;}
+.lab-pill.read.time{background:#E8EAF6;color:#3B4A9E;}
+.lab-pill.read.balance{background:#F8EDD4;color:#8A5A00;}
+.lab-pill.state{background:var(--court-soft);color:var(--court);}
+.lab-pill.need{background:var(--surface-3);color:var(--ink);}
+.lab-pill.error{background:var(--accent-soft);color:var(--accent);}
+.lab-pill.call{background:var(--ink);color:var(--ground);}
+.lab-pill.level{border:1px solid var(--rule);background:transparent;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .lab-pill.read.height{background:#1C3026;color:#6FCF97;}:root:not([data-theme="light"]) .lab-pill.read.time{background:#232B4A;color:#A7B4F2;}:root:not([data-theme="light"]) .lab-pill.read.balance{background:#352A16;color:#E8B45A;}}
+:root[data-theme="dark"] .lab-pill.read.height{background:#1C3026;color:#6FCF97;}:root[data-theme="dark"] .lab-pill.read.time{background:#232B4A;color:#A7B4F2;}:root[data-theme="dark"] .lab-pill.read.balance{background:#352A16;color:#E8B45A;}
+.th-msg.me .lab-pill{background:rgba(255,255,255,.14);color:var(--court-ink);}
+.th-msg.me .lab-pill.call{background:var(--court-light);color:var(--court-deep);}
+.th-tags{margin-top:-2px;}
+.lab-picker{display:flex;flex-direction:column;gap:10px;}
+.lab-group{display:flex;flex-direction:column;gap:6px;}
+.lab-g-label{font-family:var(--ui);font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);}
+.lab-chip{min-height:32px;padding:5px 11px;font-size:12.5px;}
+.lab-chip[data-group="reads"][aria-pressed="true"]{background:var(--court);border-color:var(--court);}
+.th-tagbox summary{cursor:pointer;font-family:var(--ui);font-size:13px;font-weight:600;color:var(--ink-soft);list-style:none;display:flex;align-items:center;gap:8px;min-height:32px;}
+.th-tagbox summary::-webkit-details-marker{display:none;}
+.th-tagbox summary::before{content:"+";font-size:16px;line-height:1;color:var(--court);}
+.th-tagbox[open] summary::before{content:"−";}
+.th-tagbox .lab-picker{padding:8px 0 4px;}
+.sk-name .lab-pills{margin-left:4px;}
+.sk-name .lab-pill{font-size:10px;padding:1px 6px;}
+.lab-reads{gap:14px;}
+.lab-reads h2{font-size:20px;letter-spacing:-.02em;}
+.lab-reads-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+@media(max-width:520px){.lab-reads-grid{grid-template-columns:1fr;}}
+.lab-read{display:flex;flex-direction:column;gap:6px;}
+.lab-read-top{display:flex;justify-content:space-between;align-items:baseline;}
+.lab-read-top b{font-family:var(--ui);font-weight:650;font-size:14px;}
+.lab-read-top span{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
+.lab-read-top small{font-size:12px;color:var(--ink-faint);font-weight:500;}
+.lab-meter{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;}
+.lab-meter i{display:block;height:100%;border-radius:99px;background:var(--court);transition:width .3s;}
+.lab-read.height .lab-meter i{background:#1F6B45;}.lab-read.time .lab-meter i{background:#3B4A9E;}.lab-read.balance .lab-meter i{background:#C98A0E;}
+.lab-read .up{color:var(--ok);font-weight:600;}.lab-read .down{color:var(--accent);font-weight:600;}
+.sk-lab{align-items:start;}
+.th-msg.card-ish.me .lab-pill{background:var(--surface);color:var(--ink-soft);}
+.th-msg.card-ish.me .lab-pill.read.height{background:#E4EFE7;color:#1F6B45;}.th-msg.card-ish.me .lab-pill.read.time{background:#E8EAF6;color:#3B4A9E;}.th-msg.card-ish.me .lab-pill.read.balance{background:#F8EDD4;color:#8A5A00;}

@@ -96,7 +96,8 @@ module.exports=function(r,ctx){
   const text=str(body.body,'reply',{required:true,max:5000}),client=uuid(body.client_id,'client_id');
   const prior=db.prepare('SELECT * FROM notes WHERE author_id=? AND client_id=?').get(user.id,client);
   if(prior){if(prior.reply_to!==n.id||prior.body!==text)throw new HttpError(409,'Reply conflict.');return {ok:true};}
-  tx(db,()=>{db.prepare("INSERT INTO notes(athlete_id,author_id,kind,visibility,body,client_id,reply_to) VALUES(?,?,'coach','shared',?,?,?)").run(n.athlete_id,user.id,text,client,n.id);db.prepare('UPDATE notes SET reviewed_at=?,reviewed_by=? WHERE id=?').run(now(),user.id,n.id);});
+  const tags=JSON.stringify(require('../lab').tags(body.tags));
+  tx(db,()=>{db.prepare("INSERT INTO notes(athlete_id,author_id,kind,visibility,body,client_id,reply_to,tags) VALUES(?,?,'coach','shared',?,?,?,?)").run(n.athlete_id,user.id,text,client,n.id,tags);db.prepare('UPDATE notes SET reviewed_at=?,reviewed_by=? WHERE id=?').run(now(),user.id,n.id);});
   return {ok:true};
  });
 };

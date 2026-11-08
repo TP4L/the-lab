@@ -6,6 +6,7 @@
    "seen" bookkeeping. */
 const { HttpError, int } = require('../http');
 const { now } = require('../db');
+const lab = require('../lab');
 
 module.exports = function (r, ctx) {
   const { db, auth } = ctx;
@@ -29,7 +30,7 @@ module.exports = function (r, ctx) {
       let type = isCoach ? (n.reply_to ? 'reply' : 'note') : 'reflection', body = n.body, title = '';
       if (!isCoach && /^Question\n/.test(body)) { type = 'question'; body = body.replace(/^Question\n/, ''); }
       else if (!isCoach && /^Video review\n/.test(body)) { type = 'video'; body = body.replace(/^Video review\n/, ''); title = 'Video for review'; }
-      items.push({ id: 'note:' + n.id, note_id: n.id, type, side: isCoach ? 'coach' : 'athlete', author: n.author || (isCoach ? 'Coach' : a.name), body, title, private: n.visibility === 'private', media_id: n.media_id || null, reply_to: n.reply_to || null, reviewed: !!n.reviewed_at, session_id: n.session_id || null, at: n.created_at, mine: viewer && n.author_id === viewer.id });
+      items.push({ id: 'note:' + n.id, note_id: n.id, type, side: isCoach ? 'coach' : 'athlete', author: n.author || (isCoach ? 'Coach' : a.name), body, title, private: n.visibility === 'private', media_id: n.media_id || null, reply_to: n.reply_to || null, reviewed: !!n.reviewed_at, session_id: n.session_id || null, tags: lab.parse(n.tags, {}), at: n.created_at, mine: viewer && n.author_id === viewer.id });
     }
     const checkins = db.prepare('SELECT * FROM pre_session_checkins WHERE athlete_id=? ORDER BY created_at DESC LIMIT 20').all(a.id);
     for (const c of checkins) {
@@ -42,7 +43,7 @@ module.exports = function (r, ctx) {
     for (const g of byDay.values()) items.push({ id: 'rating:' + g.on + ':' + g.coach, type: 'rating', side: 'coach', author: name(g.coach) || 'Coach', title: 'Skill assessment · ' + g.rows.length + ' skill' + (g.rows.length === 1 ? '' : 's'), body: g.rows.map(x => x.name + ': ' + x.rating + ' ' + SCALE[x.rating - 1].label + (x.comment ? ' — ' + x.comment : '')).join('\n'), link: coachView ? '#/skills/' + a.id : '#/skills', at: g.on < g.at.slice(0, 10) ? g.on + 'T17:00:00.000Z' : g.at });
     const goals = db.prepare('SELECT g.*, sa.name AS attribute_name FROM skill_goals g LEFT JOIN skill_attributes sa ON sa.id=g.attribute_id WHERE g.athlete_id=? ORDER BY g.created_at DESC LIMIT 40').all(a.id);
     for (const g of goals) {
-      items.push({ id: 'goal:' + g.id, type: 'goal', side: 'coach', author: name(g.coach_id) || 'Coach', title: 'New goal', body: g.title + (g.attribute_name ? ' · ' + g.attribute_name : '') + (g.note ? '\n' + g.note : ''), link: coachView ? '#/skills/' + a.id : '#/skills', at: g.created_at });
+      items.push({ id: 'goal:' + g.id, type: 'goal', side: 'coach', author: name(g.coach_id) || 'Coach', title: 'New goal', tags: { reads: lab.parse(g.reads, []) }, body: g.title + (g.attribute_name ? ' · ' + g.attribute_name : '') + (g.note ? '\n' + g.note : ''), link: coachView ? '#/skills/' + a.id : '#/skills', at: g.created_at });
       if (g.completed_at) items.push({ id: 'goal-done:' + g.id, type: 'milestone', side: 'system', title: 'Goal completed', body: g.title, link: coachView ? '#/skills/' + a.id : '#/skills', at: g.completed_at });
     }
     const sessions = db.prepare("SELECT s.id, s.title, s.status, s.started_at, s.completed_at FROM training_sessions s JOIN training_athletes ta ON ta.session_id=s.id WHERE ta.athlete_id=? AND s.status!='live' ORDER BY s.started_at DESC LIMIT 30").all(a.id);
@@ -56,7 +57,7 @@ module.exports = function (r, ctx) {
     for (const o of orders) items.push({ id: 'order:' + o.id, type: 'purchase', side: 'system', title: 'Purchase', body: o.name + ' · $' + (o.amount_cents / 100).toFixed(0), link: '#/coach/' + a.id + '/credits', at: o.paid_at, private: true });
     items.sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0));
     const unreviewed = coachView ? notes.filter(n => n.kind === 'reflection' && !n.reviewed_at).length : 0;
-    return { athlete: { id: a.id, name: a.name, user_id: a.user_id }, viewer: coachView ? 'coach' : 'athlete', items: items.slice(0, limit), unreviewed };
+    return { athlete: { id: a.id, name: a.name, user_id: a.user_id }, viewer: coachView ? 'coach' : 'athlete', items: items.slice(0, limit), unreviewed, vocab: lab.vocab() };
   }
 
   r.get('/api/athletes/:id/thread', ({ user, params, query }) => {

@@ -265,13 +265,14 @@ module.exports = function athletes(r, ctx) {
     }
     const sessionId = body.session_id ? uuid(body.session_id, 'session_id') : null;
     if (sessionId && !db.prepare('SELECT 1 FROM training_athletes WHERE session_id = ? AND athlete_id = ?').get(sessionId, a.id)) throw new HttpError(400, 'That session didn\u2019t include this athlete.');
+    const tags = JSON.stringify(require('../lab').tags(body.tags));
     // client_id makes offline retries idempotent: the same note is never saved twice.
     if (clientId) {
       const prior = db.prepare('SELECT * FROM notes WHERE author_id = ? AND client_id = ?').get(user.id, clientId);
       if (prior) return withStatus(200, prior);
     }
-    const id = Number(db.prepare('INSERT INTO notes (client_id, athlete_id, author_id, kind, visibility, body, media_id, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(clientId, a.id, user.id, kind, visibility, text, mediaId, sessionId).lastInsertRowid);
+    const id = Number(db.prepare('INSERT INTO notes (client_id, athlete_id, author_id, kind, visibility, body, media_id, session_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(clientId, a.id, user.id, kind, visibility, text, mediaId, sessionId, tags).lastInsertRowid);
     if (mediaId && visibility === 'shared') db.prepare("UPDATE media SET visibility = 'shared' WHERE id = ?").run(mediaId);
     if (kind === 'coach' && visibility === 'shared' && a.user_id) notifier.notify([a.user_id], 'feedback', `New feedback from ${user.name}`, text.slice(0, 140), '#/profile');
     return withStatus(201, db.prepare('SELECT n.*, u.name AS author FROM notes n LEFT JOIN users u ON u.id = n.author_id WHERE n.id = ?').get(id));

@@ -12,8 +12,10 @@ test('skill attributes, ratings history, deltas and goals respect coach/athlete 
   let attrs = (await p.get('/api/skill-attributes')).body;
   assert.ok(attrs.attributes.length >= 10); assert.equal(attrs.scale.length, 5);
   assert.equal((await p.post('/api/skill-attributes', { name: 'Hacks' })).status, 403);
-  const custom = (await coach.post('/api/skill-attributes', { name: 'Erne timing', category: 'Kitchen line' })).body;
-  assert.ok(custom.id);
+  const custom = (await coach.post('/api/skill-attributes', { name: 'Erne timing', category: 'Kitchen line', reads: ['time', 'balance'], level_min: 7, level_max: 13 })).body;
+  assert.ok(custom.id); assert.deepEqual(custom.reads, ['time', 'balance']); assert.equal(custom.level_min, 7);
+  assert.equal((await coach.post('/api/skill-attributes', { name: 'Bad', reads: ['luck'] })).status, 400);
+  assert.ok(attrs.attributes.find(a => a.name === 'Dinking').reads.includes('height'), 'seeded attributes carry LAB reads');
   assert.equal((await coach.post('/api/skill-attributes', { name: 'erne timing' })).status, 409);
   assert.equal((await coach.put('/api/skill-attributes/' + custom.id, { name: 'Erne & ATP timing' })).body.name, 'Erne & ATP timing');
 
@@ -59,6 +61,8 @@ test('skill attributes, ratings history, deltas and goals respect coach/athlete 
   assert.ok(done.completed_at);
   mine = (await p.get('/api/me/skills')).body;
   assert.equal(mine.summary.goals_completed, 1); assert.equal(mine.goals[0].attribute_name, 'Dinking');
+  assert.deepEqual(mine.goals[0].reads, ['height'], 'goal inherits the attribute reads');
+  assert.equal(mine.reads.height.count >= 1, true); assert.ok(mine.reads.height.avg);
 
   // Athlete was notified.
   const notes = (await p.get('/api/notifications')).body;

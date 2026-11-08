@@ -57,6 +57,7 @@ function createApp(opts = {}) {
   if (opts.jobs !== false) jobs.start();
 
   r.get('/api/health', () => ({ ok: true }));
+  r.get('/api/lab/vocab', () => require('./lab.js').vocab());
   const { MODES } = require('./formats.js');
   const { SCORING, ROUND_END } = require('./api/play.js');
   const { KINDS } = require('./api/planning.js');

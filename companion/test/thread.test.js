@@ -6,7 +6,8 @@ test('thread merges notes, replies, check-ins, assessments and goals with per-si
   const s = await start(); t.after(s.close); const { coach, coach2 } = await staff(s);
   const made = (await coach.post('/api/athletes', { name: 'Thread athlete' })).body;
   const aid = made.athlete.id, p = s.client(); await p.signup('Thread athlete', 'thread@lab.test'); await p.post('/api/claim', { code: made.claim_code });
-  await coach.post('/api/athletes/' + aid + '/notes', { body: 'Shared note', visibility: 'shared', client_id: uid() });
+  await coach.post('/api/athletes/' + aid + '/notes', { body: 'Shared note', visibility: 'shared', client_id: uid(), tags: { reads: ['height'], error: 'read', call: 'triangle' } });
+  assert.equal((await coach.post('/api/athletes/' + aid + '/notes', { body: 'x', visibility: 'shared', client_id: uid(), tags: { state: 'panic' } })).status, 400);
   await coach.post('/api/athletes/' + aid + '/notes', { body: 'Private note', visibility: 'private', client_id: uid() });
   const q = (await p.post('/api/athletes/' + aid + '/notes', { body: 'Question\nDrive or drop?', client_id: uid() })).body;
   await p.post('/api/me/pre-session-checkins', { working: 'Dinks', not_working: 'Drives', focus: 'Resets' });
@@ -20,6 +21,7 @@ test('thread merges notes, replies, check-ins, assessments and goals with per-si
   assert.ok(!mine.items.some(i => i.private), 'athlete never sees private notes');
   assert.equal(mine.items.find(i => i.type === 'rating').title, 'Skill assessment · 2 skills');
   assert.equal(mine.items.find(i => i.type === 'question').body, 'Drive or drop?');
+  const tagged = mine.items.find(i => i.body === 'Shared note'); assert.deepEqual(tagged.tags, { reads: ['height'], error: 'read', call: 'triangle' });
 
   const theirs = (await coach.get('/api/athletes/' + aid + '/thread')).body;
   assert.ok(theirs.items.some(i => i.private && i.body === 'Private note'));

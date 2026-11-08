@@ -975,7 +975,28 @@ INSERT INTO products(code,name,kind,description,price_cents,credits,credit_kind,
  ('private-10','10-lesson pack','pack','Ten private sessions at the best rate. Good for a year.',100000,10,'private',365,3,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')),
  ('group-4','Small-group 4-pack','pack','Four coached small-group sessions. Good for 90 days.',16000,4,'group',90,4,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'));
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS, INVITATIONALS_HANDOFF, SKILL_PROGRESS, SHOP_AND_CREDITS];
+
+/* LAB tags: the decision-engine vocabulary (reads, state, need, error layer,
+   call) attached to attributes, notes and goals so the system is visible
+   everywhere an athlete or coach records something. */
+const LAB_TAGS = `
+ALTER TABLE skill_attributes ADD COLUMN reads TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE skill_attributes ADD COLUMN level_min INTEGER;
+ALTER TABLE skill_attributes ADD COLUMN level_max INTEGER;
+ALTER TABLE skill_goals ADD COLUMN reads TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT '{}';
+UPDATE skill_attributes SET reads='["time"]', level_min=1, level_max=13 WHERE name='Serving & returning';
+UPDATE skill_attributes SET reads='["height"]', level_min=3, level_max=13 WHERE name='Third-shot drops';
+UPDATE skill_attributes SET reads='["height","time"]', level_min=4, level_max=13 WHERE name='Drives';
+UPDATE skill_attributes SET reads='["height"]', level_min=2, level_max=13 WHERE name='Dinking';
+UPDATE skill_attributes SET reads='["height","balance"]', level_min=5, level_max=13 WHERE name='Resets';
+UPDATE skill_attributes SET reads='["time","balance"]', level_min=6, level_max=13 WHERE name='Speed-ups & counters';
+UPDATE skill_attributes SET reads='["balance","time"]', level_min=4, level_max=13 WHERE name='Transition-zone play';
+UPDATE skill_attributes SET reads='["balance"]', level_min=1, level_max=13 WHERE name='Court positioning & movement';
+UPDATE skill_attributes SET reads='["height","time"]', level_min=5, level_max=13 WHERE name='Lobs & overheads';
+UPDATE skill_attributes SET reads='["height","time","balance"]', level_min=1, level_max=13 WHERE name='Consistency';
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS, INVITATIONALS_HANDOFF, SKILL_PROGRESS, SHOP_AND_CREDITS, LAB_TAGS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

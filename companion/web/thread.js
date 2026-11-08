@@ -3,6 +3,7 @@
 (function(){'use strict';window.LabPlugins=window.LabPlugins||[];window.LabPlugins.push(function(ctx){
  const L=window.Lab,h=L.h,api=L.api,Store=L.Store,root=()=>document.getElementById('app');
  const uid=()=>(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
+ const T=window.LabTags;
  const dayKey=v=>new Date(v).toDateString();
  const dayLabel=v=>{const d=new Date(v),t=new Date();const diff=Math.round((new Date(t.toDateString())-new Date(d.toDateString()))/86400000);return diff===0?'Today':diff===1?'Yesterday':d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:d.getFullYear()===t.getFullYear()?undefined:'numeric'});};
  const clock=v=>new Date(v).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
@@ -20,7 +21,7 @@
   const actions=[];
   if(coach&&i.side==='athlete'&&i.note_id&&(i.type==='reflection'||i.type==='question'||i.type==='video'))actions.push('<button type="button" class="th-act" data-reply="'+i.note_id+'" data-quote="'+h(i.body.slice(0,80))+'">Reply</button>');
   if(i.link&&!i.media_id&&i.type!=='note'&&i.type!=='reply'&&i.type!=='reflection')actions.push('<a class="th-act" href="'+h(i.link)+'">Open</a>');
-  return '<div class="'+cls+'" data-id="'+h(i.id)+'">'+(head?'<div class="th-head">'+head+'</div>':'')+'<div class="th-body">'+h(i.body)+'</div>'+media+'<div class="th-meta"><span>'+h(mine?'You':i.author)+'</span><time>'+h(clock(i.at))+'</time>'+(coach&&i.side==='athlete'&&i.note_id&&!i.reviewed?'<span class="th-new">New</span>':'')+actions.join('')+'</div></div>';
+  return '<div class="'+cls+'" data-id="'+h(i.id)+'">'+(head?'<div class="th-head">'+head+'</div>':'')+'<div class="th-body">'+h(i.body)+'</div>'+(i.tags&&!T.empty(i.tags)?'<div class="th-tags">'+T.pills(i.tags)+'</div>':'')+media+'<div class="th-meta"><span>'+h(mine?'You':i.author)+'</span><time>'+h(clock(i.at))+'</time>'+(coach&&i.side==='athlete'&&i.note_id&&!i.reviewed?'<span class="th-new">New</span>':'')+actions.join('')+'</div></div>';
  }
  function paint(host,d,state){
   const list=host.querySelector('#th-list');const items=d.items.filter(i=>matches(i,state.filter)).slice().reverse();
@@ -45,7 +46,8 @@
    '<div class="head-row th-headrow"><div class="head"><p class="eyebrow">'+(coach?'Thread':'Your coach')+'</p><h1>'+h(coach?first:'Thread')+'</h1></div>'+(coach&&d.unreviewed?'<button class="btn sm" type="button" id="th-seen">Mark '+d.unreviewed+' seen</button>':'')+'</div>'+
    '<div class="row th-filters">'+FILTERS.map(([k,l])=>'<button class="chip" type="button" data-filter="'+k+'" aria-pressed="'+(k==='all')+'">'+l+'</button>').join('')+'</div>'+
    '<div id="th-list" class="th-list" aria-live="polite"></div>'+
-   '<form class="th-compose" id="th-form" novalidate><div id="th-replying" class="th-replying" hidden><span></span><button type="button" class="th-act" id="th-cancel">Cancel</button></div><div class="th-row"><textarea id="th-text" rows="1" maxlength="5000" placeholder="'+(coach?'Note to '+h(first)+'…':'Message your coach…')+'" aria-label="Message"></textarea><button class="btn primary th-send" type="submit" aria-label="Send">Send</button></div>'+(coach?'<div class="row th-vis"><label class="th-toggle"><input type="checkbox" id="th-private"> <span>Private note (coach only)</span></label><span class="small muted" id="th-hint">Shared notes notify '+h(first)+'.</span></div>':'<p class="small muted">Your coach is notified. Add a pre-session check-in from <a href="#/check-in">here</a>.</p>')+'</form>';
+   '<form class="th-compose" id="th-form" novalidate><div id="th-replying" class="th-replying" hidden><span></span><button type="button" class="th-act" id="th-cancel">Cancel</button></div><div class="th-row"><textarea id="th-text" rows="1" maxlength="5000" placeholder="'+(coach?'Note to '+h(first)+'…':'Message your coach…')+'" aria-label="Message"></textarea><button class="btn primary th-send" type="submit" aria-label="Send">Send</button></div><details class="th-tagbox"><summary>Tag the read</summary>'+T.picker('th-pick',{},coach?['reads','state','need','error','call']:['reads','state'])+'</details>'+(coach?'<div class="row th-vis"><label class="th-toggle"><input type="checkbox" id="th-private"> <span>Private note (coach only)</span></label><span class="small muted" id="th-hint">Shared notes notify '+h(first)+'.</span></div>':'<p class="small muted">Your coach is notified. Add a pre-session check-in from <a href="#/check-in">here</a>.</p>')+'</form>';
+  T.setVocab(d.vocab);T.bind(host.querySelector('#th-pick'),t=>{host.querySelector('.th-tagbox summary').innerHTML=T.empty(t)?'Tag the read':'Tagged: '+T.pills(t);});
   paint(host,d,state);
   host.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.filter=b.dataset.filter;paint(host,d,state);});
   const ta=host.querySelector('#th-text');ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=Math.min(160,ta.scrollHeight)+'px';});
@@ -56,8 +58,10 @@
   host.querySelector('#th-form').onsubmit=async e=>{
    e.preventDefault();const text=ta.value.trim();if(!text)return;const send=host.querySelector('.th-send');send.disabled=true;
    try{
-    if(state.replyTo)await api.request('POST','/api/notes/'+state.replyTo.id+'/reply',{body:text,client_id:uid()});
-    else await api.request('POST','/api/athletes/'+id+'/notes',{body:text,client_id:uid(),visibility:coach?(priv&&priv.checked?'private':'shared'):'shared'});
+    const tags=T.read(host.querySelector('#th-pick'));
+    if(state.replyTo)await api.request('POST','/api/notes/'+state.replyTo.id+'/reply',{body:text,client_id:uid(),tags});
+    else await api.request('POST','/api/athletes/'+id+'/notes',{body:text,client_id:uid(),visibility:coach?(priv&&priv.checked?'private':'shared'):'shared',tags});
+    host.querySelectorAll('#th-pick .lab-chip').forEach(b=>b.setAttribute('aria-pressed','false'));host.querySelector('.th-tagbox summary').textContent='Tag the read';host.querySelector('.th-tagbox').open=false;
     ta.value='';ta.style.height='auto';state.replyTo=null;host.querySelector('#th-replying').hidden=true;
     const fresh=await api.request('GET',athleteId?'/api/athletes/'+id+'/thread':'/api/me/thread');if(!host.isConnected)return;d.items=fresh.items;d.unreviewed=fresh.unreviewed;paint(host,d,state);
    }catch(err){L.toast(err.status===0?'Offline. Try again when you have signal.':err.message);}

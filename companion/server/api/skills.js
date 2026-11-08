@@ -4,6 +4,7 @@
    history so the athlete can see how each skill has moved. */
 const { HttpError, str, int, oneOf, list } = require('../http');
 const { now, tx } = require('../db');
+const lab = require('../lab');
 
 const SCALE = [
   { value: 1, label: 'Learning', meaning: 'Knows what the shot or habit is. Succeeds sometimes in practice, rarely in games.' },
@@ -45,15 +46,20 @@ module.exports = function (r, ctx) {
     if (!partial || body.category !== undefined) out.category = str(body.category, 'category', { max: 60 });
     if (!partial || body.description !== undefined) out.description = str(body.description, 'description', { max: 400 });
     if (body.sort !== undefined) out.sort = int(body.sort, 'sort', { min: 0, max: 10000 });
+    if (body.reads !== undefined) out.reads = JSON.stringify(lab.reads(body.reads));
+    if (body.level_min !== undefined) out.level_min = lab.level(body.level_min, 'level_min');
+    if (body.level_max !== undefined) out.level_max = lab.level(body.level_max, 'level_max');
+    if (out.level_min && out.level_max && out.level_min > out.level_max) throw new HttpError(400, 'level_min must not exceed level_max.');
     return out;
   }
+  const shapeAttr = a => ({ ...a, reads: lab.parse(a.reads, []) });
   function coachName(id) { return id ? (db.prepare('SELECT name FROM users WHERE id=?').get(id) || {}).name || '' : ''; }
 
   /* ---------- attributes ---------- */
   r.get('/api/skill-attributes', ({ user, query }) => {
     auth.require(user);
     const all = query.get('all') === '1' && auth.has(user, 'coach');
-    return { attributes: db.prepare('SELECT * FROM skill_attributes ' + (all ? '' : 'WHERE archived_at IS NULL ') + 'ORDER BY sort,id').all(), scale: SCALE };
+    return { attributes: db.prepare('SELECT * FROM skill_attributes ' + (all ? '' : 'WHERE archived_at IS NULL ') + 'ORDER BY sort,id').all().map(shapeAttr), scale: SCALE, vocab: lab.vocab() };
   });
   r.post('/api/skill-attributes', ({ user, body }) => {
     auth.require(user, 'coach');
@@ -61,8 +67,8 @@ module.exports = function (r, ctx) {
     const dup = db.prepare('SELECT id FROM skill_attributes WHERE lower(name)=lower(?) AND archived_at IS NULL').get(f.name);
     if (dup) throw new HttpError(409, 'An attribute with that name already exists.');
     const sort = f.sort !== undefined ? f.sort : (db.prepare('SELECT COALESCE(MAX(sort),0)+1 AS n FROM skill_attributes').get().n);
-    const id = db.prepare('INSERT INTO skill_attributes(name,category,description,sort,created_by,created_at) VALUES(?,?,?,?,?,?)').run(f.name, f.category || '', f.description || '', sort, user.id, now()).lastInsertRowid;
-    return db.prepare('SELECT * FROM skill_attributes WHERE id=?').get(id);
+    const id = db.prepare('INSERT INTO skill_attributes(name,category,description,sort,reads,level_min,level_max,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)').run(f.name, f.category || '', f.description || '', sort, f.reads || '[]', f.level_min || null, f.level_max || null, user.id, now()).lastInsertRowid;
+    return shapeAttr(db.prepare('SELECT * FROM skill_attributes WHERE id=?').get(id));
   });
   r.put('/api/skill-attributes/:id', ({ user, params, body }) => {
     auth.require(user, 'coach');
@@ -70,7 +76,7 @@ module.exports = function (r, ctx) {
     if (body.archived !== undefined) f.archived_at = body.archived ? (a.archived_at || now()) : null;
     const keys = Object.keys(f);
     if (keys.length) db.prepare('UPDATE skill_attributes SET ' + keys.map(k => k + '=?').join(',') + ' WHERE id=?').run(...keys.map(k => f[k]), a.id);
-    return db.prepare('SELECT * FROM skill_attributes WHERE id=?').get(a.id);
+    return shapeAttr(db.prepare('SELECT * FROM skill_attributes WHERE id=?').get(a.id));
   });
 
   /* ---------- athlete view ---------- */
@@ -85,16 +91,19 @@ module.exports = function (r, ctx) {
     const skills = [...attributes, ...extra].map(x => {
       const h = byAttr.get(x.id) || [];
       const latest = h[0] || null, previous = h[1] || null;
-      return { id: x.id, name: x.name, category: x.category, description: x.description, archived: !!x.archived_at, latest, previous, delta: latest && previous ? latest.rating - previous.rating : null, history: h };
+      return { id: x.id, name: x.name, category: x.category, description: x.description, reads: lab.parse(x.reads, []), level_min: x.level_min, level_max: x.level_max, archived: !!x.archived_at, latest, previous, delta: latest && previous ? latest.rating - previous.rating : null, history: h };
     });
     const assessed = skills.filter(s => s.latest);
+    // The LAB lens: how each read is holding up, averaged across the assessed attributes mapped to it.
+    const readSummary = {};
+    for (const r of lab.READS) { const rows = assessed.filter(s => s.reads.includes(r)); readSummary[r] = { label: lab.LABELS.reads[r], count: rows.length, avg: rows.length ? Math.round(rows.reduce((a, s) => a + s.latest.rating, 0) / rows.length * 10) / 10 : null, trend: rows.reduce((a, s) => a + (s.delta || 0), 0) }; }
     const goals = db.prepare("SELECT g.*, sa.name AS attribute_name FROM skill_goals g LEFT JOIN skill_attributes sa ON sa.id=g.attribute_id WHERE g.athlete_id=? ORDER BY CASE g.status WHEN 'in_progress' THEN 0 WHEN 'not_started' THEN 1 ELSE 2 END, COALESCE(g.target_on,'9999'), g.id").all(a.id)
-      .map(g => ({ id: g.id, title: g.title, note: g.note, status: g.status, target_on: g.target_on || '', completed_at: g.completed_at || '', attribute_id: g.attribute_id, attribute_name: g.attribute_name || '', coach: coachName(g.coach_id), created_at: g.created_at }));
+      .map(g => ({ id: g.id, title: g.title, note: g.note, status: g.status, target_on: g.target_on || '', completed_at: g.completed_at || '', attribute_id: g.attribute_id, attribute_name: g.attribute_name || '', reads: lab.parse(g.reads, []), coach: coachName(g.coach_id), created_at: g.created_at }));
     return {
       athlete: { id: a.id, name: a.name },
       viewer: viewerIsCoach ? 'coach' : 'athlete',
       summary: { assessed: assessed.length, improved_last: assessed.filter(s => s.delta > 0).length, slipped_last: assessed.filter(s => s.delta < 0).length, unassessed: skills.filter(s => !s.latest && !s.archived).length, goals_open: goals.filter(g => g.status !== 'completed').length, goals_completed: goals.filter(g => g.status === 'completed').length, last_rated_on: assessed.map(s => s.latest.rated_on).sort().pop() || '' },
-      skills, goals, scale: SCALE
+      skills, goals, scale: SCALE, reads: readSummary, vocab: lab.vocab()
     };
   }
   r.get('/api/me/skills', ({ user }) => {
@@ -145,12 +154,14 @@ module.exports = function (r, ctx) {
     if (body.attribute_id !== undefined) f.attribute_id = body.attribute_id ? attr(body.attribute_id).id : null;
     if (body.target_on !== undefined) f.target_on = day(body.target_on, 'Target date', true) || null;
     if (body.status !== undefined) f.status = oneOf(body.status, GOAL_STATUS, 'status');
+    if (body.reads !== undefined) f.reads = JSON.stringify(lab.reads(body.reads));
     return f;
   }
   r.post('/api/athletes/:id/skill-goals', ({ user, params, body }) => {
     const a = coachOf(user, params.id), f = goalFields(body);
-    const id = db.prepare('INSERT INTO skill_goals(athlete_id,attribute_id,title,note,status,target_on,coach_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
-      .run(a.id, f.attribute_id || null, f.title, f.note || '', f.status || 'not_started', f.target_on || null, user.id, now(), now()).lastInsertRowid;
+    const inheritReads = f.reads === undefined && f.attribute_id ? (attr(f.attribute_id).reads || '[]') : null;
+    const id = db.prepare('INSERT INTO skill_goals(athlete_id,attribute_id,title,note,status,target_on,reads,coach_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .run(a.id, f.attribute_id || null, f.title, f.note || '', f.status || 'not_started', f.target_on || null, f.reads || inheritReads || '[]', user.id, now(), now()).lastInsertRowid;
     notifier.notify(notifier.usersOfAthletes([a.id]), 'feedback', `New goal from ${user.name}: ${f.title}`, 'Open My Progress to see it alongside your skills.', '#/skills');
     return db.prepare('SELECT * FROM skill_goals WHERE id=?').get(id);
   });

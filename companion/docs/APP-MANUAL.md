@@ -145,6 +145,10 @@ Every athlete has one thread: coach notes and replies, the athlete's reflections
 - Filters: Messages, Check-ins, Assessments, Activity. Items that live elsewhere (a check-in, an assessment, a session) link out with Open.
 - Review items on Coach Today now open the thread.
 
+## LAB tags
+
+The decision-engine vocabulary runs through the app. Every skill attribute is mapped to the read it depends on (Height, Time, Balance) and a LAB level band (1–13); goals inherit the reads of their skill; notes and replies in the thread can be tagged with a read, state, need, error layer and call. My Progress opens with "The LAB lens": the athlete's average rating per read across the skills mapped to it, with the trend since the last assessment. Coaches set reads and level bands on Coaching tools → Skill attributes.
+
 ## Membership
 
 Membership and paywall controls are built in but not activated for general use. Current access should remain complimentary until the business is ready to turn billing on. Admins can view an athlete’s membership state without charging them.
