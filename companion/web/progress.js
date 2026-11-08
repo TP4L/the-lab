@@ -46,10 +46,10 @@
   const me=ctx.me(),first=me?.user?.name?.split(' ')[0]||'';
   const hour=new Date().getHours(),hi=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
   host.innerHTML=ctx.head(hi,first,'')+'<p role="status" class="muted small">Checking your program…</p>';
-  const [blocks,assignments,site,measurements,home,learning]=await Promise.allSettled([
+  const [blocks,assignments,site,measurements,home,learning,credits]=await Promise.allSettled([
    api.get('/api/me/development-blocks'),api.get('/api/me/assignments'),api.request('GET','/api/site-bridge/feed'),
    me?.athlete_id ? api.get('/api/athletes/'+me.athlete_id+'/progress') : Promise.resolve(null),
-   api.get('/api/home'),api.get('/api/me/learning')
+   api.get('/api/home'),api.get('/api/me/learning'),api.request('GET','/api/me/credits')
   ]);
   if(!host.isConnected)return;
   const rows=blocks.value||[], rank={ready_retest:0,in_progress:1,assigned:2};
@@ -80,7 +80,7 @@
    (item.cue?'<p>'+h(item.cue)+'</p>':'')+(b?.previous_feedback?'<p><b>From your coach</b><br>'+h(b.previous_feedback)+'</p>':'')+(item.target?'<p><b>How to score it</b><br>'+h(item.target)+'</p>':'')+(item.meta?'<p class="small">'+h(item.meta)+'</p>':'')+
    '<div class="row"><a class="btn primary" href="'+h(item.href)+'">'+h(item.action)+'</a>'+(more>0?'<span class="small today-more">+'+more+' more assigned</span>':'')+'</div></article>'+
    (d?.to_confirm?'<div class="banner"><span>'+d.to_confirm+' match score'+(d.to_confirm>1?'s need':' needs')+' your confirmation.</span><a class="btn sm primary" href="#/play">Review</a></div>':'')+
-   '<nav class="quick" aria-label="Athlete sections"><a href="#/programs"><b>My program</b><span>Blocks, weeks, retests</span></a><a href="#/train"><b>Training</b><span>Assignments and sessions</span></a><a href="#/skills"><b>My progress</b><span>Skill ratings and goals</span></a><a href="#/progress"><b>Measurements</b><span>Tests'+(retest?' · retest '+h(retest):'')+'</span></a><a href="#/check-in"><b>Pre-session check-in</b><span>Tell your coach what you need</span></a><a href="#/play/match/new"><b>Record a match</b><span>Score, partners, result</span></a><a href="#/timeline"><b>Player timeline</b><span>Sessions · videos · notes</span></a></nav>'+
+   '<nav class="quick" aria-label="Athlete sections"><a href="#/programs"><b>My program</b><span>Blocks, weeks, retests</span></a><a href="#/train"><b>Training</b><span>Assignments and sessions</span></a><a href="#/skills"><b>My progress</b><span>Skill ratings and goals</span></a><a href="#/progress"><b>Measurements</b><span>Tests'+(retest?' · retest '+h(retest):'')+'</span></a><a href="#/check-in"><b>Pre-session check-in</b><span>Tell your coach what you need</span></a><a href="#/play/match/new"><b>Record a match</b><span>Score, partners, result</span></a><a href="#/timeline"><b>Player timeline</b><span>Sessions · videos · notes</span></a><a href="#/shop"><b>Sessions & packs</b><span>'+h(credits.value&&credits.value.balance&&credits.value.balance.total?credits.value.balance.total+' credit'+(credits.value.balance.total===1?'':'s')+' on your account':'Buy sessions, see your credits')+'</span></a></nav>'+
    ([blocks,assignments].some(r=>r.status==='rejected')?'<p role="status" class="small">Some app assignments could not load. <button class="btn sm" id="practiceRetry">Retry</button></p>':'')+
    (site.status==='rejected'?'<p class="small muted"><a href="#/website">Check website coaching connection</a></p>':'')+
    (d?'<div class="stack">'+title('Upcoming play','#/play/events','All events')+list(upcoming.slice(0,4).map(e=>ctx.eventRow(Object.assign({},e,{my_state:e.state}))).join(''),'No upcoming events. <a href="#/play/events">Browse events</a>.')+'</div>'+

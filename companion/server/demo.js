@@ -76,6 +76,9 @@ async function seedDemo(base) {
   await host.post(`/api/athletes/${jordan}/skill-goals`, { title: 'Split-step before every opponent contact', attribute_id: byName['Court positioning & movement'], status: 'in_progress' });
   const doneGoal = await host.post(`/api/athletes/${jordan}/skill-goals`, { title: 'Land 5 of 10 third-shot drops in a game', attribute_id: byName['Third-shot drops'] });
   await host.put(`/api/skill-goals/${doneGoal.id}`, { status: 'completed' });
+  /* ---------- shop: a pack bought courtside, two sessions used ---------- */
+  const shop = (await host.get('/api/shop')).products, pack5 = shop.find(x => x.code === 'private-5');
+  if (pack5) { await host.post(`/api/athletes/${jordan}/credits`, { product_id: pack5.id, source: 'venmo', note: 'Paid after Tuesday session' }); await host.post(`/api/athletes/${jordan}/credits/redeem`, { session_id: 'demo-s1', reason: 'Private · drops' }); await host.post(`/api/athletes/${jordan}/credits/redeem`, { session_id: 'demo-s2', reason: 'Private · transition' }); }
   const tpl = await host.post('/api/templates', { name: 'Kitchen line basics', items: [{ name: 'Cross-court dinks', measure: 'reps', target: 20 }, { name: 'Third-shot drops', measure: 'reps', target: 15 }, { name: 'Reset from transition', measure: 'feel' }] });
   await host.post(`/api/athletes/${jordan}/assignments`, { template_id: tpl.id, title: 'Kitchen line basics, twice this week', due_on: at(5).slice(0, 10), note: 'Twenty good dinks before moving on.' });
   const sid = crypto.randomUUID();

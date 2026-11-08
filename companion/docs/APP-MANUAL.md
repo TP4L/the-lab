@@ -126,6 +126,16 @@ Coaches rate each athlete on a set of skill attributes from 1 to 5 (Learning, De
 - Attributes (the skills being rated) are managed by coaches at Coaching tools → Skill attributes. Add new ones, rename, or retire. Retired attributes keep their past ratings visible.
 - The athlete is notified when ratings are saved, a goal is added, or a goal is completed.
 
+## Shop, packs and credits
+
+Athletes buy private sessions and packs at `#/shop`. Each product grants credits (private, small-group or flexible) that sit on the athlete's account with an optional expiry. Online payment runs through Stripe Checkout as a one-off charge and credits are added only after the verified webhook confirms payment. A pack purchase never changes LAB Essentials membership.
+
+- Coaches manage products at Coaching tools → Products & pricing (name, type, price, credits, expiry, optional Stripe Price ID). Hidden products stay on the books for past orders.
+- From an athlete's Credits page a coach checks off a session (one tap, one credit), records a sale paid by cash, Venmo, Zelle or comp, or adjusts credits with a reason. Every change is in the ledger.
+- Sales shows revenue, orders by product and credits outstanding for 30, 90 or 365 days.
+- `#/join` is the public entry: Field Notes (free) → LAB Essentials ($8/month) → coaching packs. Signed-out visitors to Field Notes see a Join banner.
+- Athletes are notified when a payment lands, when a coach records a sale, and when they are down to one credit.
+
 ## Membership
 
 Membership and paywall controls are built in but not activated for general use. Current access should remain complimentary until the business is ready to turn billing on. Admins can view an athlete’s membership state without charging them.

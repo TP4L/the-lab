@@ -917,7 +917,65 @@ INSERT INTO skill_attributes(name,category,description,sort) VALUES
  ('Lobs & overheads','Finishing','Using the lob on purpose, and putting overheads away.',9),
  ('Consistency','Mindset','Unforced errors under pressure and the ability to stay in the point.',10);
 `;
-const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS, INVITATIONALS_HANDOFF, SKILL_PROGRESS];
+
+/* Shop: coach-defined products (lesson packs, single sessions, event fees),
+   one-off Stripe checkout, and a credit ledger per athlete. */
+const SHOP_AND_CREDITS = `
+CREATE TABLE products(
+  id INTEGER PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK(kind IN ('pack','single','event','other')),
+  description TEXT NOT NULL DEFAULT '',
+  price_cents INTEGER NOT NULL CHECK(price_cents >= 0),
+  credits INTEGER NOT NULL DEFAULT 0 CHECK(credits >= 0),
+  credit_kind TEXT NOT NULL DEFAULT 'private' CHECK(credit_kind IN ('private','group','any')),
+  expires_days INTEGER,
+  stripe_price_id TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE orders(
+  id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  athlete_id INTEGER REFERENCES athletes(id) ON DELETE SET NULL,
+  product_id INTEGER NOT NULL REFERENCES products(id),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','cancelled','refunded')),
+  amount_cents INTEGER NOT NULL,
+  source TEXT NOT NULL DEFAULT 'stripe',
+  stripe_session_id TEXT,
+  stripe_payment_intent TEXT,
+  note TEXT NOT NULL DEFAULT '',
+  recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  paid_at TEXT
+);
+CREATE INDEX orders_user ON orders(user_id,created_at);
+CREATE INDEX orders_status ON orders(status,paid_at);
+CREATE TABLE credit_ledger(
+  id INTEGER PRIMARY KEY,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  delta INTEGER NOT NULL,
+  credit_kind TEXT NOT NULL DEFAULT 'private' CHECK(credit_kind IN ('private','group','any')),
+  reason TEXT NOT NULL DEFAULT '',
+  ref_type TEXT NOT NULL DEFAULT 'manual' CHECK(ref_type IN ('purchase','session','manual','expire','event','adjust')),
+  ref_id TEXT,
+  order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  expires_at TEXT,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX credit_ledger_athlete ON credit_ledger(athlete_id,created_at);
+INSERT INTO products(code,name,kind,description,price_cents,credits,credit_kind,expires_days,sort,created_at,updated_at) VALUES
+ ('private-1','Private lesson','single','One 60-minute private session on court with your coach.',12000,1,'private',90,1,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ ('private-5','5-lesson pack','pack','Five private sessions. Book them as you go; they stay good for six months.',55000,5,'private',180,2,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ ('private-10','10-lesson pack','pack','Ten private sessions at the best rate. Good for a year.',100000,10,'private',365,3,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ ('group-4','Small-group 4-pack','pack','Four coached small-group sessions. Good for 90 days.',16000,4,'group',90,4,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+`;
+const MIGRATIONS = [SCHEMA, PLAY, JOBS, LEARN, COACHING, TEAMS, DEVICES, EVENT_DESK, PLANNING, HOST_CONTROLS, WEBSITE_CONNECTION, WEBSITE_IDENTITY, WEBSITE_STAFF, ATHLETE_MEASUREMENTS, DEVELOPMENT_RECORDS, PADEL_JOURNAL, DEVELOPMENT_BLOCKS, DEVELOPMENT_BLOCK_AUTOMATION, DEVELOPMENT_LIBRARY_AND_BILLING, MEMBERSHIP_ACCESS_HISTORY, WEBSITE_ATHLETE_ROSTER, DEVELOPMENT_DELIVERY, PRE_SESSION_CHECKINS, NOTIFICATION_DELIVERY, COURTSIDE_DEVELOPMENT, LESSON_PROGRAMS, INVITATIONALS_HANDOFF, SKILL_PROGRESS, SHOP_AND_CREDITS];
 
 function open(file) {
   const db = new DatabaseSync(file || ':memory:');

@@ -77,6 +77,7 @@ function createApp(opts = {}) {
   require('./api/play.js')(r, ctx);
   require('./api/learn.js')(r, ctx);
   require('./api/billing.js')(r, ctx);
+  require('./api/shop.js')(r, ctx);
   require('./api/coaching.js')(r, ctx);
   require('./api/development.js')(r, ctx);
   require('./api/checkins.js')(r, ctx);

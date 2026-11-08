@@ -20,8 +20,10 @@ function stripeClient(key) {
   return new Client(key, { apiVersion: '2026-08-26.dahlia' });
 }
 
-module.exports = function billing(r, { db, auth, config, stripeClient: supplied }) {
+module.exports = function billing(r, ctx) {
+  const { db, auth, config, stripeClient: supplied } = ctx;
   const stripe = supplied || stripeClient(config.stripeKey);
+  ctx.stripe = stripe; ctx.billingHooks = ctx.billingHooks || [];
   const enabled = !!(stripe && config.stripePriceEssentials && config.stripeWebhookSecret);
   const current = user => user && db.prepare('SELECT * FROM memberships WHERE user_id = ?').get(user.id);
   const publicPlan = { code: 'essentials', name: 'LAB Essentials', price: 8, interval: 'month' };
@@ -68,6 +70,7 @@ module.exports = function billing(r, { db, auth, config, stripeClient: supplied 
   }
   function setMembership(event) {
     const obj = event.data.object || {};
+    if (obj.metadata && obj.metadata.lab_kind === 'order') return; // one-off shop purchases never touch membership
     const customer = customerId(obj);
     let userId = customer && db.prepare('SELECT user_id FROM memberships WHERE stripe_customer_id = ?').get(customer);
     if (!userId && event.type.startsWith('checkout.session.') && obj.client_reference_id) userId = { user_id: Number(obj.client_reference_id) };
@@ -95,6 +98,7 @@ module.exports = function billing(r, { db, auth, config, stripeClient: supplied 
     if (db.prepare('SELECT 1 FROM billing_events WHERE id = ?').get(event.id)) return { received: true, duplicate: true };
     tx(db, () => {
       if (event.type.startsWith('checkout.session.') || event.type.startsWith('customer.subscription.') || event.type === 'invoice.paid' || event.type === 'invoice.payment_failed') setMembership(event);
+      for (const hook of ctx.billingHooks) hook(event);
       db.prepare('INSERT INTO billing_events (id,event_type) VALUES (?,?)').run(event.id, event.type);
     });
     return { received: true };
