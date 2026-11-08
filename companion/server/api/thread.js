@@ -66,7 +66,7 @@ module.exports = function (r, ctx) {
   });
   r.get('/api/me/thread', ({ user, query }) => {
     auth.require(user);
-    const id = auth.ownAthleteId(user); if (!id) throw new HttpError(404, 'Connect an athlete profile first.');
+    const id = auth.ensureOwnAthleteId(user);
     return build(db.prepare('SELECT * FROM athletes WHERE id=?').get(id), 'self', user, Math.min(300, Math.max(20, Number(query.get('limit')) || 120)));
   });
   // Coach has read the athlete's messages: clears them from the review queue without a reply.

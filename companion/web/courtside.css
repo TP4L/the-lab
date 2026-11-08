@@ -305,7 +305,7 @@
 .lab-pill.read{text-transform:uppercase;letter-spacing:.06em;}
 .lab-pill.read.height{background:#E4EFE7;color:#1F6B45;}
 .lab-pill.read.time{background:#E8EAF6;color:#3B4A9E;}
-.lab-pill.read.balance{background:#F8EDD4;color:#8A5A00;}
+.lab-pill.read.balance{background:#F6E3DA;color:#8F3A22;}
 .lab-pill.state{background:var(--court-soft);color:var(--court);}
 .lab-pill.need{background:var(--surface-3);color:var(--ink);}
 .lab-pill.error{background:var(--accent-soft);color:var(--accent);}
@@ -339,11 +339,11 @@
 .lab-read-top small{font-size:12px;color:var(--ink-faint);font-weight:500;}
 .lab-meter{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;}
 .lab-meter i{display:block;height:100%;border-radius:99px;background:var(--court);transition:width .3s;}
-.lab-read.height .lab-meter i{background:#1F6B45;}.lab-read.time .lab-meter i{background:#3B4A9E;}.lab-read.balance .lab-meter i{background:#C98A0E;}
+.lab-read.height .lab-meter i{background:#1F6B45;}.lab-read.time .lab-meter i{background:#3B4A9E;}.lab-read.balance .lab-meter i{background:#B5472B;}
 .lab-read .up{color:var(--ok);font-weight:600;}.lab-read .down{color:var(--accent);font-weight:600;}
 .sk-lab{align-items:start;}
 .th-msg.card-ish.me .lab-pill{background:var(--surface);color:var(--ink-soft);}
-.th-msg.card-ish.me .lab-pill.read.height{background:#E4EFE7;color:#1F6B45;}.th-msg.card-ish.me .lab-pill.read.time{background:#E8EAF6;color:#3B4A9E;}.th-msg.card-ish.me .lab-pill.read.balance{background:#F8EDD4;color:#8A5A00;}
+.th-msg.card-ish.me .lab-pill.read.height{background:#E4EFE7;color:#1F6B45;}.th-msg.card-ish.me .lab-pill.read.time{background:#E8EAF6;color:#3B4A9E;}.th-msg.card-ish.me .lab-pill.read.balance{background:#F6E3DA;color:#8F3A22;}
 
 /* ---------- progress reports ---------- */
 .rp-paper{padding:clamp(20px,4vw,40px);gap:22px;}
@@ -456,3 +456,5 @@
 .dev-hero .dev-kicker{color:var(--court-light) !important;}
 .dev-hero .dev-read b{color:var(--court-light) !important;}
 .dev-hero::after,.dev-hero::before{opacity:.25;}
+.record-actions{gap:6px;margin-bottom:4px;}
+.record-actions .btn{min-height:38px;}

@@ -66,8 +66,17 @@ module.exports=function(r,ctx){
   const events=db.prepare("SELECT id,title,starts_at,location,status FROM events WHERE status IN ('published','live') AND substr(starts_at,1,10)<=? ORDER BY starts_at LIMIT 50").all(through).filter(e=>e.status==='live'||e.starts_at.slice(0,10)>=today()).map(e=>({
    id:'event:'+e.id,recordId:e.id,name:'Event',title:e.title,detail:e.location||'Location to be confirmed',due:e.starts_at,at:e.starts_at,kind:'event',priority:e.status==='live'||e.starts_at.slice(0,10)===today()?'today':'soon',source:'app'
   }));
+  const drafts=db.prepare("SELECT b.id,b.athlete_id,b.title,b.updated_at,a.name FROM development_blocks b JOIN athletes a ON a.id=b.athlete_id WHERE b.draft=1 AND b.assigned_by=? ORDER BY b.updated_at DESC").all(user.id).filter(x=>ids.has(x.athlete_id)).map(x=>({
+   id:'draft:'+x.id,recordId:x.id,athleteId:x.athlete_id,name:x.name,title:'Draft to share: '+x.title,detail:'Approve to share this practice, or keep editing.',at:x.updated_at,kind:'draft',priority:'review',source:'app'
+  }));
+  const cutoff=new Date(Date.now()-45*86400000).toISOString().slice(0,10);
+  const lastRated=new Map(db.prepare('SELECT athlete_id,MAX(rated_on) AS d FROM skill_ratings GROUP BY athlete_id').all().map(x=>[x.athlete_id,x.d]));
+  const recentlyActive=new Set(db.prepare("SELECT DISTINCT athlete_id FROM capture_players p JOIN captures c ON c.id=p.capture_id WHERE c.occurred_on>=? UNION SELECT DISTINCT ta.athlete_id FROM training_athletes ta JOIN training_sessions s ON s.id=ta.session_id WHERE s.started_at>=?").all(cutoff,cutoff+'T00:00:00.000Z').map(x=>x.athlete_id));
+  const assessmentsDue=athletes.filter(a=>recentlyActive.has(a.id)&&(!lastRated.get(a.id)||lastRated.get(a.id)<cutoff)).map(a=>({
+   id:'assessment:'+a.id,recordId:a.id,athleteId:a.id,name:a.name,title:lastRated.get(a.id)?'Assessment due · last rated '+lastRated.get(a.id):'First skill assessment',detail:'Trained recently; no rating in 45 days.',at:now(),kind:'assessment',priority:'open',source:'app'
+  }));
   const coaches=db.prepare('SELECT id,name,email,roles FROM users ORDER BY name').all().map(u=>auth.userRow(u)).filter(u=>u.roles.includes('coach')).map(u=>({id:u.id,name:u.name,email:u.email}));
-  return {viewer:{id:user.id,name:user.name,email:user.email},athletes,coaches,items:[...notes,...development,...assignments,...tasks,...retests,...sessions,...events],checkedAt:now(),window:{today:today(),through}};
+  return {viewer:{id:user.id,name:user.name,email:user.email},athletes,coaches,items:[...notes,...drafts,...development,...assignments,...tasks,...retests,...assessmentsDue,...sessions,...events],checkedAt:now(),window:{today:today(),through}};
  });
  r.get('/api/coach/followups',({user})=>{
   auth.require(user,'coach');

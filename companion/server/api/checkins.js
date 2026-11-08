@@ -25,8 +25,7 @@ module.exports = function checkins(r, { db, auth, notifier }) {
   });
   r.post('/api/me/pre-session-checkins', ({ user, body }) => {
     auth.require(user);
-    const aid = auth.ownAthleteId(user);
-    if (!aid) throw new HttpError(409, 'Connect your athlete profile before sending a check-in.');
+    const aid = auth.ensureOwnAthleteId(user);
     const media = body.media_id ? db.prepare('SELECT id, athlete_id FROM media WHERE id = ?').get(str(body.media_id, 'media_id', { max: 80 })) : null;
     if (body.media_id && (!media || media.athlete_id !== aid)) throw new HttpError(400, 'That upload is not connected to your profile.');
     const fields = [

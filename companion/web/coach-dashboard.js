@@ -24,6 +24,8 @@
     if(item.kind==='event')return '#/play/events/'+item.recordId;
     if(item.kind==='session')return '#/train/'+item.recordId;
     if(item.kind==='development')return '#/development/'+item.recordId;
+    if(item.kind==='draft')return '#/coach/practices/'+item.recordId;
+    if(item.kind==='assessment')return '#/coach/'+item.recordId+'/skills/rate';
     if(item.kind==='review'&&item.athleteId)return '#/coach/'+item.athleteId+'/thread';
     return item.athleteId?'#/coach/'+item.athleteId:'#/coach/today';
    }

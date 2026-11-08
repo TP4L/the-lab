@@ -113,8 +113,7 @@ module.exports = function (r, ctx) {
   }
   r.get('/api/me/skills', ({ user }) => {
     auth.require(user);
-    const id = auth.ownAthleteId(user);
-    if (!id) throw new HttpError(404, 'Connect an athlete profile first.');
+    const id = auth.ensureOwnAthleteId(user);
     return progress(db.prepare('SELECT * FROM athletes WHERE id=?').get(id), false);
   });
   r.get('/api/athletes/:id/skills', ({ user, params }) => { const a = athlete(user, params.id); return progress(a.row, a.level === 'coach'); });

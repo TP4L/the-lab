@@ -100,3 +100,18 @@ test('practice: private draft with coach context, approve shares to the intended
   assert.equal(sk.change, 'same'); assert.equal(sk.latest.setting_label, 'Lesson'); assert.equal(sk.history[1].setting_label, 'Conditioned play'); assert.ok(sk.latest.coach);
   assert.equal(after.summary.reassessed, 1); assert.equal(after.summary.baselines, 0); assert.equal(after.summary.same_last, 1);
 });
+
+test('first-time member can save a check-in and open the thread without a pre-existing profile', async t => {
+  const s = await start(); t.after(s.close); await staff(s);
+  const p = s.client(); await p.signup('Brand New', 'new@lab.test');
+  assert.equal((await p.get('/api/me')).body.athlete_id, null);
+  const r = await p.post('/api/me/pre-session-checkins', { working: 'Dinks', not_working: 'Serves', focus: 'Resets' });
+  assert.equal(r.status, 201);
+  const me = (await p.get('/api/me')).body; assert.ok(me.athlete_id, 'own athlete record created on first save');
+  assert.equal((await p.get('/api/me/thread')).body.athlete.id, me.athlete_id);
+  assert.equal((await p.get('/api/me/skills')).body.summary.assessed, 0);
+  // No merging by name: another user with the same name gets a separate record.
+  const q = s.client(); await q.signup('Brand New', 'new2@lab.test');
+  await q.post('/api/me/pre-session-checkins', { working: 'a', not_working: 'b', focus: 'c' });
+  assert.notEqual((await q.get('/api/me')).body.athlete_id, me.athlete_id);
+});

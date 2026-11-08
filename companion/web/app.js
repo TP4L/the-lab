@@ -227,7 +227,7 @@
   /* ================= PRE-SESSION CHECK-IN ================= */
   var CHECKIN_STATUS = { submitted: 'Coach review', planned: 'Plan ready', complete: 'Complete' };
   views.preSessionCheckin = function () {
-    if (!ME.athlete_id) return forbidden('Connect an athlete profile to send a pre-session check-in.');
+    // First-time members can send a check-in before a profile exists: the server creates their own record on first save.
     return api.get('/api/me/pre-session-checkins').then(function (rows) {
       app.innerHTML = '<a class="back" href="#/">← Home</a>' + head('Before your session', 'What should we work on?', 'Three quick answers give your coach a useful starting point before you arrive.') +
         '<form class="card form" id="checkinf" novalidate>' +
@@ -248,7 +248,7 @@
           var prog = $('#checkinprog'); prog.hidden = false; $('#checkinprogt').textContent = 'Uploading ' + file.name;
           work = api.upload(file, 'athlete_id=' + ME.athlete_id + '&visibility=shared', function (x) { $('i', prog).style.width = Math.round(x * 100) + '%'; $('#checkinprogt').textContent = Math.round(x * 100) + '%'; }).then(function (m) { return m.id; });
         }
-        work.then(send).then(function () { L.toast('Sent to your coach'); route(); }, function (err) { L.formError($('#checkinf'), err.status === 0 ? 'Check-ins need a connection. Your answers are still here.' : err.message); });
+        work.then(send).then(function () { L.toast('Sent to your coach'); return ME.athlete_id ? null : api.get('/api/me').then(function (m) { setMe(m); }).catch(function () {}); }).then(function () { route(); }, function (err) { L.formError($('#checkinf'), err.status === 0 ? 'Check-ins need a connection. Your answers are still here.' : err.message); });
       });
     });
   };

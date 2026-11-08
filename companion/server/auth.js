@@ -101,6 +101,14 @@ function createAuth(db, { secureCookies = false } = {}) {
     const r = db.prepare('SELECT id FROM athletes WHERE user_id = ?').get(user.id);
     return r ? r.id : null;
   }
+  /* First-time members can save without a pre-existing profile: create their own
+     athlete record on first use. It is never merged with anyone by name; a coach
+     maps it to a website record explicitly if one exists. */
+  function ensureOwnAthleteId(user) {
+    const id = ownAthleteId(user);
+    if (id) return id;
+    return Number(db.prepare('INSERT INTO athletes (user_id, name, created_by) VALUES (?, ?, ?)').run(user.id, user.name || 'Member', user.id).lastInsertRowid);
+  }
   /* Coaches see athletes they're assigned to; admins see everyone. */
   function coachesAthlete(user, athleteId) {
     if (!user) return false;
@@ -116,7 +124,7 @@ function createAuth(db, { secureCookies = false } = {}) {
     return null;
   }
 
-  return { userRow, startSession, endSession, currentUser, has, require, ownAthleteId, coachesAthlete, athleteAccess };
+  return { userRow, startSession, endSession, currentUser, has, require, ownAthleteId, ensureOwnAthleteId, coachesAthlete, athleteAccess };
 }
 
 module.exports = { ROLES, hashPassword, verifyPassword, sha256, token, claimCode, normalizeCode, limiter, createAuth };

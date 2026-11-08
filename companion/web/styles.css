@@ -7,15 +7,15 @@
    ===================================================================== */
 :root{
   /* neutrals: warm paper */
-  --ground:#F4F3EF;
-  --surface:#FFFFFF;
-  --surface-2:#ECEBE6;
-  --surface-3:#E3E1DB;
-  --ink:#15191E;
-  --ink-soft:#5B6470;
-  --ink-faint:#7B8491;
-  --rule:#DCDAD3;
-  --rule-soft:#E9E7E1;
+  --ground:#F5F1E8;
+  --surface:#FFFDF8;
+  --surface-2:#EEE8DC;
+  --surface-3:#E4DCCD;
+  --ink:#1B1A17;
+  --ink-soft:#5E5A52;
+  --ink-faint:#7E7A70;
+  --rule:#DDD6C8;
+  --rule-soft:#EAE4D8;
 
   /* brand */
   --court:#123D34;
@@ -23,10 +23,10 @@
   --court-ink:#F6F7F1;
   --court-light:#D9F39B;
   --court-soft:#E4EFE7;
-  --accent:#C8322C;
+  --accent:#B5472B;
   --accent-ink:#FFFFFF;
-  --accent-soft:#FBE7E5;
-  --accent-on-ink:#FF8A7E;
+  --accent-soft:#F6E3DA;
+  --accent-on-ink:#F09672;
 
   /* status */
   --ok:#1F6B45;
@@ -59,7 +59,7 @@
     --ink:#ECEEF1; --ink-soft:#A3ACB8; --ink-faint:#8791A0;
     --rule:#2A313B; --rule-soft:#222932;
     --court:#17493D; --court-deep:#0F352D; --court-soft:#1A2E28;
-    --accent:#FF6E60; --accent-ink:#1A0F0D; --accent-soft:#3A2320; --accent-on-ink:#FF8A7E;
+    --accent:#F08A66; --accent-ink:#1A0F0D; --accent-soft:#3A2620; --accent-on-ink:#F09672;
     --ok:#6FCF97; --ok-soft:#1C3026; --warn:#E8B45A; --warn-soft:#352A16;
     --shadow-1:0 1px 2px rgba(0,0,0,.35); --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 32px -20px rgba(0,0,0,.7); --shadow-3:0 2px 6px rgba(0,0,0,.4), 0 24px 56px -28px rgba(0,0,0,.8);
   }
@@ -70,7 +70,7 @@
   --ink:#ECEEF1; --ink-soft:#A3ACB8; --ink-faint:#8791A0;
   --rule:#2A313B; --rule-soft:#222932;
   --court:#17493D; --court-deep:#0F352D; --court-soft:#1A2E28;
-  --accent:#FF6E60; --accent-ink:#1A0F0D; --accent-soft:#3A2320; --accent-on-ink:#FF8A7E;
+  --accent:#F08A66; --accent-ink:#1A0F0D; --accent-soft:#3A2620; --accent-on-ink:#F09672;
   --ok:#6FCF97; --ok-soft:#1C3026; --warn:#E8B45A; --warn-soft:#352A16;
   --shadow-1:0 1px 2px rgba(0,0,0,.35); --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 32px -20px rgba(0,0,0,.7); --shadow-3:0 2px 6px rgba(0,0,0,.4), 0 24px 56px -28px rgba(0,0,0,.8);
 }
