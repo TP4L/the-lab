@@ -153,6 +153,10 @@ The decision-engine vocabulary runs through the app. Every skill attribute is ma
 
 A report is a snapshot of a period for one athlete: coached sessions, skills with start/now/change and the latest comment, the LAB lens, goals completed and open, shared coach notes, and a summary written by the coach. Open an athlete → Report, pick the period (this month, last month, 30/90 days or custom), edit the summary (a draft is pre-written from the data), and Publish. Publishing freezes the numbers and creates a share link (`#/report/<token>`) that opens without signing in and prints cleanly; it can be revoked later. The athlete is notified and sees reports under My Progress → Reports. Private notes never appear in a report.
 
+## Business pulse
+
+Coach Today → Pulse (`#/coach/pulse`) is the weekly read on the business: active, lapsing and new clients; revenue for the last 30 days against the prior 30 with an 8-week chart; credits outstanding, expiring and athletes who are out; sessions and assessments by week; upcoming event fill; and a Reach out list that ranks people by what needs attention (out of credits, messages waiting, lapsing, credits expiring, due for assessment, new this month). Everything is computed from existing records; nothing extra to enter.
+
 ## Membership
 
 Membership and paywall controls are built in but not activated for general use. Current access should remain complimentary until the business is ready to turn billing on. Admins can view an athlete’s membership state without charging them.

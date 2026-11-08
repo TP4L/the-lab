@@ -74,6 +74,7 @@ function createApp(opts = {}) {
   require('./api/skills.js')(r, ctx);
   require('./api/thread.js')(r, ctx);
   require('./api/reports.js')(r, ctx);
+  require('./api/pulse.js')(r, ctx);
   require('./api/athletes.js')(r, ctx);
   require('./api/timeline.js')(r, ctx);
   require('./api/publishing.js')(r, ctx);

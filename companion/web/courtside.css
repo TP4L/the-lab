@@ -383,3 +383,18 @@
 .lab-read-top em.up{color:var(--ok);}.lab-read-top em.down{color:var(--accent);}
 @media print{.top,.nav,.demobar,.toast,.no-print,.bell,.sync{display:none !important;}body{background:#fff;}.main{padding:0;max-width:none;}.rp-paper{box-shadow:none;border:0;padding:0;}.lab-meter i{print-color-adjust:exact;-webkit-print-color-adjust:exact;}.rp-highlights li,.lab-pill,.sk-dots i{print-color-adjust:exact;-webkit-print-color-adjust:exact;}}
 @media(max-width:520px){.rp-skills th:nth-child(2),.rp-skills td:nth-child(2){display:none;}}
+
+/* ---------- business pulse ---------- */
+.pulse-tiles{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));}
+.pulse-tiles .tile.warn .n{color:var(--warn);}
+.pulse-tiles .tile.up .n{color:var(--ok);}
+.pulse-tiles .tile .s b.up{color:var(--ok);}.pulse-tiles .tile .s b.down{color:var(--accent);}
+.pulse-chart{gap:10px;}
+.pulse-bars{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;align-items:end;height:120px;padding-top:6px;}
+.pulse-bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px;min-width:0;}
+.pulse-bar i{display:block;width:100%;max-width:28px;border-radius:6px 6px 2px 2px;background:var(--surface-3);}
+.pulse-bar.now i{background:var(--court);}
+.pulse-bar span{font-family:var(--ui);font-size:10.5px;color:var(--ink-faint);white-space:nowrap;}
+.pulse-fill{display:block;height:5px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-top:6px;max-width:220px;}
+.pulse-fill i{display:block;height:100%;background:var(--court);}
+.pulse-fill i.ok{background:var(--ok);}.pulse-fill i.low{background:var(--warn);}
