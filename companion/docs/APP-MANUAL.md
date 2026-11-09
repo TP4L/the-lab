@@ -157,6 +157,14 @@ A report is a snapshot of a period for one athlete: coached sessions, skills wit
 
 Coach Today → Pulse (`#/coach/pulse`) is the weekly read on the business: active, lapsing and new clients; revenue for the last 30 days against the prior 30 with an 8-week chart; credits outstanding, expiring and athletes who are out; sessions and assessments by week; upcoming event fill; and a Reach out list that ranks people by what needs attention (out of credits, messages waiting, lapsing, credits expiring, due for assessment, new this month). Everything is computed from existing records; nothing extra to enter.
 
+## Navigation
+
+The bottom bar depends on who is signed in. Coaches: Today, Athletes, Capture, Review, More (operations, setup and reading live under More). Athletes: Today, Program, Progress, Thread, Profile (Play, Learn, shop and membership live under Profile). Signing in lands on Today.
+
+## The athlete record (coach)
+
+Name and credits first, then four actions (Thread, Capture session, Rate skills, Set next practice) and a More menu. Today shows the current focus, a status strip (current practice, last assessment with the biggest change, last session, messages waiting) and the latest thread items. Program lists practices and plans; History holds notes, sessions, communication and media. Access is admin only. Quick notes and closeouts moved into the Thread and Capture.
+
 ## Membership
 
 Membership and paywall controls are built in but not activated for general use. Current access should remain complimentary until the business is ready to turn billing on. Admins can view an athlete’s membership state without charging them.

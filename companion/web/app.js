@@ -108,7 +108,7 @@
     if (META.demo) $('#democard').hidden = false;
     $$('[data-demo]').forEach(function (b) { b.addEventListener('click', function () {
       api.request('POST', '/api/demo/login', { as: b.getAttribute('data-demo') }).then(function () { return api.request('GET', '/api/me'); })
-        .then(function (m) { setMe(m); location.hash = b.getAttribute('data-demo') === 'player' ? '#/play' : '#/coach/desk'; }, function (err) { L.toast(err.message); });
+        .then(function (m) { setMe(m); location.hash = '#/'; }, function (err) { L.toast(err.message); });
     }); });
     bindEmailForm();
     if (!META.demo) (META.magic ? $('#magicemail') : $('#em')).focus();
@@ -1517,29 +1517,30 @@
           (has('admin') ? '<form class="form" id="membershipForm" novalidate><div class="form-grid"><div class="field"><label class="flabel" for="membershipStatus">Access</label><select id="membershipStatus"><option value="none"' + (!m ? ' selected' : '') + '>No membership</option><option value="active"' + (m && m.active ? ' selected' : '') + '>Complimentary access</option><option value="cancelled"' + (m && !m.active ? ' selected' : '') + '>Lapsed</option></select></div><div class="field"><label class="flabel" for="membershipExpires">Expires <span class="hint">optional</span></label><input type="date" id="membershipExpires" value="' + h(m && m.expires_at ? m.expires_at.slice(0, 10) : '') + '"></div></div><div class="field"><label class="flabel" for="membershipNote">Internal note</label><input id="membershipNote" maxlength="300" value="' + h(m ? m.note : '') + '" placeholder="Reason or access arrangement"></div><div class="row"><button class="btn" type="submit">Save membership access</button></div></form>' : '<p class="small muted">Membership status is visible to coaches. Only an administrator can change access.</p>')) +
         (p.membership_history.length ? '<details class="membership-history"><summary>Membership history</summary><div class="list">' + p.membership_history.map(function (x) { return '<div class="li"><span class="main-col"><span class="t small">' + h(x.status === 'active' ? 'Access activated' : x.status === 'none' ? 'Access removed' : 'Access lapsed') + '</span><span class="d">' + h(x.changed_by || (x.source === 'stripe' ? 'Stripe' : 'Administrator')) + (x.note ? ' · ' + h(x.note) : '') + '</span></span><span class="side">' + h(L.when(x.created_at)) + '</span></div>'; }).join('') + '</div></details>' : '') + '</section>';
       app.innerHTML = '<a class="back" href="#/coach">← Athletes</a>' + offlineNote(p) +
-        '<div class="pcard coach-athlete-head">' + avatar(a) + '<div><p class="pid">' + playerId(a.id) + (a.claimed ? ' · claimed' : ' · not claimed yet') + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
+        '<div class="pcard coach-athlete-head">' + avatar(a) + '<div><p class="pid">' + (a.claimed ? 'In the app' : 'Not in the app yet') + (has('admin') ? ' · ' + playerId(a.id) : '') + '</p><h1>' + h(a.name) + '</h1><p class="facts">' +
         '<span>Hand <b>' + h(HANDS[a.hand] || 'Not set') + '</b></span><span>Side <b>' + h(SIDES[a.side] || 'Not set') + '</b></span><span>Rating <b>' + h(a.rating || 'Not set') + '</b></span></p></div></div>' +
         '<p class="small muted coach-credit-line" id="coach-credit-line" hidden></p>' +
         '<div class="coach-athlete-actions"><a class="btn primary" href="#/coach/' + a.id + '/thread">Thread</a><a class="btn" href="#/coach/capture/new?athlete=' + a.id + '">Capture session</a><a class="btn" href="#/coach/' + a.id + '/skills/rate">Rate skills</a><a class="btn" href="#/coach/' + a.id + '/practice/new">Set next practice</a>' +
         '<details class="coach-more"><summary class="btn ghost">More</summary><div class="coach-more-menu"><a href="#/skills/' + a.id + '">Skill progress</a><a href="#/coach/' + a.id + '/practices">Practices</a><a href="#/coach/' + a.id + '/report">Progress report</a><a href="#/coach/' + a.id + '/credits">Credits and sales</a><a href="#/progress/app/' + a.id + '">Measurements</a><a href="#/timeline/app/' + a.id + '">Player timeline</a><a href="#/coach/' + a.id + '/development/new">New Development Block</a><a href="#/train/new?athlete=' + a.id + '">Scored session</a><a href="#/train/new?quick=1&athlete=' + a.id + '">Counter</a></div></details></div>' +
         '<nav class="coach-athlete-tabs" aria-label="Athlete coaching workspace">' +
-        [['today','Today'],['plan','Program'],['notes','History'],['access','Access']].map(function (x) { return '<button type="button" data-athlete-tab="' + x[0] + '" aria-pressed="' + (x[0] === 'today') + '">' + x[1] + '</button>'; }).join('') + '</nav>' +
+        [['today','Today'],['plan','Program'],['notes','History']].concat(has('admin') ? [['access','Access']] : []).map(function (x) { return '<button type="button" data-athlete-tab="' + x[0] + '" aria-pressed="' + (x[0] === 'today') + '">' + x[1] + '</button>'; }).join('') + '</nav>' +
         '<div class="coach-athlete-panels">' +
         '<section data-athlete-panel="today" class="stack"><div class="coach-athlete-today"><article class="coach-focus-card"><p class="eyebrow">CURRENT FOCUS</p><h2>' + h(a.focus || 'Set the next focus') + '</h2><p>' + h(a.plan || 'Add a simple development plan so every session has direction.') + '</p><a href="#" data-open-athlete-tab="progress">Edit development profile</a></article>' +
         '<div class="coach-athlete-glance"><div><strong>' + p.results.length + '</strong><span>Sessions</span></div><div><strong>' + p.media.length + '</strong><span>Media</span></div><div><strong>' + notes.length + '</strong><span>Notes</span></div><div><strong id="coach-open-count">0</strong><span>Open work</span></div></div></div>' +
-        '<details class="coach-fold"><summary><span class="eyebrow">Quick note</span><b>Record what you noticed</b><span class="small muted">Private by default</span></summary><form class="card form coach-capture" id="nf" novalidate>' +
+        '<div id="coach-status-strip" class="stack"></div>' +
+        '<details class="coach-fold" hidden><summary><span class="eyebrow">Quick note</span><b>Record what you noticed</b><span class="small muted">Private by default</span></summary><form class="card form coach-capture" id="nf" novalidate>' +
         '<div class="form-grid"><div class="field"><label class="flabel" for="ntype">Capture type</label><select id="ntype"><option>Coaching note</option><option>What is working</option><option>What is not working</option><option>Next focus</option><option>Athlete question</option><option>Video review</option><option>Follow-up</option></select></div><div class="field"><label class="flabel" for="nbody">Observation</label><textarea id="nbody" maxlength="5000" placeholder="Keep it specific and useful."></textarea></div></div>' +
         '<div class="field"><span class="flabel">Who can see it</span><div class="seg-btns" id="vis"><button type="button" data-v="private" aria-pressed="true">Private · coaches only</button><button type="button" data-v="shared" aria-pressed="false">Shared with athlete</button></div></div>' +
         '<div class="field"><label class="flabel" for="nfile">Photo or video <span class="hint">optional</span></label><input type="file" id="nfile" accept="image/*,video/*"><div class="upload-row" id="nprog" hidden><div class="progress"><i></i></div><span class="small muted" id="nprog-t"></span></div></div>' +
         '<div class="row"><button class="btn primary" type="submit">Save note</button><a class="btn ghost" href="#/followups">Set follow-up</a></div></form></details>' +
-        '<details class="coach-fold"><summary><span class="eyebrow">Session closeout</span><b>Turn today into the next step</b><span class="small muted">About one minute</span></summary><form class="card form session-closeout" id="closeoutForm" novalidate><div class="coach-capture-head"><div><span class="small muted">About one minute</span></div>' +
+        '<details class="coach-fold" hidden><summary><span class="eyebrow">Session closeout</span><b>Turn today into the next step</b><span class="small muted">About one minute</span></summary><form class="card form session-closeout" id="closeoutForm" novalidate><div class="coach-capture-head"><div><span class="small muted">About one minute</span></div>' +
         '<div class="field"><label class="flabel" for="closeSession">Session <span class="hint">optional</span></label><select id="closeSession"><option value="">General coaching closeout</option>' + p.results.map(function (s) { return '<option value="' + h(s.session_id) + '">' + h(s.title) + ' · ' + h(L.when(s.started_at)) + '</option>'; }).join('') + '</select></div>' +
         '<div class="closeout-grid"><div class="field"><label class="flabel" for="closeWorked">What improved?</label><textarea id="closeWorked" maxlength="1200" required></textarea></div><div class="field"><label class="flabel" for="closeNeeds">What still needs work?</label><textarea id="closeNeeds" maxlength="1200" required></textarea></div><div class="field"><label class="flabel" for="closeNext">Next action</label><textarea id="closeNext" maxlength="1200" required></textarea></div></div>' +
         '<div class="form-grid"><div class="field"><label class="flabel" for="closeVisibility">Athlete visibility</label><select id="closeVisibility"><option value="shared">Share the recap</option><option value="private">Coaches only</option></select></div><div class="field"><label class="flabel" for="closeDue">Follow-up date <span class="hint">optional</span></label><input id="closeDue" type="date"></div></div>' +
         '<label class="check"><input id="closeAssign" type="checkbox" checked> Assign the next action to the athlete</label><label class="check"><input id="closeFollow" type="checkbox" checked> Add this to the coaching follow-up list</label>' +
         '<div class="row"><button class="btn primary" type="submit">Complete closeout</button><p class="small muted" id="closeoutStatus" role="status"></p></div></form></details></section>' +
-        '<section data-athlete-panel="plan" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">DEVELOPMENT PLAN</p><h2>Build the next step</h2></div><a class="btn primary" href="#/coach/' + a.id + '/development/new">New Development Block</a></div>' +
-        '<form class="card form" id="af" novalidate><p class="section-title">Assign training</p><div class="form-grid">' +
+        '<section data-athlete-panel="plan" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">DEVELOPMENT PLAN</p><h2>Practices and plans</h2></div><a class="btn primary" href="#/coach/' + a.id + '/practice/new">Set next practice</a></div>' +
+        '<form class="card form" id="af" novalidate hidden><p class="section-title">Assign training</p><div class="form-grid">' +
         '<div class="field"><label class="flabel" for="atpl">Template</label><select id="atpl"><option value="">No template</option></select></div>' +
         '<div class="field"><label class="flabel" for="atitle">Title</label><input type="text" id="atitle" maxlength="120" placeholder="Defaults to the template name"></div>' +
         '<div class="field"><label class="flabel" for="adue">Due</label><input type="date" id="adue"></div></div>' +
@@ -2401,6 +2402,32 @@
   }
   function isPublic() { var p = parse(); return p && p.r[3]; }
 
+  /* Role-based navigation. Coaches get the operating loop (Today, Athletes, Capture, Review);
+     athletes get their three destinations plus the thread. Everything else is reachable from Today or Profile. */
+  var NAV_COACH = [
+    { key: 'today', label: 'Today', href: '#/coach/today', match: function (path, q) { return (path === '/coach/today' && q.filter !== 'review') || path === '/coach/pulse' || path === '/'; } },
+    { key: 'athletes', label: 'Athletes', href: '#/workspace', match: function (path) { return /^\/(workspace|coach\/\d+|skills\/\d+|coach\/practices|progress\/app|progress\/website|timeline)/.test(path); } },
+    { key: 'capture', label: 'Capture', href: '#/coach/capture/new', match: function (path) { return path.indexOf('/coach/capture') === 0; } },
+    { key: 'review', label: 'Review', href: '#/coach/today?filter=review', match: function (path, q) { return (path === '/coach/today' && q.filter === 'review') || /^\/(development|coach\/checkins|followups)/.test(path); } },
+    { key: 'profile', label: 'More', href: '#/profile', match: function (path) { return /^\/(profile|admin|coach\/(products|sales|attributes|desk|development)|play|learn|train|studio|shop|membership|cohorts)/.test(path); } }
+  ];
+  var NAV_ATHLETE = [
+    { key: 'today', label: 'Today', href: '#/', match: function (path) { return path === '/' || path === '/check-in'; } },
+    { key: 'program', label: 'Program', href: '#/programs', match: function (path) { return /^\/(programs|train|development|journey|play|learn)/.test(path); } },
+    { key: 'progress', label: 'Progress', href: '#/skills', match: function (path) { return /^\/(skills|progress|reports?)/.test(path); } },
+    { key: 'thread', label: 'Thread', href: '#/thread', match: function (path) { return path === '/thread'; } },
+    { key: 'profile', label: 'Profile', href: '#/profile', match: function (path) { return /^\/(profile|shop|membership|timeline|cohorts)/.test(path); } }
+  ];
+  var navKey = '';
+  function paintNav(p) {
+    var items = has('coach') ? NAV_COACH : NAV_ATHLETE, key = (has('coach') ? 'c' : 'a') + ':' + (ME ? ME.user.id : '');
+    var inner = $('#nav-inner');
+    if (navKey !== key) { inner.innerHTML = items.map(function (it) { return '<a href="' + it.href + '" data-nav="' + it.key + '">' + it.label + '</a>'; }).join(''); navKey = key; }
+    var path = '/' + (p.m[0] || '').replace(/^\//, ''), q = p.query || {};
+    var current = items.find(function (it) { return it.match(path, q); });
+    $$('.nav a').forEach(function (a) { if (current && a.getAttribute('data-nav') === current.key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  }
+
   function route() {
     var p = parse();
     if(ME && p && p.r[1]==='signin' && !p.query.error){location.hash='#/';return;}
@@ -2412,7 +2439,7 @@
     $('#nav').hidden = !ME;
     $('#bell').hidden = !ME;
     if (ME) pollBell(true);
-    $$('.nav a').forEach(function (a) { if (a.getAttribute('data-nav') === p.r[2]) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    paintNav(p);
     app.innerHTML = '<p class="muted small" role="status">Loading…</p>';
     window.scrollTo(0, 0);
     Promise.resolve().then(function () { return views[p.r[1]](p.m[1], p.query, p.m[2]); }).catch(function (err) {

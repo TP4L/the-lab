@@ -187,8 +187,38 @@
     (home&&home.sessions&&home.sessions.length?'<section class="stack"><p class="section-title">Session history<a href="#/journey/sessions">All</a></p><div class="list">'+home.sessions.slice(0,6).map(s=>'<a class="li" href="#/train/'+h(s.id)+'"><span class="main-col"><span class="t">'+h(s.title)+'</span><span class="d">'+h(L.when(s.started_at))+'</span></span></a>').join('')+'</div></section>':'');
    root().appendChild(sec);}catch{}};
 
+ /* ---------- Profile: "More" for coaches collects operations and secondary areas ---------- */
+ const origProfile=ctx.views.profile;
+ if(origProfile)ctx.views.profile=async function(...a){const hash=location.hash;await origProfile(...a);if(location.hash!==hash)return;
+  const sec=document.createElement('section');sec.className='stack more-links';
+  const link=(href,t,d)=>'<a class="li" href="'+href+'"><span class="main-col"><span class="t">'+t+'</span>'+(d?'<span class="d">'+d+'</span>':'')+'</span></a>';
+  if(ctx.has('coach')){
+   sec.innerHTML='<p class="section-title">Operations</p><div class="list">'+link('#/coach/desk','Events desk','Registration, courts, brackets, interest checks')+link('#/play','Play','Matches, events, leaderboard')+link('#/train','Scored sessions','Templates, scoreboard, counter')+link('#/coach/pulse','Business pulse','Clients, money, court time')+'</div>'+
+    '<p class="section-title">Setup</p><div class="list">'+link('#/coach/products','Products and pricing','Packs, singles, event fees')+link('#/coach/sales','Sales','Paid orders and credits outstanding')+link('#/coach/attributes','Skill attributes','What you rate, reads and level bands')+link('#/coach/development/library','Development library','Blocks and programs')+(ctx.has('contributor','editor')?link('#/studio','Publishing studio','Field Notes drafts'):'')+(ctx.has('admin')?link('#/admin','Admin','People and permissions'):'')+'</div>'+
+    '<p class="section-title">Reading</p><div class="list">'+link('#/learn','Learn','Courses and Field Notes')+'</div>';
+  }else{
+   sec.innerHTML='<p class="section-title">More</p><div class="list">'+link('#/play','Play','Events, matches, leaderboard')+link('#/learn','Learn','Courses and Field Notes')+link('#/shop','Sessions and packs','Buy sessions, see your credits')+link('#/membership','LAB Essentials','Member library')+link('#/timeline','Player timeline','Sessions, videos, notes')+link('#/progress','Measurements','Tests and retests')+'</div>';
+  }
+  const head=root().querySelector('.head,.head-row,.pcard');(head||root().firstChild).insertAdjacentElement('afterend',sec);};
+
  /* ---------- entry points ---------- */
  const origCoachAthlete=ctx.views.coachAthlete;
  if(origCoachAthlete)ctx.views.coachAthlete=async function(id,...rest){const hash=location.hash;await origCoachAthlete(id,...rest);if(location.hash!==hash)return;
+  // Status strip: the four facts a coach needs before acting, then the latest from the thread.
+  try{
+   const [prog,thread,caps]=await Promise.all([api.request('GET','/api/athletes/'+id+'/skills').catch(()=>null),api.request('GET','/api/athletes/'+id+'/thread?limit=40').catch(()=>null),api.request('GET','/api/athletes/'+id+'/captures').catch(()=>({captures:[]}))]);
+   if(location.hash!==hash)return;const slot=root().querySelector('#coach-status-strip');if(!slot)return;
+   const sum=prog&&prog.summary,pr=prog&&prog.practice;const lastCap=caps.captures[0];const lastSess=thread?thread.items.find(i=>i.type==='session'):null;
+   const changed=prog?prog.skills.filter(s=>s.delta).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta))[0]:null;
+   const items=[
+    {k:'Practice',v:pr?pr.title+(pr.status==='ready_retest'?' · ready to retest':pr.status==='in_progress'?' · in progress':pr.status==='evidence_submitted'||pr.status==='coach_review'?' · update waiting':''):'None shared',href:pr?'#/development/'+pr.id:'#/coach/'+id+'/practice/new',cta:pr?'Open':'Set one'},
+    {k:'Assessed',v:sum&&sum.last_rated_on?day(sum.last_rated_on)+(changed?' · '+changed.name+(changed.delta>0?' up ':' down ')+Math.abs(changed.delta):' · '+sum.assessed+' skills'):'Not yet',href:'#/skills/'+id,cta:'Progress'},
+    {k:'Last session',v:lastCap&&(!lastSess||lastCap.occurred_on>=lastSess.at.slice(0,10))?(lastCap.name||lastCap.format_label)+' · '+day(lastCap.occurred_on)+(lastCap.attributes.length?' · '+lastCap.attributes.slice(0,2).join(', '):''):lastSess?lastSess.body+' · '+day(lastSess.at):'No session recorded yet',href:lastCap&&(!lastSess||lastCap.occurred_on>=lastSess.at.slice(0,10))?'#/coach/capture/'+lastCap.id+'/next':lastSess?lastSess.link:'#/coach/capture/new?athlete='+id,cta:lastCap||lastSess?'Open':'Capture'},
+    {k:'Waiting on you',v:thread&&thread.unreviewed?thread.unreviewed+' message'+(thread.unreviewed===1?'':'s')+' to review':'Nothing waiting',href:'#/coach/'+id+'/thread',cta:'Thread',hot:!!(thread&&thread.unreviewed)}
+   ];
+   const talk=new Set(['note','reply','reflection','question','video','plan']);const recent=thread?[...thread.items.filter(i=>talk.has(i.type)),...thread.items.filter(i=>!talk.has(i.type)&&i.side!=='system')].slice(0,3):[];
+   slot.innerHTML='<div class="list status-strip">'+items.map(i=>'<a class="li'+(i.hot?' hot':'')+'" href="'+h(i.href)+'"><span class="main-col"><span class="k">'+h(i.k)+'</span><span class="t">'+h(i.v)+'</span></span><span class="side small">'+h(i.cta)+'</span></a>').join('')+'</div>'+
+    (recent.length?'<p class="section-title">Latest in the thread<a href="#/coach/'+id+'/thread">Open thread</a></p><div class="list">'+recent.map(i=>'<a class="li" href="#/coach/'+id+'/thread"><span class="main-col"><span class="t small">'+h(i.title||(i.side==='coach'?'Coach note':'From '+(i.author||'athlete')))+(i.private?' <span class="vis private">Private</span>':'')+'</span><span class="d">'+h(i.body.length>140?i.body.slice(0,140)+'…':i.body)+'</span><span class="d">'+h(L.when(i.at))+'</span></span></a>').join('')+'</div>':'');
+  }catch{}
   try{const c=await api.request('GET','/api/athletes/'+id+'/captures');if(location.hash!==hash||!c.captures.length)return;const sec=document.createElement('details');sec.className='sk-done';sec.innerHTML='<summary>'+c.captures.length+' captured session'+(c.captures.length===1?'':'s')+'</summary><div class="list">'+c.captures.slice(0,20).map(x=>'<a class="li" href="#/coach/capture/'+x.id+'/next"><span class="main-col"><span class="t small">'+h(x.name||x.format_label)+'</span><span class="d">'+h(day(x.occurred_on))+(x.attributes.length?' · '+x.attributes.map(h).join(', '):'')+(x.observation?'<br>'+h(x.observation):'')+'</span></span></a>').join('')+'</div>';root().appendChild(sec);}catch{}};
 });})();
