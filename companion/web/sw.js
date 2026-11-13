@@ -1,6 +1,6 @@
 /* Service worker: keeps the app shell on the device so THE LAB opens with no
    connection. API calls always go to the network; the app handles offline. */
-const VERSION = 'lab-shell-v27';
+const VERSION = 'lab-shell-v28';
 const SHELL = ['/', '/index.html', '/styles.css', '/lib.js', '/engine.js', '/qr.js', '/markdown.js', '/voice.js', '/desk.js', '/website.js', '/journey.js', '/workspace.js', '/progress.js', '/timeline.js', '/invitationals.js', '/lab-needs.js', '/courtside.js', '/courtside.css', '/coach-dashboard.js', '/journey.css', '/app.js', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', e => {

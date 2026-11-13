@@ -393,6 +393,8 @@ input[type=datetime-local],input[type=email],input[type=search]{width:100%;font:
 .auth-wrap{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:18px;padding-top:12px;}
 .auth-wrap .brandmark{font-family:var(--display);font-weight:800;font-size:40px;letter-spacing:.02em;line-height:1;}
 .auth-wrap .brandmark span{color:var(--accent);}
+.auth-divider{display:flex;align-items:center;gap:12px;color:var(--ink-soft);font-size:12px;margin-top:18px;}
+.auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--rule);}
 .link-btn{background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px;cursor:pointer;font:inherit;font-size:14.5px;}
 
 /* ---------- play ---------- */

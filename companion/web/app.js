@@ -54,6 +54,13 @@
   /* ================= auth views ================= */
   var views = {};
 
+  function googleButton() {
+    return '<a class="btn primary google" href="/api/auth/google/start" id="gbtn" data-google-auth hidden>Continue with Google</a>';
+  }
+  function syncGoogleAuth() {
+    $$('[data-google-auth]').forEach(function (el) { el.hidden = !META.google; });
+  }
+
   function emailForm() {
     return '<form class="card form" id="emailform"><h2>Sign in with email</h2><p>No password needed. Use your existing account email to keep your profile and history.</p><div class="field"><label class="flabel" for="magicemail">Email</label><input id="magicemail" type="email" autocomplete="email" maxlength="200" required></div><button class="btn primary" type="submit">Email me a sign-in link</button><p id="emailstatus" role="status" aria-live="polite"></p></form>';
   }
@@ -92,36 +99,38 @@
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
       '<div class="card stack demo-card" id="democard" hidden><p class="section-title">Try the demo</p><p class="small">Sample players, a live event on courts 4 and 5, a double-elimination bracket, interest checks, a coached session plan and Field Notes. Nothing is emailed, and everything resets daily.</p>' +
       '<div class="demo-btns"><button class="btn primary" type="button" data-demo="host">Host and coach<span>Brett: runs events, plans, publishing</span></button><button class="btn" type="button" data-demo="player">Player<span>Jordan: courts, scores, notes, recap</span></button><button class="btn ghost" type="button" data-demo="coach">Assistant coach<span>Austin: roster and training</span></button></div></div>' +
-      '<a class="btn primary google" href="/api/auth/google/start" id="gbtn" hidden>Continue with Google</a><div id="email-slot">' + (META.magic ? emailForm() : '') + '</div><details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p>' +
+      googleButton() + '<div id="email-slot">' + (META.magic ? emailForm() : '') + '</div><details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="field"><label class="flabel" for="pw">Password</label><input type="password" id="pw" autocomplete="current-password" required></div>' +
       '<div class="row"><button class="btn primary" type="submit">Sign in</button><a class="link-btn" href="#/forgot">Forgot password?</a></div></form>' +
-      '<p class="small">New to THE LAB? <a href="#/signup">Create an account</a>. If your coach gave you a claim code, create your account first, then add the code on your Profile.</p>' +
-      '</details><p class="small"><a href="#/learn">Read Field Notes without signing in →</a></p></div>';
+      '</details><p class="small">New to THE LAB? <a href="#/signup">Create an account</a>. If your coach gave you a claim code, create your account first, then add the code on your Profile.</p>' +
+      '<p class="small"><a href="#/learn">Read Field Notes without signing in →</a></p></div>';
     $('#f').addEventListener('submit', function (e) {
       e.preventDefault();
       api.request('POST', '/api/auth/login', { email: $('#em').value, password: $('#pw').value })
         .then(function (m) { setMe(m); location.hash = '#/'; }, function (err) { L.formError($('#f'), err.status === 0 ? 'You’re offline. Sign in needs a connection.' : err.message); });
     });
-    if (META.google) $('#gbtn').hidden = false;
+    syncGoogleAuth();
     if (META.demo) $('#democard').hidden = false;
     $$('[data-demo]').forEach(function (b) { b.addEventListener('click', function () {
       api.request('POST', '/api/demo/login', { as: b.getAttribute('data-demo') }).then(function () { return api.request('GET', '/api/me'); })
         .then(function (m) { setMe(m); location.hash = b.getAttribute('data-demo') === 'player' ? '#/play' : '#/coach/desk'; }, function (err) { L.toast(err.message); });
     }); });
     bindEmailForm();
-    if (!META.demo) (META.magic ? $('#magicemail') : $('#em')).focus();
+    if (!META.demo) (META.google ? $('#gbtn') : META.magic ? $('#magicemail') : $('#em')).focus();
   };
 
   views.signup = function () {
     app.innerHTML = '<div class="auth-wrap"><h1 class="brandmark">THE <span>LAB</span></h1>' +
+      googleButton() + '<div data-google-auth hidden><p class="small muted">Use the Google account with the email your coach has. No new password needed.</p><p class="auth-divider">or create an account with email</p></div>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Create your account</p>' +
       '<div class="field"><label class="flabel" for="nm">Full name</label><input type="text" id="nm" autocomplete="name" maxlength="80" required></div>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required><p class="small muted">Use the email your coach has, so your profile and history connect.</p></div>' +
       '<div class="field"><label class="flabel" for="pw">Password <span class="hint">10+ characters</span></label><input type="password" id="pw" autocomplete="new-password" minlength="10" required></div>' +
       '<div class="row"><button class="btn primary" type="submit">Create account</button></div></form>' +
       '<p class="small">Already have an account? <a href="#/signin">Sign in</a>.</p></div>';
+    syncGoogleAuth();
     $('#f').addEventListener('submit', function (e) {
       e.preventDefault();
       api.request('POST', '/api/auth/signup', { name: $('#nm').value, email: $('#em').value, password: $('#pw').value })
@@ -2419,7 +2428,7 @@
   // Confirm the session is still valid, then render.
   function demoBar() { $('#demobar').hidden = !META.demo; if ($('#democard') && META.demo) $('#democard').hidden = false; }
   demoBar();
-  api.request('GET', '/api/meta').then(function (m) { META = m; Store.set('meta', m); if (m.magic && $('#email-slot') && !$('#emailform')) { $('#email-slot').innerHTML = emailForm(); bindEmailForm(); } if ($('#gbtn') && m.google) $('#gbtn').hidden = false; demoBar(); }, function () {});
+  api.request('GET', '/api/meta').then(function (m) { META = m; Store.set('meta', m); if (m.magic && $('#email-slot') && !$('#emailform')) { $('#email-slot').innerHTML = emailForm(); bindEmailForm(); } syncGoogleAuth(); demoBar(); }, function () {});
   api.request('GET', '/api/me').then(function (m) { setMe(m); }, function (err) { if (err.status === 401) setMe(null); }).then(function () { route(); pollBell(); });
   L.status(); L.flush();
 })();
