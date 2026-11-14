@@ -1,7 +1,7 @@
 /* Service worker: keeps the app shell on the device so THE LAB opens with no
    connection. API calls always go to the network; the app handles offline. */
-const VERSION = 'lab-shell-v33';
-const SHELL = ['/', '/index.html', '/styles.css', '/lib.js', '/engine.js', '/qr.js', '/markdown.js', '/voice.js', '/desk.js', '/website.js', '/journey.js', '/workspace.js', '/progress.js', '/timeline.js', '/invitationals.js', '/lab-needs.js', '/courtside.js', '/courtside.css', '/coach-dashboard.js', '/members.js', '/welcome.js', '/google-logo.png', '/journey.css', '/app.js', '/manifest.webmanifest', '/icon.svg'];
+const VERSION = 'lab-shell-v34';
+const SHELL = ['/', '/index.html', '/styles.css', '/lib.js', '/engine.js', '/qr.js', '/markdown.js', '/voice.js', '/desk.js', '/website.js', '/journey.js', '/workspace.js', '/website-import.js', '/progress.js', '/timeline.js', '/invitationals.js', '/lab-needs.js', '/courtside.js', '/courtside.css', '/coach-dashboard.js', '/members.js', '/welcome.js', '/google-logo.png', '/journey.css', '/app.js', '/manifest.webmanifest', '/icon.svg'];
 SHELL.push('/design.js', '/design.css', '/fonts/manrope.woff', '/fonts/anton.woff', '/fonts/archivo-black.woff');
 
 self.addEventListener('install', e => {

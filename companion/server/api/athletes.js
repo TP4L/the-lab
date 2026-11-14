@@ -58,7 +58,7 @@ module.exports = function athletes(r, ctx) {
   function notesFor(athleteId, level) {
     const rows = db.prepare(`SELECT n.*, u.name AS author, m.mime AS media_mime FROM notes n LEFT JOIN users u ON u.id = n.author_id LEFT JOIN media m ON m.id = n.media_id
       WHERE n.athlete_id = ? ${level === 'coach' ? '' : "AND n.visibility = 'shared'"} ORDER BY n.created_at DESC, n.id DESC LIMIT 200`).all(athleteId);
-    return rows;
+    return rows.map(n=>({...n,attachments:db.prepare(`SELECT m.id,m.mime,a.name,a.caption FROM note_attachments a JOIN media m ON m.id=a.media_id WHERE a.note_id=? AND m.athlete_id=? ${level==='coach'?'':"AND m.visibility='shared'"}`).all(n.id,athleteId)}));
   }
   function mediaFor(athleteId, level) {
     return db.prepare(`SELECT id, mime, size, visibility, owner_id, created_at FROM media WHERE athlete_id = ?
@@ -75,6 +75,8 @@ module.exports = function athletes(r, ctx) {
       coaches: db.prepare('SELECT u.id, u.name FROM coach_athletes c JOIN users u ON u.id = c.coach_id WHERE c.athlete_id = ?').all(a.id)
     };
     if (level === 'coach') {
+      const imported=db.prepare('SELECT profile,imported_at FROM website_athlete_imports WHERE athlete_id=?').get(a.id);
+      if(imported)out.website_original={...JSON.parse(JSON.parse(imported.profile).data),imported_at:imported.imported_at};
       out.membership = membership ? { ...membership, active, complimentary: membership.source === 'manual' && active } : null;
       out.membership_eligible = !!a.user_id;
       out.membership_access = db.prepare("SELECT id,title,slug FROM courses WHERE status = 'published' AND access = 'members' ORDER BY title").all();

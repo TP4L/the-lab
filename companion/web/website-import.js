@@ -1,0 +1,20 @@
+(function(){'use strict';window.LabPlugins=window.LabPlugins||[];window.LabPlugins.push(function(ctx){
+ const L=window.Lab,h=L.h;
+ ctx.routes.push([/^\/admin\/website-import$/,'websiteImport','home']);
+ ctx.views.websiteImport=async function(){
+  const root=document.getElementById('app');
+  if(!ctx.has('admin')){root.innerHTML='<p>Administrator access required.</p>';return;}
+  root.innerHTML=ctx.head('Athlete history','Bring your athletes together','Match website records to existing app profiles and preserve their original dates and visibility.')+'<div class="card stack"><label for="import-file" class="flabel">Website history export</label><input type="file" id="import-file" accept="application/json,.json"><p class="small muted">An import adds history to the matched profiles. Existing app notes stay in place. Original website records remain available.</p><button id="import-preview" class="btn" disabled>Preview matches</button><div id="import-result" aria-live="polite"></div><a class="btn ghost" href="#/workspace">Back to athletes</a><details><summary>Staff connection</summary><a class="btn" href="/api/site-bridge/signin/start?workspace=1">Reconnect website staff access</a></details></div>';
+  const file=root.querySelector('#import-file'),preview=root.querySelector('#import-preview'),result=root.querySelector('#import-result');let bundle,match;
+  file.onchange=async()=>{preview.disabled=true;match=null;try{if(!file.files[0]||file.files[0].size>240000)throw Error('Choose an export under 240 KB.');bundle=JSON.parse(await file.files[0].text());preview.disabled=false;result.textContent='Export loaded. Preview the identity matches before importing.';}catch(e){bundle=null;result.textContent=e.message;}};
+  preview.onclick=async()=>{preview.disabled=true;result.textContent='Checking athlete matches…';try{
+   match=await L.api.request('POST','/api/admin/website-import/preview',{bundle});
+   const c=match.counts;result.innerHTML='<h2>'+c.athletes+' matched athletes</h2><p>'+c.notes+' notes · '+c.progress+' progress check-ins · '+c.focus+' session focuses · '+c.attachments+' attachments · '+c.communications+' communication records</p><div class="list">'+match.matches.map(a=>'<div class="li"><span>'+h(a.name)+'</span><span>Existing app profile #'+a.athlete_id+'</span></div>').join('')+'</div><button class="btn primary" id="import-commit">Import matched history</button><p id="import-status" role="status"></p>';
+   result.querySelector('#import-commit').onclick=async e=>{e.target.disabled=true;file.disabled=true;preview.disabled=true;const status=result.querySelector('#import-status');status.textContent='Copying original attachments and saving history. Keep this page open…';try{
+    const d=await L.api.request('POST','/api/admin/website-import/commit',{bundle,fingerprint:match.fingerprint});
+    status.textContent=(d.alreadyImported?'This history is already imported. No duplicates were added.':'Import complete. '+d.counts.athletes+' athlete profiles now contain their website history.')+(d.backupSaved?' A database backup was saved before the import.':'');
+    e.target.textContent='History imported';
+   }catch(err){status.textContent=err.message+' Preview again to check the result before retrying.';preview.disabled=false;file.disabled=false;}};
+  }catch(e){result.textContent=e.message;}finally{preview.disabled=false;}};
+ };
+});})();

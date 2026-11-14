@@ -98,7 +98,7 @@ test('welcome migration leaves existing accounts out of first-time setup',()=>{
   const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{open}=require('../server/db');
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'lab-welcome-'));let db;
   try{const file=path.join(dir,'test.db');db=open(file);const version=db.prepare('PRAGMA user_version').get().user_version;
-    db.exec('DROP TRIGGER queue_member_welcome; DROP TABLE member_welcome; PRAGMA user_version='+(version-1));
+    db.exec('DROP TABLE website_import_runs; DROP TABLE note_attachments; DROP TABLE website_record_imports; DROP TABLE website_athlete_imports; DROP TRIGGER queue_member_welcome; DROP TABLE member_welcome; PRAGMA user_version='+(version-2));
     db.prepare('INSERT INTO users(email,name,password_hash) VALUES(?,?,?)').run('earlier@lab.test','Earlier','x');db.close();db=null;
     db=open(file);assert.equal(db.prepare('SELECT count(*) n FROM member_welcome').get().n,0);
     db.prepare('INSERT INTO users(email,name,password_hash) VALUES(?,?,?)').run('new@lab.test','New','x');assert.equal(db.prepare('SELECT count(*) n FROM member_welcome').get().n,1);

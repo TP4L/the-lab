@@ -8,6 +8,8 @@ module.exports=function(r,{db,auth,config}){
   auth.require(user);
   const wid=q.get('website');let a,c,staff=null;
   if(wid){
+   const imported=db.prepare('SELECT a.* FROM athletes a JOIN website_athlete_imports w ON w.athlete_id=a.id WHERE w.website_id=?').get(wid);
+   if(imported){const access=auth.athleteAccess(user,imported.id);if(!access)throw new HttpError(404,'Athlete not found.');return {a:imported,access,imported:true};}
    staff=db.prepare('SELECT token FROM website_staff_connections WHERE user_id=? AND expires_at>?').get(user.id,Date.now());
    if(!user.workspace||!staff)throw new HttpError(403,'Connect staff access to open this athlete.');
    if(!/^[a-f0-9-]{36}$/i.test(wid))throw new HttpError(400,'Select an athlete.');
@@ -18,6 +20,7 @@ module.exports=function(r,{db,auth,config}){
   const id=q.has('athlete')?int(q.get('athlete'),'athlete',{min:1,required:true}):auth.ownAthleteId(user);
   if(id){a=db.prepare('SELECT * FROM athletes WHERE id=?').get(id);if(!a||!auth.athleteAccess(user,id))throw new HttpError(404,'Athlete not found.');}
   if(!a)throw new HttpError(409,'Connect your player profile first.');
+  if(db.prepare('SELECT 1 FROM website_athlete_imports WHERE athlete_id=?').get(a.id))return {a,access:auth.athleteAccess(user,a.id),imported:true};
   if(a.user_id)c=db.prepare('SELECT athlete_id,token FROM website_connections WHERE user_id=?').get(a.user_id);
   return {a,website:c?.athlete_id,token:c?.token,staff:false,access:auth.athleteAccess(user,a.id)};
  }
@@ -56,7 +59,8 @@ module.exports=function(r,{db,auth,config}){
   const only=query.get('source');
   if(!only||only==='app')sources.app=w.a?{status:'ok',...local(w.a,query.get('appBefore')||'',w.access==='coach'||w.staff)}:{status:'unlinked',items:[],next:null,message:'No verified app profile is connected to this website athlete yet.'};
   if(!only||only==='website'){
-   if(!w.token)sources.website={status:'unlinked',items:[],next:null,message:'Connect your website profile to include its history.'};
+   if(w.imported)sources.website={status:'merged',items:[],next:null,message:'Website history is saved in this app profile.'};
+   else if(!w.token)sources.website={status:'unlinked',items:[],next:null,message:'Connect your website profile to include its history.'};
    else try{const up=await remote(w,{action:'timeline',...(w.staff?{id:w.website}:{}),before:query.get('webBefore')||''});const d=await up.json();if(!up.ok||d.error)throw Error(d.error||'Website history unavailable.');sources.website={status:'ok',...d};}catch(e){sources.website={status:'error',items:[],next:null,message:e.message||'Website history unavailable. Retry to load it.'};}
   }
   return {athlete:{id:w.a?.id,websiteId:w.website,name:w.a?.name||sources.website?.athlete?.name||'Athlete'},sources};

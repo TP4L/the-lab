@@ -143,8 +143,8 @@ test('upgrade preserves existing accounts and queues only registrations after th
   let db;
   try {
     db=open(file);const version=db.prepare('PRAGMA user_version').get().user_version;
-    db.exec('DROP TRIGGER queue_member_welcome; DROP TABLE member_welcome; DROP TRIGGER queue_member_signup; DROP TABLE member_signups; PRAGMA user_version='+(version-2));
-    db.prepare('INSERT INTO users(email,name,password_hash) VALUES(?,?,?)').run('earlier@lab.test','Earlier','x');db.close();
+    db.exec('DROP TABLE website_import_runs; DROP TABLE note_attachments; DROP TABLE website_record_imports; DROP TABLE website_athlete_imports; DROP TRIGGER queue_member_welcome; DROP TABLE member_welcome; DROP TRIGGER queue_member_signup; DROP TABLE member_signups; PRAGMA user_version='+(version-3));
+    db.prepare('INSERT INTO users(email,name,password_hash) VALUES(?,?,?)').run('earlier@lab.test','Earlier','x');db.close();db=null;
     db=open(file);assert.equal(db.prepare('SELECT count(*) n FROM users').get().n,1);
     assert.equal(db.prepare('SELECT count(*) n FROM member_signups').get().n,0);
     db.prepare('INSERT INTO users(email,name,password_hash) VALUES(?,?,?)').run('later@lab.test','Later','x');

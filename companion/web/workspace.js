@@ -15,35 +15,21 @@
  ctx.routes.push([/^\/coach\/local$/,'localCoach','home']);
  ctx.views.localCoach=originalCoach;
  ctx.views.workspace=async function(){
-  const host=page('Your workspace','Your existing athletes, notes and assignments.');
-  host.innerHTML+='<div class="row">'+(ctx.has('coach')?'<a class="btn" href="#/coach/desk">Events desk</a><a class="btn" href="#/coach/templates">Session templates</a><a class="btn" href="#/coach/new">New app athlete</a>':'')+(ctx.has('editor','contributor')?'<a class="btn" href="#/studio">Publishing</a>':'')+'<a class="btn ghost" href="'+SITE+'/studio" target="_blank" rel="noopener">Earlier coaching tools</a><button class="btn ghost" id="ws-refresh">Refresh athletes</button></div><p id="ws-loading" role="status">Loading your athlete rosters…</p><label class="flabel" for="ws-search">Find an athlete</label><input id="ws-search" type="search" placeholder="Search all connected athletes"><section class="stack" id="ws-roster"></section><section class="stack" id="ws-local"></section>';
+  const host=page('Your athletes','One profile per athlete. Notes, media and training together.');
+  host.innerHTML+='<div class="row"><a class="btn" href="#/coach/new">New athlete</a><a class="btn" href="#/coach/desk">Events desk</a><a class="btn" href="#/coach/templates">Session templates</a><button class="btn ghost" id="ws-refresh">Refresh athletes</button>'+(ctx.has('admin')?'<a class="btn ghost" href="#/admin/website-import">Import website history</a>':'')+'</div><p id="ws-loading" role="status">Loading athletes…</p><label class="flabel" for="ws-search">Find an athlete</label><input id="ws-search" type="search" placeholder="Search athletes"><section class="stack" id="ws-roster"></section>';
   host.querySelector('#ws-refresh').onclick=()=>ctx.route();
-  const results=await Promise.allSettled([request({action:'roster'}),ctx.has('coach')?L.api.request('GET','/api/athletes'):Promise.resolve([])]);
-  if(!host.isConnected)return;
-  host.querySelector('#ws-loading').remove();
-  const website=results[0],local=results[1],slot=host.querySelector('#ws-roster');
-  const siteAthletes=website.status==='fulfilled'?website.value.athletes:[];
-  const localAthletes=local.status==='fulfilled'?local.value:[];
-  if(website.status==='fulfilled'){
-   const d=website.value;
-   slot.innerHTML='<div class="journey-section"><h2>Existing website athletes · '+siteAthletes.length+'</h2><span class="tag">'+h(d.name)+'</span></div><p class="small muted">Your original website profiles and coaching history. Changes save to the same records.</p><div id="ws-players" class="journey-notes"></div><details class="more"><summary>Staff connection</summary><p>Connected as '+h(d.email)+'.</p>'+connect+' <button class="btn ghost" id="ws-disconnect">Disconnect staff access</button><p role="status" id="ws-connection-status"></p></details>';
-   slot.querySelector('#ws-disconnect').onclick=async()=>{try{await request({action:'disconnect'});ctx.setMe(await L.api.request('GET','/api/me'));ctx.route();}catch(e){slot.querySelector('#ws-connection-status').textContent=e.message;}};
-  }else{
-   slot.innerHTML='<div class="card"><h2>Connect your existing website athletes</h2><p>Your website roster has not loaded. An empty app roster does not mean your website athletes are missing.</p><p role="status">'+h(website.reason.message)+'</p>'+connect+'<p class="small muted">Continue with Brett’s or Austin’s website account. Sign in to your existing app account first if prompted. You do not need to recreate athletes or claim a player profile.</p></div>';
-  }
-  const localSlot=host.querySelector('#ws-local');
-  localSlot.innerHTML='<div class="journey-section"><h2>App training profiles · '+localAthletes.length+'</h2></div><p class="small muted">Profiles created in the app, with their app sessions and training assignments.</p><div id="ws-local-players" class="journey-notes"></div>';
-  if(local.status==='rejected')localSlot.innerHTML='<div class="card"><h2>App roster unavailable</h2><p role="status">'+h(local.reason.message)+'</p></div>';
-  const paint=term=>{
-   const cards=(rows,source)=>rows.filter(a=>(a.name||'').toLowerCase().includes(term)).map(a=>'<a class="journey-note workspace-player" href="'+(source==='website'?'#/workspace/athlete/':'#/coach/')+h(a.id)+'"><div class="journey-section"><h3>'+h(a.name)+'</h3><span class="tag">'+(source==='website'?'Website':'App')+'</span></div><p class="small muted">'+h(a.focus||a.level||a.rating||'Player development')+'</p><span class="small">View notes · Assign training · Review</span></a>').join('');
-   if(website.status==='fulfilled')slot.querySelector('#ws-players').innerHTML=cards(siteAthletes,'website')||'<p>'+(term?'No matching website athletes.':'No athlete records were returned by the website. Use Refresh athletes to check again.')+'</p>';
-   if(local.status==='fulfilled')localSlot.querySelector('#ws-local-players').innerHTML=cards(localAthletes,'app')||'<p>'+(term?'No matching app profiles.':'No separate app training profiles. Your website athletes appear above once staff access is connected.')+'</p>';
-  };paint('');host.querySelector('#ws-search').oninput=e=>paint(e.target.value.trim().toLowerCase());
+  try{
+   const rows=await L.api.request('GET','/api/athletes');if(!host.isConnected)return;
+   host.querySelector('#ws-loading').textContent=rows.length+' athletes';
+   const paint=term=>{host.querySelector('#ws-roster').innerHTML='<div class="journey-notes">'+(rows.filter(a=>(a.name||'').toLowerCase().includes(term)).map(a=>'<a class="journey-note workspace-player" href="#/coach/'+h(a.id)+'"><div class="journey-section"><h3>'+h(a.name)+'</h3></div><p class="small muted">'+h(a.focus||a.rating||'Player development')+'</p><span class="small">Notes · Media · Training</span></a>').join('')||'<p>No matching athletes.</p>')+'</div>';};
+   paint('');host.querySelector('#ws-search').oninput=e=>paint(e.target.value.trim().toLowerCase());
+  }catch(e){if(host.isConnected)host.querySelector('#ws-loading').textContent=e.message;}
  };
  // Every existing Coach Workspace link now opens the connected roster.
  ctx.views.coach=function(){return ctx.views.workspace();};
  ctx.views.workspaceAthlete=async function(id){
   const host=page('Athlete workspace','Loading the latest coaching record…');
+  try{const rows=await L.api.request('GET','/api/athletes');const linked=rows.find(a=>a.website_id===id);if(linked){location.hash='#/coach/'+linked.id;return;}}catch{}
   try{const d=await request({action:'athlete',id});if(!host.isConnected)return;
    const focuses=d.records.filter(r=>r.kind==='focus'),reflections=d.records.filter(r=>r.kind==='reflection');
    host.innerHTML='<a class="back" href="#/workspace">← Your workspace</a>'+ctx.head('Athlete coaching',d.athlete.name,'Website profile · changes save to this player’s existing history')+'<nav class="journey-tabs" aria-label="Athlete workspace sections">'+[['overview','Overview'],['assign','Assign training'],['notes','Notes'],['review','Reflections']].map(([key,label])=>'<button class="btn ghost" data-panel="'+key+'" aria-pressed="'+(key==='overview')+'">'+label+'</button>').join('')+'</nav><div id="ws-content"></div>';

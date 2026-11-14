@@ -69,6 +69,7 @@ function createApp(opts = {}) {
   require('./api/invitationals.js')(r,ctx,opts.invitationalsPublicKey);
   require('./api/site-signin.js')(r, ctx);
   require('./api/workspace.js')(r, ctx);
+  require('./api/website-import.js')(r, ctx);
   require('./api/training.js')(r, ctx);
   require('./api/progress.js')(r, ctx);
   require('./api/athletes.js')(r, ctx);

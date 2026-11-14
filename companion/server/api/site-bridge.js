@@ -13,8 +13,9 @@ module.exports = function(r, ctx) {
     if(!res.ok)throw new HttpError([400,401,403,409].includes(res.status)?res.status:503,data.error||'Website connection failed.');
     return data;
   }
-  ctx.sharedProgress=async(a,action,data)=>{if(!a.user_id)return null;const c=db.prepare('SELECT token FROM website_connections WHERE user_id=?').get(a.user_id);return c?remote({action,data},c.token):null;};
+  ctx.sharedProgress=async(a,action,data)=>{if(db.prepare('SELECT 1 FROM website_athlete_imports WHERE athlete_id=?').get(a.id))return null;if(!a.user_id)return null;const c=db.prepare('SELECT token FROM website_connections WHERE user_id=?').get(a.user_id);return c?remote({action,data},c.token):null;};
   ctx.sharedProfile=async(a,fields,save=false)=>{
+    if(db.prepare('SELECT 1 FROM website_athlete_imports WHERE athlete_id=?').get(a.id))return null;
     if(!a.user_id)return null;
     const c=db.prepare('SELECT token FROM website_connections WHERE user_id=?').get(a.user_id);if(!c)return null;
     const data={name:fields.name,hand:fields.hand||'',rating:fields.rating||'',goals:fields.goals||'',side:fields.side||''};
