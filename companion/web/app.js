@@ -2415,6 +2415,7 @@
     if (!p.r[3] && !ME) { window.LabInviteReturn.save(location.hash); location.hash = '#/signin'; return; }
     $('#nav').hidden = !ME;
     $('#bell').hidden = !ME;
+    if (PLUGIN_CTX.renderShell) PLUGIN_CTX.renderShell(p);
     if (ME) pollBell(true);
     $$('.nav a').forEach(function (a) { if (a.getAttribute('data-nav') === p.r[2]) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     app.innerHTML = '<p class="muted small" role="status">Loading…</p>';

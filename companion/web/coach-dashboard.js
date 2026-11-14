@@ -42,7 +42,7 @@
     const results=await Promise.allSettled([api.request('GET','/api/coach/dashboard'),ws({action:'followups'})]);if(!host.isConnected)return;
     const app=results[0].status==='fulfilled'?results[0].value:null,site=results[1].status==='fulfilled'?results[1].value:null;
     if(!app){host.querySelector('#coach-load').innerHTML='<div class="card"><h2>App dashboard unavailable</h2><p>'+h(results[0].reason.message)+'</p><button class="btn" id="coach-retry">Retry</button></div>';host.querySelector('#coach-retry').onclick=load;host.querySelector('#coach-refresh').disabled=false;return;}
-    const state={items:[...app.items,...(site?siteItems(site):[])],app,site,filter:reviewing?'review':'all',query:'',expanded:false};
+    const state={items:[...app.items,...(site?siteItems(site):[])],app,site,filter:['review','website'].includes(query.filter)?query.filter:'all',query:'',expanded:false};
     host.querySelector('#coach-load').outerHTML='<div id="coach-content"></div>';const content=host.querySelector('#coach-content');
     function counts(items){return {review:items.filter(x=>x.priority==='review').length,overdue:items.filter(x=>x.priority==='overdue').length,soon:items.filter(x=>['today','soon'].includes(x.priority)).length,unassigned:items.filter(x=>x.kind==='task'&&!x.assignee).length,athletes:new Set([...app.athletes.map(a=>'app:'+a.id),...(site?.athletes||[]).map(a=>'website:'+a.id)]).size};}
     function relevant(i){
@@ -82,7 +82,7 @@
        slot.querySelector('form').onsubmit=async e=>{
         e.preventDefault();const form=e.currentTarget,submit=form.querySelector('button');submit.disabled=true;
         const decision=form.elements.decision.value,feedback=form.elements.feedback.value;
-        try{await api.request('PUT','/api/development-blocks/'+item.recordId,{status:decision,coach_feedback:feedback,retest_notes:decision==='ready_retest'?feedback:'',expected_status:block.status,expected_updated_at:block.updated_at});await ctx.views.coachToday();L.toast('Review saved.');}
+        try{await api.request('PUT','/api/development-blocks/'+item.recordId,{status:decision,coach_feedback:feedback,retest_notes:decision==='ready_retest'?feedback:'',expected_status:block.status,expected_updated_at:block.updated_at});await ctx.route();L.toast('Review saved.');}
         catch(err){form.querySelector('[role=status]').textContent=err.message;submit.disabled=false;}
        };
       }catch(err){slot.textContent=err.message;button.disabled=false;}
@@ -92,7 +92,7 @@
     }
     paint();host.querySelector('#coach-refresh').disabled=false;
    };
-   host.querySelector('#coach-refresh').onclick=()=>ctx.views.coachToday(_,query);await load();
+   host.querySelector('#coach-refresh').onclick=()=>ctx.route();await load();
   };
   for(const key of ['home','workspace']){
    const old=ctx.views[key];if(!old)continue;ctx.views[key]=async function(...args){if(key==='home'&&(ctx.has('coach')||ctx.me()?.user?.workspace))return ctx.views.coachToday();const hash=location.hash;await old(...args);if(location.hash!==hash||(!ctx.has('coach')&&!ctx.me()?.user?.workspace))return;const entry=document.createElement('section');entry.className='coach-today-entry';entry.innerHTML='<div><p class="eyebrow">Coach today</p><h2>What needs your attention?</h2><p>Reviews, due work and the next seven days across the app and website.</p></div><a class="btn primary" href="#/coach/today">Open coaching dashboard</a>';root().prepend(entry);};

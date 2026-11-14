@@ -303,6 +303,20 @@ module.exports = function planning(r, ctx) {
     const rows = user.roles.includes('admin') ? db.prepare('SELECT * FROM plans ORDER BY COALESCE(starts_at, created_at) DESC').all() : db.prepare('SELECT * FROM plans WHERE owner_id = ? ORDER BY COALESCE(starts_at, created_at) DESC').all(user.id);
     return rows.map(p => ({ id: p.id, title: p.title, starts_at: p.starts_at, location: p.location, status: p.status, capacity: p.capacity, counts: rsvpCounts(p.id), event_id: p.event_id }));
   });
+  // A member sees only their own published invitations, never a coach's draft,
+  // other players' invite tokens, roster details, or private handoff notes.
+  r.get('/api/me/lessons', ({ user }) => {
+    auth.require(user);
+    const athleteId = auth.ownAthleteId(user);
+    if (!athleteId) return [];
+    return db.prepare(`SELECT p.id,p.title,p.starts_at,p.ends_at,p.timezone,p.location,p.sport,
+      p.coaches,u.name AS coach,pp.rsvp,pp.token
+      FROM plan_players pp JOIN plans p ON p.id=pp.plan_id LEFT JOIN users u ON u.id=p.owner_id
+      WHERE pp.athlete_id=? AND p.status='published' AND pp.rsvp!='out'
+      AND p.starts_at IS NOT NULL AND COALESCE(p.ends_at,p.starts_at)>=?
+      ORDER BY p.starts_at,pp.id LIMIT 30`).all(athleteId, now())
+      .map(({token,...lesson}) => ({...lesson,link:'#/i/'+token}));
+  });
   r.post('/api/plans', ({ user, body }) => {
     auth.require(user, 'coach');
     const f = planInput(body);

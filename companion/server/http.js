@@ -6,7 +6,7 @@ const MAX_JSON = 256 * 1024;
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff': 'font/woff',
   '.webmanifest': 'application/manifest+json'
 };
 
@@ -137,7 +137,7 @@ function serveStatic(root, req, res, pathname) {
       'Cache-Control': 'no-cache'
     };
     if (path.extname(file) === '.html') {
-      headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+      headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
     }
     if (path.basename(file) === 'sw.js') headers['Service-Worker-Allowed'] = '/';
     res.writeHead(200, headers);
