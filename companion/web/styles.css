@@ -546,8 +546,8 @@ a.bslot:hover{border-color:var(--ink);}
 .vision-rotation .vision-slots{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border:1px solid var(--rule-soft);}
 @media (max-width:520px){.vision-head{align-items:flex-start;}.vision-count{align-items:flex-start;}.vision-head{flex-direction:column;gap:10px;}.vision-slots{grid-template-columns:1fr 1fr;}.vision-slot{padding:9px 8px;}.vision-slot b{font-size:12px;}}
 
-.btn.google{background:var(--surface);border:1px solid var(--rule);color:var(--ink);min-height:46px;font-size:12.5px;}
-.btn.google::before{content:"G";font-family:var(--display);font-weight:800;font-size:16px;color:#4285F4;margin-right:4px;}
+.btn.google{background:#fff;border:1px solid #747775;color:#1f1f1f;min-height:46px;font:500 14px/20px "Google Sans",Arial,sans-serif;letter-spacing:0;text-transform:none;gap:10px;padding:12px;}
+.btn.google img{object-fit:contain;flex:0 0 20px;}
 
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
@@ -637,3 +637,16 @@ fieldset.field legend{padding:0;margin-bottom:6px;}
 @media(max-width:760px){.coach-athlete-tabs{top:64px;margin-inline:-8px}.coach-athlete-today{grid-template-columns:1fr}.coach-athlete-glance{grid-template-columns:repeat(4,minmax(90px,1fr));overflow-x:auto}.coach-athlete-glance>div{min-width:90px;padding:14px}.coach-athlete-actions .btn{flex:1 1 calc(50% - 8px);justify-content:center}.coach-panel-head{align-items:flex-start;flex-direction:column}.coach-panel-head>.btn,.coach-panel-head>.row{width:100%}.coach-panel-head>.row .btn{flex:1}.coach-capture-head{align-items:flex-start;flex-direction:column;gap:4px}}
 .session-closeout{border-color:color-mix(in srgb,var(--accent) 55%,var(--rule));background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 7%,var(--surface)),var(--surface) 48%)}.closeout-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.closeout-grid textarea{min-height:112px}.coach-conversation{display:grid;gap:10px}.conversation-item{max-width:88%;padding:16px 18px;border:1px solid var(--rule);border-radius:14px;background:var(--surface)}.conversation-item.from-coach{margin-left:auto;border-color:color-mix(in srgb,var(--accent) 45%,var(--rule))}.conversation-meta{display:flex;justify-content:space-between;gap:16px;color:var(--ink-soft);font-size:12px}.conversation-item p{white-space:pre-wrap}.inline-reply{margin-top:10px}.inline-reply-form textarea{min-height:96px}.ownership-list{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 16px}.coach-ownership form>.row input{flex:1;min-width:220px}
 @media(max-width:760px){.closeout-grid{grid-template-columns:1fr}.conversation-item{max-width:96%}.coach-ownership form>.row{align-items:stretch;flex-direction:column}.coach-ownership form>.row input{width:100%;min-width:0}}
+
+/* First-time member setup */
+.signup-steps{display:flex;gap:8px;justify-content:space-between;list-style:none;margin:0;padding:0;font:11px var(--mono);color:var(--ink-soft)}
+.signup-steps li{padding:8px 0;border-bottom:2px solid var(--rule)}
+.signup-steps [aria-current]{color:var(--ink);border-color:var(--accent)}
+.welcome-wrap{max-width:560px}
+.welcome-options{display:flex;flex-direction:column;gap:10px;border:0;margin:10px 0;padding:0;min-width:0}
+.welcome-options legend{font-weight:700;margin-bottom:12px}
+.welcome-options label{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--rule);border-radius:8px;cursor:pointer}
+.welcome-options label:has(input:checked){border-color:var(--accent);background:var(--surface)}
+.welcome-options input{width:18px;min-height:18px;height:18px;flex:0 0 18px;margin:3px 0 0}
+.welcome-options small{display:block;color:var(--ink-soft);margin-top:4px;line-height:1.5}
+.welcome-connected{padding:14px;border-left:3px solid var(--accent)}

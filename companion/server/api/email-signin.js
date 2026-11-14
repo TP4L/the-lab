@@ -52,6 +52,7 @@ module.exports = function emailSignIn(r, { db, auth, config }) {
     const session = auth.startSession(user.id);
     res.setHeader('Set-Cookie', session.cookie);
     res.setHeader('Cache-Control', 'no-store');
-    return { user: auth.userRow(user), athlete_id: auth.ownAthleteId(user), has_password: !user.password_hash.startsWith('oauth$') };
+    const safeUser = auth.userRow(user);
+    return { user: safeUser, athlete_id: auth.ownAthleteId(user), has_password: !user.password_hash.startsWith('oauth$'), welcome_required: require('./welcome.js').required(db, safeUser) };
   });
 };

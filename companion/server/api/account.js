@@ -27,7 +27,7 @@ module.exports = function account(r, { db, auth, config }) {
   function me(user) {
     const athleteId = auth.ownAthleteId(user);
     const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(user.id);
-    return { user, athlete_id: athleteId, has_password: !!row && !String(row.password_hash).startsWith('oauth$') };
+    return { user, athlete_id: athleteId, has_password: !!row && !String(row.password_hash).startsWith('oauth$'), welcome_required: require('./welcome.js').required(db, user) };
   }
 
   r.post('/api/auth/signup', ({ body, res }) => {
@@ -77,6 +77,7 @@ module.exports = function account(r, { db, auth, config }) {
     let claims;
     try {
       const tr = await config.fetchImpl('https://oauth2.googleapis.com/token', {
+        signal: AbortSignal.timeout(15000),
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ code: query.get('code'), client_id: config.googleClientId, client_secret: config.googleClientSecret, redirect_uri: googleRedirect(), grant_type: 'authorization_code' }).toString()
       });
@@ -85,11 +86,12 @@ module.exports = function account(r, { db, auth, config }) {
       claims = JSON.parse(Buffer.from(tok.id_token.split('.')[1], 'base64url').toString('utf8'));
     } catch { return fail('Couldn\u2019t reach Google. Try again.'); }
     const nowS = Math.floor(Date.now() / 1000);
-    if (claims.aud !== config.googleClientId || !['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss) || !(claims.exp > nowS) || claims.email_verified !== true || !claims.email) {
+    if (!claims || claims.aud !== config.googleClientId || !['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss) || !(claims.exp > nowS) || claims.email_verified !== true || typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 255 || typeof claims.email !== 'string' || claims.email.length > 200 || !EMAIL.test(claims.email)) {
       return fail('That Google account couldn\u2019t be verified.');
     }
     const e = String(claims.email).toLowerCase();
     let u = db.prepare('SELECT * FROM users WHERE google_sub = ?').get(claims.sub) || db.prepare('SELECT * FROM users WHERE email = ?').get(e);
+    if (u && u.google_sub && u.google_sub !== claims.sub) return fail('This email is connected to another Google account. Use your original sign-in method.');
     if (u && !u.google_sub) db.prepare('UPDATE users SET google_sub = ? WHERE id = ?').run(claims.sub, u.id);
     if (!u) {
       const roles = config.adminEmail && e === config.adminEmail.toLowerCase() ? ['athlete', 'coach', 'contributor', 'editor', 'admin'] : ['athlete'];

@@ -225,11 +225,11 @@ module.exports = function athletes(r, ctx) {
   });
 
   /* Athlete claims a coach-made profile. One code, one account, no duplicate record. */
-  r.post('/api/claim', ({ user, body }) => {
+  function claimAthlete(user, codeValue) {
     auth.require(user);
     if (!claimLimit('u' + user.id)) throw new HttpError(429, 'Too many attempts. Try again in an hour.');
     if (auth.ownAthleteId(user)) throw new HttpError(409, 'Your account already has an athlete profile.');
-    const code = normalizeCode(body.code);
+    const code = normalizeCode(codeValue);
     if (code.length !== 8) throw new HttpError(400, 'Claim codes are 8 characters, like ABCD-2345.');
     const a = db.prepare('SELECT * FROM athletes WHERE claim_code_hash = ? AND user_id IS NULL').get(sha256(code));
     if (!a) throw new HttpError(400, 'That code doesn’t match a profile. Check it with your coach.');
@@ -238,18 +238,25 @@ module.exports = function athletes(r, ctx) {
     }
     db.prepare('UPDATE athletes SET user_id = ?, claim_code_hash = NULL, updated_at = ? WHERE id = ?').run(user.id, now(), a.id);
     return profile(load(a.id), 'self');
-  });
+  }
+  ctx.claimAthlete = claimAthlete;
+  r.post('/api/claim', ({ user, body }) => claimAthlete(user, body.code));
 
   /* An athlete without a coach can start their own profile. */
-  r.post('/api/me/athlete', ({ user, body }) => {
+  function createOwnAthlete(user, body) {
     auth.require(user);
     if (auth.ownAthleteId(user)) throw new HttpError(409, 'Your account already has an athlete profile.');
+    if (db.prepare('SELECT 1 FROM athletes WHERE user_id IS NULL AND lower(claim_email)=?').get(user.email.toLowerCase())) {
+      throw new HttpError(409, 'Your coach already has a profile for this email. Use their claim code or choose to connect your coaching history later.');
+    }
     const f = fields({ name: user.name, ...body }, 'self');
     const id = Number(db.prepare('INSERT INTO athletes (user_id, name, hand, side, rating, goals, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(user.id, f.name, f.hand, f.side, f.rating, f.goals, user.id).lastInsertRowid);
     saveMeasurements(id, f);
-    return withStatus(201, profile(load(id), 'self'));
-  });
+    return profile(load(id), 'self');
+  }
+  ctx.createOwnAthlete = createOwnAthlete;
+  r.post('/api/me/athlete', ({ user, body }) => withStatus(201, createOwnAthlete(user, body)));
 
   /* ---------- notes ---------- */
   r.post('/api/athletes/:id/notes', ({ user, params, body }) => {

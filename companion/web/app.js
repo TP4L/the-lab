@@ -55,14 +55,15 @@
   var views = {};
 
   function googleButton() {
-    return '<a class="btn primary google" href="/api/auth/google/start" id="gbtn" data-google-auth hidden>Continue with Google</a>';
+    return '<a class="btn primary google" href="/api/auth/google/start" id="gbtn" data-google-auth hidden><img src="/google-logo.png" alt="" width="20" height="20">Continue with Google</a>';
   }
   function syncGoogleAuth() {
     $$('[data-google-auth]').forEach(function (el) { el.hidden = !META.google; });
   }
 
   function emailForm() {
-    return '<form class="card form" id="emailform"><h2>Sign in with email</h2><p>No password needed. Use your existing account email to keep your profile and history.</p><div class="field"><label class="flabel" for="magicemail">Email</label><input id="magicemail" type="email" autocomplete="email" maxlength="200" required></div><button class="btn primary" type="submit">Email me a sign-in link</button><p id="emailstatus" role="status" aria-live="polite"></p></form>';
+    var signup = location.hash === '#/signup';
+    return '<form class="card form" id="emailform"><h2>' + (signup ? 'Continue with email' : 'Sign in with email') + '</h2><p>' + (signup ? 'We’ll email you a secure link. Open it to create your account, then tell us a little about your game. No password needed.' : 'No password needed. Use your existing account email to keep your profile and history.') + '</p><div class="field"><label class="flabel" for="magicemail">Email</label><input id="magicemail" type="email" autocomplete="email" maxlength="200" required></div><button class="btn primary" type="submit">Email me a sign-in link</button><p id="emailstatus" role="status" aria-live="polite"></p></form>';
   }
   function bindEmailForm() {
     var form = $('#emailform');
@@ -104,7 +105,7 @@
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="field"><label class="flabel" for="pw">Password</label><input type="password" id="pw" autocomplete="current-password" required></div>' +
       '<div class="row"><button class="btn primary" type="submit">Sign in</button><a class="link-btn" href="#/forgot">Forgot password?</a></div></form>' +
-      '</details><p class="small">New to THE LAB? <a href="#/signup">Create an account</a>. If your coach gave you a claim code, create your account first, then add the code on your Profile.</p>' +
+      '</details><p class="small">New to THE LAB? <a href="#/signup">Create an account</a>. You can connect your coaching profile with a claim code after signup.</p>' +
       '<p class="small"><a href="#/learn">Read Field Notes without signing in →</a></p></div>';
     $('#f').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -122,19 +123,26 @@
   };
 
   views.signup = function () {
-    app.innerHTML = '<div class="auth-wrap"><h1 class="brandmark">THE <span>LAB</span></h1>' +
-      googleButton() + '<div data-google-auth hidden><p class="small muted">Use the Google account with the email your coach has. No new password needed.</p><p class="auth-divider">or create an account with email</p></div>' +
-      '<form class="card form" id="f" novalidate><p class="section-title">Create your account</p>' +
+    app.innerHTML = '<div class="auth-wrap"><header class="auth-court"><div><p class="court-kicker">THE LAB · Start here</p><h1>Your game. Your next step.</h1><p>Keep your coaching, practice and progress together. Create your free account, then make it yours.</p></div><span class="court-art" aria-hidden="true"><i></i></span></header>' +
+      '<ol class="signup-steps" aria-label="Getting started"><li aria-current="step">1 · Account</li><li>2 · Your game</li><li>3 · Dashboard</li></ol>' +
+      googleButton() + '<p class="small muted" data-google-auth hidden>Choose Google to create your THE LAB account without a new password. Already a member? The same button signs you in.</p>' +
+      '<div id="email-slot">' + (META.magic ? emailForm() : '') + '</div>' +
+      '<details><summary>Create an account with a password</summary><form class="card form" id="f"><p class="section-title">Create your account</p>' +
       '<div class="field"><label class="flabel" for="nm">Full name</label><input type="text" id="nm" autocomplete="name" maxlength="80" required></div>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required><p class="small muted">Use the email your coach has. You can connect earlier coaching history after signing in.</p></div>' +
       '<div class="field"><label class="flabel" for="pw">Password <span class="hint">10+ characters</span></label><input type="password" id="pw" autocomplete="new-password" minlength="10" required></div>' +
-      '<div class="row"><button class="btn primary" type="submit">Create account</button></div></form>' +
+      '<div class="row"><button class="btn primary" type="submit">Create account</button></div></form></details>' +
+      '<p class="small muted">Already training with THE LAB? Use the email your coach has so you can keep your coaching history together. No card is needed to create an account.</p>' +
       '<p class="small">Already have an account? <a href="#/signin">Sign in</a>.</p></div>';
     syncGoogleAuth();
+    bindEmailForm();
     $('#f').addEventListener('submit', function (e) {
       e.preventDefault();
+      var form = this, button = form.querySelector('button');
+      if (button.disabled) return;
+      button.disabled = true; button.textContent = 'Creating account…';
       api.request('POST', '/api/auth/signup', { name: $('#nm').value, email: $('#em').value, password: $('#pw').value })
-        .then(function (m) { setMe(m); L.toast('Welcome to THE LAB'); location.hash = '#/profile'; }, function (err) { L.formError($('#f'), err.message); });
+        .then(function (m) { setMe(m); location.hash = '#/'; }, function (err) { button.disabled = false; button.textContent = 'Create account'; L.formError(form, err.message); });
     });
   };
 
@@ -2398,9 +2406,10 @@
 
   function route() {
     var p = parse();
-    if(ME && p && p.r[1]==='signin' && !p.query.error){location.hash='#/';return;}
+    if(ME && p && ['signin','signup'].includes(p.r[1]) && !p.query.error){location.hash='#/';return;}
     if (!p) { location.hash = '#/'; return; }
     if(ME && p.r[1]==='home'){
+      if (ME.welcome_required) { location.hash='#/welcome'; return; }
       const pending=window.LabInviteReturn.take();if(pending){location.hash=pending;return;}
     }
     if (!p.r[3] && !ME) { window.LabInviteReturn.save(location.hash); location.hash = '#/signin'; return; }

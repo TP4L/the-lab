@@ -100,7 +100,8 @@ function routes(r, ctx) {
     const athlete = db.prepare('SELECT id,name,focus,goals FROM athletes WHERE user_id=?').get(u.id) || null;
     const candidates = athlete ? [] : db.prepare('SELECT id,name FROM athletes WHERE user_id IS NULL AND claim_email=?').all(u.email);
     const signup = db.prepare('SELECT reviewed_at,email_state,email_sent_at,last_error FROM member_signups WHERE user_id=?').get(u.id) || null;
-    return { member: u, athlete, candidates, signup };
+    const welcome = db.prepare('SELECT completed_at,sport,goals,connection FROM member_welcome WHERE user_id=?').get(u.id) || null;
+    return { member: u, athlete, candidates, signup, welcome };
   });
   r.post('/api/admin/members/:id/reviewed', ({ user, params }) => {
     const u = member(user, params.id);
@@ -115,7 +116,8 @@ function routes(r, ctx) {
       if (db.prepare('SELECT 1 FROM athletes WHERE user_id IS NULL AND claim_email=?').get(u.email)) {
         throw new HttpError(409, 'An earlier profile matches this email. Open that record and use its claim code to preserve the history.');
       }
-      const id = Number(db.prepare('INSERT INTO athletes(user_id,name,created_by) VALUES (?,?,?)').run(u.id,u.name,user.id).lastInsertRowid);
+      const welcome = db.prepare('SELECT sport,goals FROM member_welcome WHERE user_id=?').get(u.id);
+      const id = Number(db.prepare('INSERT INTO athletes(user_id,name,sport,goals,created_by) VALUES (?,?,?,?,?)').run(u.id,u.name,welcome?.sport || '',welcome?.goals || '',user.id).lastInsertRowid);
       db.prepare('INSERT INTO coach_athletes(coach_id,athlete_id) VALUES (?,?)').run(user.id,id);
       return { athlete_id: id };
     });

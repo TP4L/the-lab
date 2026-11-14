@@ -72,6 +72,7 @@ function createApp(opts = {}) {
   require('./api/training.js')(r, ctx);
   require('./api/progress.js')(r, ctx);
   require('./api/athletes.js')(r, ctx);
+  require('./api/welcome.js').routes(r, ctx);
   require('./api/timeline.js')(r, ctx);
   require('./api/publishing.js')(r, ctx);
   require('./api/play.js')(r, ctx);
