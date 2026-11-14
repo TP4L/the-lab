@@ -18,3 +18,145 @@ body{font-size:15px;line-height:1.55}a,button,input,textarea,select{-webkit-tap-
 @media print{.lab-sidebar,.top,.nav,.lab-scrim{display:none!important}.lab-signed-in .main{margin:0;padding:0;max-width:none}body{background:#fff;color:#111}.lab-panel{break-inside:avoid}.lab-color-card{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 
 .btn.primary.google{background:#fff;border-color:#747775;color:#1f1f1f;font-family:Arial,sans-serif}.btn.primary.google:hover{background:#f2f2f2}.lab-auth-page .auth-wrap{max-width:540px}.lab-sidebar .lab-wordmark:focus-visible{outline-offset:6px}
+
+/* The same palette follows the athlete from the dashboard into each section. */
+body {
+  --section-accent:#efff00;
+  --section-tint:#272c17;
+  --accent:var(--section-accent);
+  --accent-soft:var(--section-tint);
+  background:radial-gradient(ellipse at 100% 0%,color-mix(in srgb,var(--section-accent) 7%,transparent),transparent 65%) var(--ground);
+  background-attachment:fixed;
+}
+body:is([data-section="athletes"],[data-section="progress"],[data-section="members"],[data-section="profile"]) {
+  --section-accent:#43e9ab;
+  --section-tint:#18352a;
+}
+body:is([data-section="reviews"],[data-section="library"],[data-section="studio"]) {
+  --section-accent:#ff862d;
+  --section-tint:#38271c;
+}
+.top {border-bottom-color:color-mix(in srgb,var(--section-accent) 30%,var(--rule-soft))}
+.lab-sidebar {border-right-color:#3e4930;background:linear-gradient(160deg,#21271a,#141713 50%)}
+.lab-side-brand {border-top:3px solid #efff00;padding-top:15px}
+.lab-wordmark {color:#efff00}
+.lab-side-link .lab-icon {color:#efff00}
+.lab-side-link:is([data-section="athletes"],[data-section="progress"],[data-section="members"],[data-section="profile"]) .lab-icon {color:#43e9ab}
+.lab-side-link:is([data-section="reviews"],[data-section="library"],[data-section="studio"]) .lab-icon {color:#ff862d}
+.lab-side-link[aria-current=page],.nav a[aria-current=page] {background:var(--section-accent);color:#0c0d0c}
+.lab-side-link[aria-current=page] .lab-icon {color:inherit}
+.lab-account {background:#43e9ab;border-color:#43e9ab}
+.btn.primary:not(.google):hover {background:color-mix(in srgb,var(--section-accent) 82%,#fff);border-color:var(--section-accent)}
+
+/* Bright entrances, then quieter tinted surfaces for reading and editing. */
+body:not([data-section="home"]) :is(.head,.lab-page-heading,.journey-heading),
+.court-hero,.auth-court,.coach-athlete-head {
+  --ink:#10150e;
+  --ink-soft:#364032;
+  --ink-faint:#404a38;
+  --rule:#10150e55;
+  --rule-soft:#10150e26;
+  color:var(--ink);
+  background:linear-gradient(118deg,var(--section-accent),color-mix(in srgb,var(--section-accent) 32%,#f6f0df))!important;
+  border:1px solid transparent!important;
+  border-radius:24px!important;
+  padding:clamp(22px,3vw,34px);
+}
+body:not([data-section="home"]) :is(.head,.lab-page-heading,.journey-heading) {margin-top:0}
+body:not([data-section="home"]) :is(.head,.lab-page-heading,.journey-heading) :is(h1,h2,.eyebrow,.lab-greeting),
+.court-hero :is(h1,.court-kicker),.auth-court :is(h1,.court-kicker),.coach-athlete-head :is(h1,.pid) {color:#10150e}
+body:not([data-section="home"]) :is(.head,.lab-page-heading,.journey-heading) p,
+.court-hero p,.auth-court p,.coach-athlete-head .facts {color:#364032}
+.journey-heading h1 {font-family:Anton,Impact,sans-serif;font-weight:400;letter-spacing:.005em;line-height:1.1}
+.court-hero {grid-template-columns:minmax(0,1fr)}
+:is(.head,.lab-page-heading,.journey-heading,.court-hero,.auth-court) .btn:not(.danger):not(.google),
+body:not([data-section="home"]) .lab-page-heading>.lab-action {
+  background:#10150e;color:#f6f0df;border-color:#10150e;
+}
+:is(.head,.lab-page-heading,.journey-heading,.court-hero,.auth-court,.coach-athlete-head) :focus-visible {outline-color:#10150e}
+.auth-court {background:linear-gradient(125deg,#efff00,#b9ef96)!important}
+
+.lab-signed-in :is(.card,.list,.tile,.journey-note,.journey-media,.lab-panel:not(.cream)) {
+  background:linear-gradient(130deg,color-mix(in srgb,var(--section-accent) 9%,#171a17),#171a17 80%);
+  border-color:color-mix(in srgb,var(--section-accent) 24%,#2c312a);
+}
+.lab-signed-in :is(.card,.journey-note,.lab-panel:not(.cream)) {border-top:3px solid color-mix(in srgb,var(--section-accent) 65%,#2c312a)}
+.lab-signed-in :is(.section-title,.journey-section h2,.coach-panel-head .eyebrow) {color:var(--section-accent)}
+.lab-panel:not(.cream) .lab-panel-heading h2 {color:var(--section-accent)}
+.lab-journal {--section-accent:#43e9ab}
+.lab-resource-strip {background:linear-gradient(110deg,#273515,#193b2b);border-color:#4d6c35}
+.lab-record>.lab-icon {color:var(--section-accent)}
+.cream .lab-record>.lab-icon {color:#364032}
+.lab-signed-in :is(.card,.list,.journey-note) a:not(.btn):not(.li):not(.dev-card):not(.course-card):not(.journey-session) {text-decoration-color:var(--section-accent);text-underline-offset:4px}
+.lab-filter-links [aria-pressed=true],.journey-tabs a[aria-current=page],.journey-tabs button[aria-pressed=true],
+.court-nav a[aria-current=page],.coach-athlete-tabs button[aria-pressed=true],.court-player-switch [aria-pressed=true] {
+  background:var(--section-accent);border-color:var(--section-accent);color:#10150e;
+}
+.journey-tabs a,.coach-athlete-tabs button {border-radius:999px}
+.lab-page-search>div,.lab-side-search {border-color:color-mix(in srgb,var(--section-accent) 38%,#42483e)}
+.lab-page-search .lab-icon {color:var(--section-accent)}
+.welcome-options label:has(input:checked) {background:#283219;border-color:#efff00}
+.welcome-connected {background:#193b2b;border-color:#43e9ab;border-radius:12px}
+
+/* Practice, player focus, and measurement cards keep their color at depth. */
+.dev-card:not(.mastered),.dev-hero {background:linear-gradient(125deg,#efff00,#d5e99b);color:#10150e;border-color:#d5e99b;border-radius:22px}
+.dev-card:not(.mastered) :is(b,.dev-kicker,.dev-meta),.dev-hero :is(.dev-kicker,.dev-read b) {color:#10150e}
+.dev-card:not(.mastered) .dev-problem,.dev-hero>p {color:#364032}
+.dev-card:after,.dev-hero:after {border-color:#10150e12;pointer-events:none}
+.dev-steps span.on {background:var(--section-tint);color:var(--section-accent)}
+.coach-focus-card {background:#43e9ab;color:#10150e;border-radius:22px}
+.coach-athlete-head .avatar {background:#10150e;color:#43e9ab;border-radius:16px}
+.coach-focus-card :is(.eyebrow,a) {color:#10150e}
+.coach-focus-card>a {text-decoration:underline;text-underline-offset:4px}
+.coach-athlete-glance>div {background:#21392c;border-color:#3c6b4d}
+.coach-athlete-glance>div:nth-child(2) {background:#3b2a1c;border-color:#79502a}
+.coach-athlete-glance>div:nth-child(3) {background:#30351b;border-color:#626b2f}
+.coach-athlete-glance strong {color:#43e9ab}
+.coach-athlete-glance>div:nth-child(2) strong {color:#ffae6a}
+.coach-athlete-glance>div:nth-child(3) strong {color:#efff00}
+.court-select input {accent-color:var(--section-accent)}
+.court-select:has(input:checked) {background:var(--section-tint);border-radius:10px}
+.court-week legend {background:var(--section-accent);color:#10150e;border-radius:999px;padding:6px 12px}
+.court-focus {background:#193b2b;border-color:#3c6b4d}
+.court-page :focus-visible,.court-nav :focus-visible,.court-player-switch :focus-visible {outline-color:var(--section-accent)}
+
+/* Resource type and conversation role have stable colors, even after filtering. */
+#library-results .lab-panel {--resource-color:#efff00;background:var(--resource-color);border-color:var(--resource-color);color:#10150e;padding:26px}
+#library-results [data-resource-kind="course"] {--resource-color:#43e9ab}
+#library-results .lab-panel :is(p,.lab-kicker) {color:#28362b}
+#library-results .lab-action {border-top:1px solid #10150e33;border-radius:0;padding-top:18px;color:#10150e}
+#library-results .lab-action .lab-icon {color:#10150e}
+#library-results :focus-visible {outline-color:#10150e}
+.lab-personal-library {--section-accent:#43e9ab}
+.lab-review-note[data-author-kind="coach"] {--section-accent:#43e9ab}
+.lab-review-note .lab-kicker {color:var(--section-accent)}
+.journey-focus {background:#ff862d;color:#10150e;border-color:#ff862d}
+.journey-focus>p:not(.eyebrow),.journey-focus .eyebrow {color:#302617}
+.journey-focus .btn {background:#10150e;color:#f6f0df;border-color:#10150e}
+.journey-focus :focus-visible {outline-color:#10150e}
+.journey-upload {background:#38271c;border-color:#ff862d;color:#f6f0df}
+.journey-columns>* {min-width:0}
+.journey-compose input[type=file] {width:100%;min-width:0}
+.journey-media figcaption {border-top:3px solid #ff862d}
+.course-card {border-radius:20px;border-color:#6c5834}
+.course-card .cover {background:#43e9ab;color:#10150e}
+.coach-work {background:linear-gradient(135deg,#34271b,#171a17);border-color:#73502d;border-top:3px solid #ff862d}
+.coach-workspace-bar {background:#29251b;border-color:#6a5032}
+.coach-pulse button {background:var(--section-tint);border-color:color-mix(in srgb,var(--section-accent) 35%,#42483e)}
+.coach-actions a:not(.assign) {background:#193b2b;border-color:#3c6b4d}
+.coach-actions a:not(.assign) span {color:#43e9ab}
+.coach-today {width:100%;grid-template-columns:minmax(0,1fr)}
+.coach-today>* {min-width:0}
+#test-form .form-grid>label {display:grid;gap:6px;min-width:0}
+.form input:not([type]) {width:100%;padding:10px 12px;border:1px solid var(--rule)}
+
+@media(max-width:599px) {
+  body:not([data-section="home"]) :is(.head,.lab-page-heading,.journey-heading),.coach-athlete-head {padding:23px 20px;border-radius:21px!important}
+  body:not([data-section="home"]) .lab-page-heading h1 {font-size:42px}
+  .court-hero>div {padding-right:0}
+  #library-results .lab-panel {padding:23px}
+}
+@media print {
+  body {background:#fff}
+  .lab-signed-in :is(.card,.list,.journey-note,.lab-panel:not(.cream)) {background:#fff;color:#111;border-color:#777}
+}

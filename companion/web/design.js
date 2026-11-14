@@ -80,8 +80,8 @@
       const name=p.r[1],path=(location.hash||'#/').split('?')[0];
       if(['home','coachToday'].includes(name))return 'home';
       if(path.startsWith('#/admin/members'))return 'members';
-      if(name==='coachQueue'||name==='labReviews'||path.startsWith('#/journey/videos'))return 'reviews';
-      if(/Progress$/.test(name)||path.startsWith('#/progress')||name==='timeline')return 'progress';
+      if(name==='coachQueue'||name==='labReviews'||/^#\/journey\/(videos|notes|feedback)/.test(path)||name==='followups')return 'reviews';
+      if(/Progress$/.test(name)||path.startsWith('#/progress')||path==='#/timeline')return 'progress';
       if(path.startsWith('#/coach/plans')||path.startsWith('#/coach/lesson')||path.startsWith('#/i/')||path==='#/journey/sessions'||name==='session'||name==='live')return 'sessions';
       if(path.startsWith('#/workspace')||/^coach(New|Athlete|Code)?$/.test(name))return 'athletes';
       if(path.startsWith('#/train')||path.startsWith('#/development')||path==='#/programs'||path==='#/coach/programs')return 'practice';
@@ -94,7 +94,7 @@
       document.body.classList.toggle('lab-signed-in',logged);
       document.body.classList.toggle('lab-auth-page',!logged||p.r[1]==='welcome');
       document.body.classList.toggle('lab-compact-sidebar',!!L.Store.get('sidebar-compact',false));
-      document.body.dataset.view=p.r[1];aside.hidden=!logged;
+      document.body.dataset.view=p.r[1];document.body.dataset.section=key;aside.hidden=!logged;
       const top=document.querySelector('.top-inner'),right=document.querySelector('.top-right');
       let menu=document.getElementById('lab-menu');
       if(!menu){menu=document.createElement('button');menu.id='lab-menu';menu.className='lab-icon-button lab-menu';menu.type='button';menu.innerHTML=icon('menu');menu.setAttribute('aria-label','Open navigation');menu.setAttribute('aria-controls','lab-sidebar');top.prepend(menu);}
@@ -105,7 +105,7 @@
       account.hidden=!logged;account.textContent=initials(me?.user?.name);account.setAttribute('aria-label','Your profile');
       const bell=document.getElementById('bell');bell.innerHTML=icon('bell');
       if(!logged)return;
-      const navLink=([id,label,url,symbol])=>'<a href="'+url+'" class="lab-side-link" title="'+h(label)+'"'+(id===key?' aria-current="page"':'')+'>'+icon(symbol)+'<span class="lab-nav-label">'+h(label)+'</span></a>';
+      const navLink=([id,label,url,symbol])=>'<a href="'+url+'" class="lab-side-link" data-section="'+id+'" title="'+h(label)+'"'+(id===key?' aria-current="page"':'')+'>'+icon(symbol)+'<span class="lab-nav-label">'+h(label)+'</span></a>';
       aside.innerHTML='<div class="lab-side-brand"><a class="lab-wordmark" href="#/" aria-label="THE LAB home">THE LAB</a><button class="lab-icon-button" id="lab-collapse" aria-label="Collapse sidebar" type="button">'+icon('chevron')+'</button></div>'+
         '<form class="lab-side-search" role="search"><label class="sr-only" for="lab-search">Search your LAB</label>'+icon('search')+'<input id="lab-search" name="q" type="search" placeholder="Search your LAB" required><button type="submit" aria-label="Search">'+icon('arrow')+'</button></form>'+
         '<a class="lab-search-shortcut lab-icon-button" href="#/search" aria-label="Search your LAB">'+icon('search')+'</a>'+
@@ -225,7 +225,7 @@
       const notes=p.notes;
       host.innerHTML+='<div class="lab-filter-links">'+action('#/journey/notes','All coaching notes','outline','message')+action('#/journey/videos','Your video room','outline','review')+'</div><div class="lab-review-grid">'+(notes.length?notes.map(n=>{
         const m=media.get(n.media_id),mime=n.media_mime||m?.mime||'';
-        return '<article class="lab-panel lab-review-note"><div class="lab-panel-heading"><p class="lab-kicker">'+h(n.kind==='coach'?'From '+(n.author||'your coach'):n.reviewed_at?'Reviewed':'Awaiting review')+'</p><time>'+h(date(n.created_at))+'</time></div><p class="lab-note-body">'+h(clean(n.body))+'</p>'+
+        return '<article class="lab-panel lab-review-note" data-author-kind="'+(n.kind==='coach'?'coach':'member')+'"><div class="lab-panel-heading"><p class="lab-kicker">'+h(n.kind==='coach'?'From '+(n.author||'your coach'):n.reviewed_at?'Reviewed':'Awaiting review')+'</p><time>'+h(date(n.created_at))+'</time></div><p class="lab-note-body">'+h(clean(n.body))+'</p>'+
           (n.media_id&&mime.startsWith('video/')?'<video controls playsinline preload="metadata" aria-label="Training clip" src="/api/media/'+h(n.media_id)+'"></video>':n.media_id&&mime.startsWith('image/')?'<img loading="lazy" alt="Shared coaching attachment" src="/api/media/'+h(n.media_id)+'">':'')+
           action('#/journey/feedback','Ask a follow-up','outline','message')+'</article>';
       }).join(''):empty('Start with one useful question.','Upload a clip and tell your coach what to look for.','#/journey/feedback?type=video','Upload your first clip'))+'</div>';
@@ -240,7 +240,7 @@
         '<section class="lab-panel lab-personal-library"><h2>YOUR COACHING RECORDS</h2>'+row('#/journey/videos','Your videos & photos','Media shared on your athlete profile.','review')+row('#/timeline','Session history','Your sessions, notes and connected coaching records.','calendar')+row('#/website','Earlier website records','Open your connected coaching history.','book')+'</section>';
       let kind='all';const items=[...courses.map(c=>({...c,kind:'course',href:'#/learn/course/'+c.slug})),...posts.map(p=>({...p,kind:'post',href:'#/learn/'+p.slug}))];
       const paint=()=>{const query=host.querySelector('#library-search').value.toLowerCase().trim(),rows=items.filter(i=>(kind==='all'||i.kind===kind)&&[i.title,i.summary,i.description].join(' ').toLowerCase().includes(query));
-        host.querySelector('#library-results').innerHTML=rows.map(i=>'<article class="lab-panel"><p class="lab-kicker">'+h(i.kind==='course'?'Course'+(i.access==='members'?' · Member access':''):'Field note')+'</p><h2>'+h(i.title)+'</h2><p>'+h(short(i.summary||i.description||'',160))+'</p>'+action(i.href,'Open '+(i.kind==='course'?'course':'field note'))+'</article>').join('')||empty(items.length?'No matching resources.':'Your library is growing.',items.length?'Try another search or resource type.':'Published courses and field notes will appear here.');};
+        host.querySelector('#library-results').innerHTML=rows.map(i=>'<article class="lab-panel" data-resource-kind="'+i.kind+'"><p class="lab-kicker">'+h(i.kind==='course'?'Course'+(i.access==='members'?' · Member access':''):'Field note')+'</p><h2>'+h(i.title)+'</h2><p>'+h(short(i.summary||i.description||'',160))+'</p>'+action(i.href,'Open '+(i.kind==='course'?'course':'field note'))+'</article>').join('')||empty(items.length?'No matching resources.':'Your library is growing.',items.length?'Try another search or resource type.':'Published courses and field notes will appear here.');};
       host.querySelector('form').onsubmit=e=>e.preventDefault();host.querySelector('input').oninput=paint;
       host.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{kind=b.dataset.kind;host.querySelectorAll('[data-kind]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));paint();});paint();notice(host,results);
     };

@@ -54,6 +54,12 @@ fs.mkdirSync(out,{recursive:true});
   await go('#/journey/feedback','#message-body');await p.fill('#message-body','How can I give myself more time?');
   await p.locator('.journey-compose button[type=submit]').click();await p.locator('#message-status').filter({hasText:'Saved to your coaching notes.'}).waitFor();
   await go('#/reviews','.lab-review-note');assert.match(await p.locator('#app').innerText(),/How can I give myself more time/);
+  // Follow the dashboard into the reading, editing, and feedback surfaces.
+  const memberPages=[['practice','#/train','#developmentPath .dev-card'],['development','#/development/'+practice.id,'.dev-hero'],['library','#/library','#library-results article'],['reviews','#/reviews','.lab-review-note'],['feedback','#/journey/feedback','#message-body'],['progress','#/progress','#test-form']];
+  for(const [name,hash,selector] of memberPages){
+   await p.setViewportSize({width:1440,height:1100});await go(hash,selector);await fit();await p.screenshot({path:path.join(out,name+'-desktop.png'),fullPage:true});
+   for(const width of [390,320]){await p.setViewportSize({width,height:844});await fit();if(width===390)await p.screenshot({path:path.join(out,name+'-phone.png'),fullPage:true});}
+  }
   await go('#/','.lab-lesson');
   for(const width of [390,320,768]){await p.setViewportSize({width,height:844});await fit();assert.ok(await p.locator('.lab-sidebar').evaluate(e=>e.getBoundingClientRect().right<=0),'Closed phone drawer must be off screen');await p.screenshot({path:path.join(out,'member-'+width+'.png'),fullPage:true});}
   await p.setViewportSize({width:390,height:844});await p.click('#lab-menu');assert.ok(await p.locator('body.lab-drawer-open').count());
@@ -66,10 +72,13 @@ fs.mkdirSync(out,{recursive:true});
   await go('#/','.lab-lesson');await fit();assert.match(await p.locator('#app').innerText(),/Alex Rivera/);assert.match(await p.locator('#app').innerText(),/1 waiting for review/);
   await p.screenshot({path:path.join(out,'coach-desktop.png'),fullPage:true});
   await p.setViewportSize({width:390,height:844});await fit();await p.screenshot({path:path.join(out,'coach-phone.png'),fullPage:true});
-  await go('#/coach/queue?filter=review','.coach-queue');await p.click('#coach-refresh');await p.locator('.coach-queue').waitFor();await p.locator('[data-reply]').first().click();await p.locator('.coach-inline textarea').fill('Pause, find balance, and choose the next ball.');await p.locator('.coach-inline button[type=submit]').click();
+  await go('#/coach/queue?filter=review','.coach-queue');await fit();await p.screenshot({path:path.join(out,'queue-phone.png'),fullPage:true});await p.click('#coach-refresh');await p.locator('.coach-queue').waitFor();await p.locator('[data-reply]').first().click();await p.locator('.coach-inline textarea').fill('Pause, find balance, and choose the next ball.');await p.locator('.coach-inline button[type=submit]').click();
   await p.waitForFunction(()=>!document.querySelector('[data-reply]'));
   assert.ok(ok(await member.get('/api/athletes/'+aid)).notes.some(n=>n.body==='Pause, find balance, and choose the next ball.'));
-  await go('#/coach/lesson/'+plan.id,'#app h1');assert.doesNotMatch(await p.locator('#app').innerText(),/Couldn’t load/);
+  for(const [name,hash,selector] of [['athlete','#/coach/'+aid,'.coach-focus-card'],['lesson','#/coach/lesson/'+plan.id,'#lessonStart'],['program','#/coach/programs','#programBuilder']]){
+   await p.setViewportSize({width:1440,height:1100});await go(hash,selector);await fit();await p.screenshot({path:path.join(out,name+'-desktop.png'),fullPage:true});
+   for(const width of [390,320]){await p.setViewportSize({width,height:844});await fit();if(width===390)await p.screenshot({path:path.join(out,name+'-phone.png'),fullPage:true});}
+  }
   await go('#/more','.lab-library-grid');assert.match(await p.locator('#app').innerText(),/Quick make \/ miss/);await fit();
   await cc.close();
   const nc=await browser.newContext({viewport:{width:390,height:844}});p=await nc.newPage();p.on('pageerror',e=>errors.push(e.message));
@@ -78,7 +87,7 @@ fs.mkdirSync(out,{recursive:true});
   await p.waitForURL(/#\/welcome/);await p.locator('#welcome-form').waitFor();await p.screenshot({path:path.join(out,'welcome.png'),fullPage:true});
   await p.fill('#welcome-sport','Pickleball');await p.fill('#welcome-goals','Find more control.');await p.check('input[value=new]');await p.locator('#welcome-form button[type=submit]').click();await p.locator('.lab-lesson').waitFor();assert.match(await p.locator('#app').innerText(),/Make it count/);await fit();await p.screenshot({path:path.join(out,'new-member.png'),fullPage:true});
   assert.equal(errors.length,0,errors.join('\n'));assert.deepEqual(badResponses,[]);
-  console.log('PASS: member and coach dashboards, desktop and 320/390/768px layouts, sidebar, search, courses, task persistence, private-note isolation, feedback round-trip, offline cache, signup and welcome.');
+  console.log('PASS: member and coach dashboards; practice, development, library, feedback, progress, athlete, lesson and program screens at desktop and 320/390px; 768px dashboard, sidebar, search, courses, task persistence, private-note isolation, feedback round-trip, offline cache, signup and welcome.');
   console.log('Screenshots: '+out);
  }catch(e){if(p)await p.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});throw e;}
  finally{await browser?.close();await s.close();}
