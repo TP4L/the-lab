@@ -104,7 +104,7 @@ module.exports = function athletes(r, ctx) {
     };
     // The coach owns focus and plan; an athlete can't rewrite their own plan.
     if (level === 'coach') {
-      if (body.focus !== undefined) f.focus = str(body.focus, 'focus', { max: 500 });
+      if (body.focus !== undefined) f.focus = str(body.focus, 'focus', { max: 2000 });
       if (body.plan !== undefined) f.plan = str(body.plan, 'plan', { max: 4000 });
     }
     return f;

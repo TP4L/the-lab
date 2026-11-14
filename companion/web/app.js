@@ -1486,7 +1486,7 @@
       '<div class="form-grid"><div class="field"><label class="flabel" for="hand">Playing hand</label><select id="hand"><option value="">—</option>' + opts(HANDS) + '</select></div>' +
       '<div class="field"><label class="flabel" for="side">Preferred side</label><select id="side"><option value="">—</option>' + opts(SIDES) + '</select></div>' +
       '<div class="field"><label class="flabel" for="rating">Rating</label><input type="text" id="rating" maxlength="20"></div></div>' +
-      '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" placeholder="e.g. Third-shot drop depth"></div>' +
+      '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="2000" placeholder="e.g. Third-shot drop depth"></div>' +
       athleticFields({}) +
       '<div class="row"><button class="btn primary" type="submit">Create profile</button></div></form>';
     $('#f').addEventListener('submit', function (e) {
@@ -1560,7 +1560,7 @@
         '<section data-athlete-panel="progress" class="stack" hidden><div class="coach-panel-head"><div><p class="eyebrow">PLAYER DEVELOPMENT</p><h2>Focus, goals and measurements</h2></div></div>' +
         '<form class="card form" id="pf" novalidate><p class="section-title">Development</p>' +
         '<label>Coach-assigned training needs <input id="trainingNeeds" maxlength="1450" value="' + h((a.training_needs || []).join(', ')) + '" placeholder="transition reset, bounce read, middle priority"></label><p class="small muted">Separate needs with commas. Coaches see overlaps when planning a group lesson.</p>' +
-        '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="500" value="' + h(a.focus) + '"></div>' +
+        '<div class="field"><label class="flabel" for="focus">Current focus</label><input type="text" id="focus" maxlength="2000" value="' + h(a.focus) + '"></div>' +
         '<div class="field"><label class="flabel" for="plan">Development plan</label><textarea id="plan" maxlength="4000">' + h(a.plan) + '</textarea></div>' +
         athleticFields(a) +
         '<div class="field"><label class="flabel" for="goals">Athlete goals</label><textarea id="goals" maxlength="2000">' + h(a.goals) + '</textarea></div>' +
