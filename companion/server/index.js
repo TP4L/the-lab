@@ -28,6 +28,10 @@ function createApp(opts = {}) {
     stripeWebhookSecret: opts.stripeWebhookSecret || '',
     stripePriceEssentials: opts.stripePriceEssentials || '',
     stripeIntegrationIdentifier: opts.stripeIntegrationIdentifier || 'the_lab_essentials',
+    discoveryOwnerEmail: opts.discoveryOwnerEmail || opts.adminEmail || '',
+    discoveryGeocoder: opts.discoveryGeocoder || 'https://nominatim.openstreetmap.org/search',
+    discoveryTileUrl: opts.discoveryTileUrl || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    discoveryTileAttribution: opts.discoveryTileAttribution || '© OpenStreetMap contributors',
     mediaDir,
     backupDir: opts.backupDir === undefined ? (opts.file && opts.file !== ':memory:' ? path.join(path.dirname(opts.file), 'backups') : null) : opts.backupDir,
     removeFiles: files => files.forEach(f => fs.rm(path.join(mediaDir, f), { force: true }, () => {}))
@@ -79,6 +83,7 @@ function createApp(opts = {}) {
   require('./api/play.js')(r, ctx);
   require('./api/learn.js')(r, ctx);
   require('./api/billing.js')(r, ctx);
+  require('./api/discovery.js')(r, ctx);
   require('./api/coaching.js')(r, ctx);
   require('./api/development.js')(r, ctx);
   require('./api/checkins.js')(r, ctx);
@@ -169,7 +174,7 @@ function createApp(opts = {}) {
       let assetPath;
       try { assetPath = path.posix.normalize(decodeURIComponent(pathname)); } catch { return send(res, 400, {error:'Bad path.'}); }
       if (assetPath === '/padel' || assetPath.startsWith('/padel/')) return send(res, 404, { error: 'This page is no longer hosted here.' });
-      return serveStatic(WEB_ROOT, req, res, pathname);
+      return serveStatic(WEB_ROOT, req, res, pathname, config.discoveryTileUrl);
     }
     try {
       const method = req.method === 'HEAD' ? 'GET' : req.method;
@@ -223,6 +228,10 @@ if (require.main === module) {
     vapidSubject: process.env.VAPID_SUBJECT || '',
     googleClientId: demo ? '' : process.env.GOOGLE_CLIENT_ID || '',
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    discoveryOwnerEmail: process.env.DISCOVERY_OWNER_EMAIL,
+    discoveryGeocoder: process.env.DISCOVERY_GEOCODER_URL,
+    discoveryTileUrl: process.env.DISCOVERY_TILE_URL,
+    discoveryTileAttribution: process.env.DISCOVERY_TILE_ATTRIBUTION,
     stripeKey: demo ? '' : process.env.STRIPE_RESTRICTED_KEY || process.env.STRIPE_SECRET_KEY || '',
     stripeWebhookSecret: demo ? '' : process.env.STRIPE_WEBHOOK_SECRET || '',
     stripePriceEssentials: demo ? '' : process.env.STRIPE_PRICE_ESSENTIALS || '',

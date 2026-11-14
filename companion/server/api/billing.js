@@ -20,7 +20,8 @@ function stripeClient(key) {
   return new Client(key, { apiVersion: '2026-08-26.dahlia' });
 }
 
-module.exports = function billing(r, { db, auth, config, stripeClient: supplied }) {
+module.exports = function billing(r, ctx) {
+  const { db, auth, config, stripeClient: supplied } = ctx;
   const stripe = supplied || stripeClient(config.stripeKey);
   const enabled = !!(stripe && config.stripePriceEssentials && config.stripeWebhookSecret);
   const current = user => user && db.prepare('SELECT * FROM memberships WHERE user_id = ?').get(user.id);
@@ -93,8 +94,10 @@ module.exports = function billing(r, { db, auth, config, stripeClient: supplied 
     try { event = stripe.webhooks.constructEvent(raw, req.headers['stripe-signature'], config.stripeWebhookSecret); }
     catch { throw new HttpError(400, 'Invalid webhook signature.'); }
     if (db.prepare('SELECT 1 FROM billing_events WHERE id = ?').get(event.id)) return { received: true, duplicate: true };
+    const discoveryEvent = ctx.discovery && await ctx.discovery.webhook(event);
     tx(db, () => {
-      if (event.type.startsWith('checkout.session.') || event.type.startsWith('customer.subscription.') || event.type === 'invoice.paid' || event.type === 'invoice.payment_failed') setMembership(event);
+      if (db.prepare('SELECT 1 FROM billing_events WHERE id = ?').get(event.id)) return;
+      if (!discoveryEvent && (event.type.startsWith('checkout.session.') || event.type.startsWith('customer.subscription.') || event.type === 'invoice.paid' || event.type === 'invoice.payment_failed')) setMembership(event);
       db.prepare('INSERT INTO billing_events (id,event_type) VALUES (?,?)').run(event.id, event.type);
     });
     return { received: true };

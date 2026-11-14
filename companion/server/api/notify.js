@@ -11,10 +11,11 @@ const PREFS = {
   matches: 'Match confirmations and corrections',
   events: 'Event registration and check-in',
   reminders: 'Reminders before events',
+  discovery: 'Discovery requests, session changes and messages',
   content: 'New Field Notes'
 };
 const SETTINGS = { email_notifications: 'Email me coach notes, training and event updates', leaderboard: 'Show me on leaderboards' };
-const PRIORITY = { up_next: 'urgent', reminders: 'urgent', feedback: 'important', training: 'important', matches: 'important', events: 'important', courts: 'routine', content: 'routine' };
+const PRIORITY = { discovery: 'important', up_next: 'urgent', reminders: 'urgent', feedback: 'important', training: 'important', matches: 'important', events: 'important', courts: 'routine', content: 'routine' };
 const EMAIL_MODES = ['important', 'digest', 'all', 'off'];
 
 function prefsOf(row) {

@@ -75,7 +75,7 @@
     matchMedia('(min-width:1000px)').addEventListener('change',closeDrawer);
     const memberNav=[['home','Home','#/','home'],['practice','Practice plan','#/train','practice'],['sessions','Sessions','#/journey/sessions','calendar'],['reviews','Video & feedback','#/reviews','review'],['progress','Progress','#/progress','progress']];
     const coachNav=[['home','Today','#/coach/today','home'],['athletes','Athletes','#/workspace','people'],['sessions','Lesson planner','#/coach/plans','calendar'],['practice','Programs','#/coach/programs','practice'],['reviews','Review queue','#/coach/queue?filter=review','review']];
-    const resources=()=>[['library','Library','#/library','book'],['play','Play & events','#/play','activity'],...(staff()?[['tools','Coaching tools','#/more','settings']]:[]),...(ctx.has('contributor','editor')?[['studio','Publishing','#/studio','book']]:[]),...(ctx.has('admin')?[['members','New members','#/admin/members','people'],['admin','Administration','#/admin','settings']]:[])];
+    const resources=()=>[['discovery','Discovery','#/discovery','search'],['library','Library','#/library','book'],['play','Play & events','#/play','activity'],...(staff()?[['tools','Coaching tools','#/more','settings']]:[]),...(ctx.has('contributor','editor')?[['studio','Publishing','#/studio','book']]:[]),...(ctx.has('admin')?[['members','New members','#/admin/members','people'],['admin','Administration','#/admin','settings']]:[])];
     function section(p){
       const name=p.r[1],path=(location.hash||'#/').split('?')[0];
       if(['home','coachToday'].includes(name))return 'home';
@@ -115,7 +115,7 @@
       const collapse=aside.querySelector('#lab-collapse');
       const labelCollapse=()=>{const mobile=matchMedia('(max-width: 999px)').matches;collapse.setAttribute('aria-label',mobile?'Close navigation':document.body.classList.contains('lab-compact-sidebar')?'Expand sidebar':'Collapse sidebar');};labelCollapse();
       collapse.onclick=()=>{if(matchMedia('(max-width: 999px)').matches)closeDrawer();else {const value=!L.Store.get('sidebar-compact',false);L.Store.set('sidebar-compact',value);document.body.classList.toggle('lab-compact-sidebar',value);labelCollapse();}};
-      const bottom=staff()?[coachNav[0],coachNav[1],coachNav[2],coachNav[4]]:[memberNav[0],memberNav[1],memberNav[3],['profile','Profile','#/profile','profile']];
+      const bottom=staff()?[coachNav[0],coachNav[1],coachNav[2],coachNav[4]]:[memberNav[0],memberNav[1],['discovery','Discovery','#/discovery','search'],memberNav[3],['profile','Profile','#/profile','profile']];
       document.querySelector('#nav .nav-inner').innerHTML=bottom.map(([id,label,url,symbol])=>'<a href="'+url+'" data-nav="'+(id===key?p.r[2]:'lab-'+id)+'"'+(id===key?' aria-current="page"':'')+'>'+icon(symbol)+'<span>'+h(({sessions:'Sessions',reviews:staff()?'Review':'Reviews',practice:'Practice',home:staff()?'Today':'Home'})[id]||label)+'</span></a>').join('');
     };
 

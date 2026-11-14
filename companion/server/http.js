@@ -123,7 +123,7 @@ function send(res, status, data, headers = {}) {
   res.end(JSON.stringify(data));
 }
 
-function serveStatic(root, req, res, pathname) {
+function serveStatic(root, req, res, pathname, tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png') {
   let rel;
   try { rel = decodeURIComponent(pathname); } catch { return send(res, 400, { error: 'Bad path.' }); }
   if (rel === '/' || !path.extname(rel)) rel = '/index.html';
@@ -137,7 +137,7 @@ function serveStatic(root, req, res, pathname) {
       'Cache-Control': 'no-cache'
     };
     if (path.extname(file) === '.html') {
-      headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+      headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: data: "+new URL(tileUrl).origin+"; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
     }
     if (path.basename(file) === 'sw.js') headers['Service-Worker-Allowed'] = '/';
     res.writeHead(200, headers);
