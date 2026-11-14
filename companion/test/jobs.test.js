@@ -85,7 +85,7 @@ test('mailer: sends through Resend when configured, logs when not, never throws 
 
 test('password reset uses the mailer when no hook is given', async (t) => {
   const sent = [];
-  const mailer = { enabled: true, send: async () => {}, sendSoon: msg => sent.push(msg) };
+  const mailer = { enabled: true, send: async msg => { sent.push(msg); return { sent: true }; }, sendSoon: msg => sent.push(msg) };
   const s = await start({ mailer, onResetLink: undefined }); t.after(s.close);
   const c = s.client(); await c.signup('Mae', 'mae@lab.test');
   await s.client().post('/api/auth/reset/request', { email: 'mae@lab.test' });

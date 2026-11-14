@@ -1854,12 +1854,12 @@
     if (!has('admin')) return forbidden('Admin is for administrators.');
     var ROLES = ['coach', 'contributor', 'editor', 'admin'];
     return api.get('/api/admin/users').then(function (users) {
-      app.innerHTML = head('Admin', 'People and permissions', 'Everyone starts as an athlete. Grant staff roles and membership here.', '<a class="btn ghost" href="#/cohorts">Cohorts</a>') +
+      app.innerHTML = head('Admin', 'People and permissions', 'Everyone starts as an athlete. Grant staff roles and membership here.', '<a class="btn primary" href="#/admin/members">New members</a><a class="btn ghost" href="#/cohorts">Cohorts</a>') +
         '<input type="search" id="q" placeholder="Search people" aria-label="Search people">' +
         '<div class="list" id="ul">' + users.map(function (u) {
           return '<div class="li" data-name="' + h((u.name + ' ' + u.email).toLowerCase()) + '"><span class="main-col"><span class="t">' + h(u.name) + '</span><span class="d">' + h(u.email) + (u.athlete_id ? ' · ' + playerId(u.athlete_id) : '') + '</span>' +
             '<span class="checks" data-u="' + u.id + '">' + ROLES.map(function (r) { return '<label><input type="checkbox" value="' + r + '"' + (u.roles.indexOf(r) >= 0 ? ' checked' : '') + (u.id === ME.user.id && r === 'admin' ? ' disabled' : '') + '> ' + r + '</label>'; }).join('') + '</span></span>' +
-            '<span class="side"><select class="msel" data-m="' + u.id + '" aria-label="Membership for ' + h(u.name) + '"><option value="none"' + (!u.membership ? ' selected' : '') + '>No membership</option><option value="active"' + (u.membership && u.membership.active ? ' selected' : '') + '>Member</option><option value="cancelled"' + (u.membership && !u.membership.active ? ' selected' : '') + '>Lapsed</option></select><button class="btn sm ghost" type="button" data-reset="' + u.id + '">Reset link</button></span></div>';
+            '<span class="side"><a class="btn sm" href="#/admin/members/' + u.id + '">Open member</a><select class="msel" data-m="' + u.id + '" aria-label="Membership for ' + h(u.name) + '"><option value="none"' + (!u.membership ? ' selected' : '') + '>No membership</option><option value="active"' + (u.membership && u.membership.active ? ' selected' : '') + '>Member</option><option value="cancelled"' + (u.membership && !u.membership.active ? ' selected' : '') + '>Lapsed</option></select><button class="btn sm ghost" type="button" data-reset="' + u.id + '">Reset link</button></span></div>';
         }).join('') + '</div><div id="linkbox"></div>' +
         '<div class="stack"><p class="section-title">System</p><div class="card stack" id="sys"><p class="small muted">Loading\u2026</p></div></div>';
       Promise.all([api.get('/api/admin/status'), api.get('/api/admin/backups')]).then(function (r) {

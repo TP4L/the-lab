@@ -8,7 +8,7 @@
   function mount(){const n=document.createElement('section');n.className='court-page';document.getElementById('app').replaceChildren(n);return n;}
   const rootLink=id=>origin+'/?event='+encodeURIComponent(id);
   function nav(e){return `<a class="back" href="${h(e?rootLink(e):origin)}">← Invitationals</a>`;}
-  const returnRoute=/^#\/(?:invitational\/[a-f0-9]{64}|invitational-recap\/[a-zA-Z0-9_-]{1,90})$/;
+  const returnRoute=/^#\/(?:invitational\/[a-f0-9]{64}|invitational-recap\/[a-zA-Z0-9_-]{1,90}|admin\/members(?:\/[1-9][0-9]*)?)$/;
   const returnKey='lab-invitational-return';
   window.LabInviteReturn={
     save(hash){if(returnRoute.test(hash)){try{localStorage.setItem(returnKey,JSON.stringify({hash,at:Date.now()}));}catch{}}},

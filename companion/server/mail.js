@@ -7,11 +7,11 @@ function createMailer({ apiKey, from, fetchImpl = globalThis.fetch, log = consol
   async function send({ to, subject, text, html, idempotencyKey }) {
     if (!enabled) { log(`[mail disabled] to=${to} subject=${subject}\n${text}`); return { sent: false }; }
     const res = await fetchImpl('https://api.resend.com/emails', {
-      method: 'POST',
+      method: 'POST', signal: AbortSignal.timeout(15000),
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
       body: JSON.stringify({ from, to: [to], subject, text, html })
     });
-    if (!res.ok) { const body = await res.text().catch(() => ''); throw new Error(`Email failed (${res.status}): ${body.slice(0, 200)}`); }
+    if (!res.ok) { const body = await res.text().catch(() => ''); const error = new Error(`Email failed (${res.status}): ${body.slice(0, 200)}`); error.status = res.status; throw error; }
     return { sent: true };
   }
   /* Fire-and-forget: a mail outage never breaks the request that triggered it. */

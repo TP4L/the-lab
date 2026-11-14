@@ -83,6 +83,7 @@ function createJobs(ctx) {
   }
 
   function runOnce(now = new Date()) {
+    void ctx.memberAlerts?.flush(now.toISOString());
     const out = { reminders: 0, posts: 0, digests: 0, backup: null };
     try { out.reminders = eventReminders(now); } catch (e) { console.error('[jobs] reminders', e); }
     try { out.posts = scheduledPosts(now); } catch (e) { console.error('[jobs] posts', e); }

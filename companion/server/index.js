@@ -52,6 +52,7 @@ function createApp(opts = {}) {
   config.pushEnabled = push.enabled;
   const notifier = require('./api/notify.js').createNotifier(db, push, mailer, config.publicUrl);
   const ctx = { db, auth, config, notifier, mailer, push, stripeClient: opts.stripeClient };
+  ctx.memberAlerts = require('./member-alerts.js').createMemberAlerts(ctx);
   ctx.jobsFirst = key => Number(db.prepare('INSERT OR IGNORE INTO job_log (key) VALUES (?)').run(key).changes) === 1;
   const jobs = require('./jobs.js').createJobs(ctx);
   if (opts.jobs !== false) jobs.start();
@@ -82,6 +83,7 @@ function createApp(opts = {}) {
   require('./api/planning.js')(r, ctx);
   require('./demo.js').routes(r, ctx);
   require('./api/notify.js').routes(r, ctx);
+  require('./member-alerts.js').routes(r, ctx);
 
   /* Admin: list and download nightly backups (for an off-site copy). */
   r.get('/api/admin/backups', ({ user }) => {
@@ -153,6 +155,9 @@ function createApp(opts = {}) {
     let url;
     try { url = new URL(req.url, 'http://localhost'); } catch { return send(res, 400, { error: 'Bad URL.' }); }
     const { pathname } = url;
+    if (opts.jobs !== false && (pathname.startsWith('/api/auth/') || pathname.startsWith('/api/site-bridge/signin/'))) {
+      res.once('finish', () => { void ctx.memberAlerts.flush(); });
+    }
     if (!pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'Method not allowed.' });
       if (pathname === '/timeline' || pathname.startsWith('/timeline/')) {
@@ -191,7 +196,7 @@ function createApp(opts = {}) {
 
   const server = http.createServer((req, res) => { handle(req, res); });
   server.on('close', () => jobs.stop());
-  return { server, db, config, jobs };
+  return { server, db, config, jobs, memberAlerts: ctx.memberAlerts };
 }
 
 module.exports = { createApp };
