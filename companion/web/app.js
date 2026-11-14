@@ -95,11 +95,11 @@
   };
 
   views.signin = function (_, query) {
-    app.innerHTML = '<div class="auth-wrap"><header class="auth-court"><div><p class="court-kicker">THE LAB · Companion</p><h1>Back on court.</h1><p>Sign in for your lessons, scores and next practice.</p></div><span class="court-art" aria-hidden="true"><i></i></span></header>' +
+    app.innerHTML = '<div class="auth-wrap"><header class="auth-court"><div><p class="court-kicker">THE LAB · Your training app</p><h1>Back on court.</h1><p>Your main app for coaching, lessons and the next practice. Sign in with Google or email.</p></div><span class="court-art" aria-hidden="true"><i></i></span></header>' +
       (query && query.error ? '<p class="flag" role="alert"><b>Couldn\u2019t sign in.</b> ' + h(query.error) + '</p>' : '') +
       '<div class="card stack demo-card" id="democard" hidden><p class="section-title">Try the demo</p><p class="small">Sample players, a live event on courts 4 and 5, a double-elimination bracket, interest checks, a coached session plan and Field Notes. Nothing is emailed, and everything resets daily.</p>' +
       '<div class="demo-btns"><button class="btn primary" type="button" data-demo="host">Host and coach<span>Brett: runs events, plans, publishing</span></button><button class="btn" type="button" data-demo="player">Player<span>Jordan: courts, scores, notes, recap</span></button><button class="btn ghost" type="button" data-demo="coach">Assistant coach<span>Austin: roster and training</span></button></div></div>' +
-      googleButton() + '<div id="email-slot">' + (META.magic ? emailForm() : '') + '</div><details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Continue with THE LAB</a><p class="small muted">Use your website account and player profile. Existing app login is also available below.</p>' +
+      googleButton() + '<div id="email-slot">' + (META.magic ? emailForm() : '') + '</div><details><summary>Other sign-in options</summary><a class="btn" href="/api/site-bridge/signin/start">Use an earlier THE LAB account</a><p class="small muted">Connect your previous website account and coaching history. Your app password sign-in is below.</p>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Sign in</p>' +
       '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required></div>' +
       '<div class="field"><label class="flabel" for="pw">Password</label><input type="password" id="pw" autocomplete="current-password" required></div>' +
@@ -126,7 +126,7 @@
       googleButton() + '<div data-google-auth hidden><p class="small muted">Use the Google account with the email your coach has. No new password needed.</p><p class="auth-divider">or create an account with email</p></div>' +
       '<form class="card form" id="f" novalidate><p class="section-title">Create your account</p>' +
       '<div class="field"><label class="flabel" for="nm">Full name</label><input type="text" id="nm" autocomplete="name" maxlength="80" required></div>' +
-      '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required><p class="small muted">Use the email your coach has, so your profile and history connect.</p></div>' +
+      '<div class="field"><label class="flabel" for="em">Email</label><input type="email" id="em" autocomplete="email" required><p class="small muted">Use the email your coach has. You can connect earlier coaching history after signing in.</p></div>' +
       '<div class="field"><label class="flabel" for="pw">Password <span class="hint">10+ characters</span></label><input type="password" id="pw" autocomplete="new-password" minlength="10" required></div>' +
       '<div class="row"><button class="btn primary" type="submit">Create account</button></div></form>' +
       '<p class="small">Already have an account? <a href="#/signin">Sign in</a>.</p></div>';
@@ -1343,7 +1343,7 @@
     if (has('coach')) staff.push('<a href="#/coach"><b>Coach Workspace</b><span>Athletes, notes, sessions</span></a>');
     if (has('contributor', 'editor')) staff.push('<a href="#/studio"><b>Publishing Studio</b><span>Write and publish</span></a>');
     if (has('admin')) staff.push('<a href="#/admin"><b>Admin</b><span>People and permissions</span></a>');
-    return '<p><a class="btn" href="#/website">Website connection</a></p>' + (staff.length ? '<div class="stack"><p class="section-title">Staff</p><div class="staff">' + staff.join('') + '</div></div>' : '') +
+    return '<p><a class="btn" href="#/website">Connect earlier coaching history</a></p><details class="more"><summary>Earlier records and tools</summary><p class="small muted">Your older journal, assessments and tools remain available while their transfer is completed. They may ask for your earlier website sign-in.</p><a href="https://transcending-performance-lab.brettadamstp.chatgpt.site/previous-lab" target="_blank" rel="noopener">Open earlier records</a></details>' + (staff.length ? '<div class="stack"><p class="section-title">Staff</p><div class="staff">' + staff.join('') + '</div></div>' : '') +
       '<div class="stack"><p class="section-title">Account</p><div class="card stack">' +
       '<p><b>' + h(ME.user.name) + '</b> · <span class="muted">' + h(ME.user.email) + '</span></p>' +
       '<p class="small muted">Roles: ' + h(ME.user.roles.join(', ')) + '</p>' +
