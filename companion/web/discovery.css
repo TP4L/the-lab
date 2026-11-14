@@ -12,3 +12,5 @@
 @media(max-width:700px){.discovery .head{padding:22px!important}.discovery .head h1{font-size:2.4rem}.discovery .head p{font-size:.85rem}.disc-toolbar{gap:8px}.disc-toolbar>span{font-size:.75rem}.discovery .disc-map{height:320px}}
 .discovery .disc-panel .btn:not(.primary),.discovery .disc-access .btn:not(.primary){background:#0c0d0c;color:#f6f0df;border-color:#0c0d0c}
 .disc-search-area{margin-top:12px}
+
+.disc-venue-fields{display:grid;gap:16px!important;border-top:1px solid #c4bfb1!important;padding-top:18px!important}.disc-venue{background:#ffffff66;padding:14px 18px;border-radius:16px;margin-top:18px}.disc-venue p{margin:8px 0}.disc-policy p{white-space:pre-wrap}.discovery #disc-calendar{margin-top:14px}.disc-stats strong{color:#efff00}.disc-panel #disc-invite-status{overflow-wrap:anywhere}

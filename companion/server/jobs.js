@@ -86,6 +86,7 @@ function createJobs(ctx) {
     void ctx.memberAlerts?.flush(now.toISOString());
     const out = { reminders: 0, posts: 0, digests: 0, backup: null };
     try { out.reminders = eventReminders(now); } catch (e) { console.error('[jobs] reminders', e); }
+    try { out.discovery = ctx.discovery?.reminders(now) || 0; } catch (e) { console.error('[jobs] discovery', e); }
     try { out.posts = scheduledPosts(now); } catch (e) { console.error('[jobs] posts', e); }
     try { out.digests = dailyDigests(now); } catch (e) { console.error('[jobs] digests', e); }
     try { out.backup = backup(now); } catch (e) { console.error('[jobs] backup', e); }

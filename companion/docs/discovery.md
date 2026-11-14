@@ -66,3 +66,23 @@ Before increasing service instances or significant traffic, use a hosted map/geo
 `node --test test/discovery.test.js` checks authorization, default-off behavior, price gating, opt-in, coordinate minimization, request capacity, conversation visibility, notifications, blocking, reports, opt-out, expiry/revocation, frozen time, stale settings, geocoding caching/rate limits, and isolated signed payment fulfillment/refunds.
 
 `node test/e2e/discovery.js` checks the owner toggle and the member profile → map → post → request → accept → chat → paused-access journey, with 320/390/768/1440px layouts. It uses an isolated fixture database and test identities. Set `CHROMIUM` to an available Chromium binary.
+
+## Session continuity and Houston pilot
+
+Confirmed participation is tied to the pass used when the host posted or accepted a member. Natural expiration preserves that session's details, calendar download, and conversation through its end. A 30-day follow-up window permits private outcome check-ins and read-only chat history. Pending requests do not gain this access. Explicit pass revocation/refund, blocking, profile opt-out, removed listings, and the owner's global pause still take priority. New posts and new acceptances always require current access.
+
+Members can specify reservation status, venue entry restrictions, venue fees, and arrival instructions. Existing listings display "Confirm with host" until updated. These are host-provided details, not automatic court reservations or verified venue policies.
+
+Confirmed hosts and players receive one reminder around 24 hours and one within an hour before start, plus a single follow-up after the session. Jobs run each minute in the existing server. Delivery is keyed by session, member, time, and reminder type, survives restarts, supports late acceptances and rescheduling, and respects Discovery/reminder/email/push preferences. Pausing stops reminders. External email and push still depend on configured providers and device permission.
+
+The calendar button downloads an authenticated RFC 5545 .ics file with UTC times, escaped/folded text, venue details, a stable UID and revision, and a link back to the session. It does not establish a live calendar subscription; changes must be checked in THE LAB or downloaded again.
+
+After a session, participants can record "I attended", "The session did not happen", or "I could not attend" and update that response within 30 days. The owner sees sessions reported played, sessions corroborated by at least two attended responses without a conflicting canceled response, repeat participants, and conflicting responses. These are self-reports, not verified attendance or public player ratings.
+
+The owner pilot panel provides the signup link, complimentary-pass controls, and a shortcut to post real sessions. No invitations are sent automatically and no example sessions or athletes are inserted into production. A practical first pilot is a small Houston group with several real sessions, then review reported meetups and repeat participation before opening purchases.
+
+## Payment launch still requires account configuration
+
+The app requires an owner-entered refund policy before sales can open. Members can read it alongside the price before Checkout. The exact policy, price, and duration are stored with each order. If the offer changes while a member is reviewing it, they must refresh before opening Checkout.
+
+Use a sandbox account and its restricted key to perform a real Checkout and refund test before live activation. Automated tests cover actual Stripe signature verification, duplicate fulfillment, refunds, disputes and authorization, but do not replace a connected sandbox checkout. In production, keep the existing owner availability and sales switches off until ready. A connector connection alone does not install an API key in Render.
