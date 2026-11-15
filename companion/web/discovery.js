@@ -71,7 +71,7 @@
     if(showClubs)clubs.filter(x=>x.lat!==null).forEach(x=>{
      const marker=M.marker([x.lat,x.lng],{icon:clubPin(),title:x.name,alt:x.name,opacity:x.status==='operating'?1:0.65}).addTo(clubLayer)
       .bindPopup('<div class="disc-club-popup"><strong>'+h(x.name)+'</strong><p>'+h(x.address)+'</p><p>'+h(venueStatus[x.status])+' · Oct 2026</p><div class="disc-club-actions">'+clubLinks(x)+'</div></div>')
-      .bindTooltip(h(x.name),{direction:'top',offset:[0,-35],className:'disc-club-label'});
+      .bindTooltip(h(x.name),{permanent:true,direction:'top',offset:[0,-35],className:'disc-club-label'});
      clubMarkers.set(x.id,marker);
     });
     result.querySelectorAll('[data-club]').forEach(b=>b.onclick=()=>{const marker=clubMarkers.get(b.dataset.club);if(!marker)return;mp.setView(marker.getLatLng(),14);marker.openPopup();el.querySelector('#disc-map').scrollIntoView({block:'center',behavior:'auto'});});
