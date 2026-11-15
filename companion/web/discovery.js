@@ -50,8 +50,13 @@
    el.querySelector('#disc-map').setAttribute('aria-label','Discovery map. Club pins show names and addresses. The matching results list offers the same destinations.');
    let generation=0,mode='all',sessions=[],clubs=[],clubMarkers=new Map(),truncated=false;
    function updateLabels(){
-    let shown=0;const names=el.querySelector('#disc-club-names').checked;
-    clubMarkers.forEach(marker=>{const visible=names&&mode!=='sessions'&&mp.getBounds().contains(marker.getLatLng())&&(mp.getZoom()>=12||shown<6);if(visible){marker.openTooltip();shown++;}else marker.closeTooltip();});
+    const boxes=[],names=el.querySelector('#disc-club-names').checked;
+    clubMarkers.forEach(marker=>{
+     const visible=names&&mode!=='sessions'&&mp.getBounds().contains(marker.getLatLng())&&(mp.getZoom()>=12||boxes.length<6);
+     if(!visible){marker.closeTooltip();return;}
+     marker.openTooltip();const box=marker.getTooltip().getElement().getBoundingClientRect();
+     if(boxes.some(b=>box.left<b.right+8&&box.right>b.left-8&&box.top<b.bottom+8&&box.bottom>b.top-8))marker.closeTooltip();else boxes.push(box);
+    });
    }
    function render(){
     const showClubs=mode!=='sessions',showSessions=mode!=='clubs';sessionLayer.clearLayers();clubLayer.clearLayers();clubMarkers=new Map();
