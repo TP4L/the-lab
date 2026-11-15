@@ -1043,6 +1043,8 @@
     dom.dockNote.textContent = note;
     bus.emit('tick', { t: t, force: !!force });
   }
+  /* re-render cards and panels now (e.g. after a module changes its own view state) */
+  LABP.refresh = function () { lastFloorSlow = 0; slowTick(true); };
   var lastWall = 0, lastSlow = 0, lastMini = 0, lastSave = 0, lastCycle = 0, lastFloorSlow = 0, lastRM = 0;
   function loop(now) {
     requestAnimationFrame(loop);
