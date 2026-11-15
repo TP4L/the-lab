@@ -51,10 +51,42 @@ parts, nothing more:
 
 Invoke it with `/lab-coach`, or just describe a rep and let it trigger.
 
+## Performance dashboard
+
+`public/performance.html` is the coach's view of the training floor: turf, weight
+room and mat, drawn top-down on one screen. One surface is focused, the other two
+stay live as minis, and the floor expands to full screen for a wall display.
+
+- **Live · Replay · Heat · Plan** on every surface, with a scrubber over the hour.
+- **Group on the floor, tap an athlete to drill in** — heart rate, today's results,
+  personal bests, and their Stress Bowl.
+- **Coach actions** — one-tap observations, a stopwatch that logs results, moving
+  an athlete to another surface. The log is kept in the browser.
+- **Stress Bowl** — the total-load and readiness framework. A coach planning
+  estimate, never a measurement.
+- **Performance engine** — an empty, labelled slot. The model is not in the repo yet.
+- **US ⇄ metric**, light and dark, phone to wall TV.
+
+Everything on it is **sample data**, shaped the way timing gates, GPS, heart rate
+and bar speed will arrive. `public/performance/data.js` is the one file to replace
+when real feeds are connected. No build step: open the page from any static host.
+
+Seven more venues (tennis, pickleball, squash, padel, football, baseball, track)
+are previewed as locked cards. A new surface is one file that calls
+`LABP.registerSurface` — the contract is documented at the top of
+`public/performance/core.js`.
+
 ## Layout
 
 | Path | What's in it |
 |---|---|
+| `public/index.html` | The decision engine, as a readable page |
+| `public/session-builder.html` | Session Builder: 5 / 8 / 13 minute flights |
+| `public/performance.html` | Performance dashboard shell |
+| `public/performance/core.js`, `core.css` | Dashboard engine: clock, simulation, stage, timeline, design system |
+| `public/performance/data.js` | Sample sessions, athletes and plans |
+| `public/performance/surface-*.js` | One file per surface: turf, weight room, mat |
+| `public/performance/panel-*.js` | Athlete, Stress Bowl, roster, coach actions, charts, next venues |
 | `.claude/skills/lab-coach/SKILL.md` | The coach: equation, pipeline, output contract |
 | `.claude/skills/lab-coach/reference/pipeline.md` | Each stage in depth |
 | `.claude/skills/lab-coach/reference/outer-layers.md` | The nine lenses, incl. Error Classification table |
