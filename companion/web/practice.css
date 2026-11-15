@@ -1,0 +1,22 @@
+.practice-page{max-width:810px;margin:0 auto}
+.practice-page h2{font-size:1.16rem;margin:0}
+.practice-spread{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.practice-calendar,.practice-timer{color:#fff;background:radial-gradient(ellipse at 100% 110%,#c83791 0%,transparent 62%),linear-gradient(145deg,#47113f,#761155 65%,#9b2469);border:1px solid #80256c;border-radius:26px;padding:clamp(14px,4vw,28px)}
+.practice-calendar button{color:inherit;background:#ffffff20;border:1px solid #ffffff24;border-radius:16px;min-width:36px;min-height:36px;font:inherit;cursor:pointer}
+.practice-calendar button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.practice-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:clamp(3px,1vw,10px);padding:16px 0;margin-bottom:12px;border-bottom:1px solid #ffffff38}
+.practice-days button{display:grid;justify-items:center;align-content:center;gap:2px;min-width:0;min-height:62px;padding:4px 0;background:transparent;border-color:transparent}
+.practice-days button[aria-pressed=true]{background:#fff;color:#561544}
+.practice-days button small{font-size:.67rem}
+.practice-row{display:grid;grid-template-columns:minmax(55px,auto) 1fr auto;align-items:center;gap:14px;color:inherit;text-decoration:none}
+.practice-row:hover,.practice-row:focus-visible{outline:2px solid #a64186}
+.practice-row span,.practice-drill,.practice-track div{display:grid;gap:4px}
+.practice-drill{padding:10px 0;border-top:1px solid currentColor;border-color:#8c829544}
+.practice-timer{text-align:center}
+.practice-track{display:grid;place-items:center;aspect-ratio:1.55;max-width:350px;margin:14px auto;border:3px solid #ffdcf5;border-radius:999px;box-shadow:0 0 0 8px #ffffff15,inset 0 0 0 8px #ffffff15}
+.practice-track strong{font-size:clamp(2.8rem,12vw,5rem);font-variant-numeric:tabular-nums;line-height:1}
+.practice-score{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.practice-score button{display:grid;min-height:80px;place-content:center;gap:2px}
+.practice-score b{font-size:1.8rem}
+.practice-page fieldset{min-width:0}
+.practice-page summary{cursor:pointer;padding:8px 0}
