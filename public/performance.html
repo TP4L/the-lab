@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>THE LAB · Performance</title>
+<meta name="description" content="The live training floor: turf, weight room and mat on one coach dashboard.">
+<meta name="theme-color" content="#EDEEF0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13171D" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="performance/core.css">
+<link rel="stylesheet" href="performance/surface-turf.css">
+<link rel="stylesheet" href="performance/surface-weights.css">
+<link rel="stylesheet" href="performance/surface-mat.css">
+<link rel="stylesheet" href="performance/panel-athlete.css">
+<link rel="stylesheet" href="performance/panel-coach.css">
+<link rel="stylesheet" href="performance/panel-insights.css">
+<link rel="stylesheet" href="performance/panel-next.css">
+<script>
+/* apply a saved theme before first paint */
+try { var p = JSON.parse(localStorage.getItem('labp:prefs') || '{}'); if (p.theme === 'light' || p.theme === 'dark') document.documentElement.setAttribute('data-theme', p.theme); } catch (e) {}
+</script>
+</head>
+<body>
+<a class="skip" href="#hero">Skip to the training floor</a>
+<div class="app">
+
+  <header class="topbar">
+    <h1 class="brand"><a href="index.html"><b>THE LAB</b><span aria-hidden="true">/</span><em>Performance</em></a></h1>
+    <nav class="toplinks" aria-label="The Lab tools">
+      <a href="index.html">Decision Engine</a>
+      <a href="session-builder.html">Session Builder</a>
+      <a href="performance.html" aria-current="page">Performance</a>
+    </nav>
+    <div class="topctl">
+      <label class="field"><span class="sr">Session</span><select id="sessionSel"></select></label>
+      <div class="seg seg--sm" role="group" aria-label="Units">
+        <button type="button" data-units="us">US</button>
+        <button type="button" data-units="metric">Metric</button>
+      </div>
+      <button type="button" id="btnTheme" class="iconbtn" aria-label="Switch between light and dark">
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <p class="sample"><span class="chip chip--sample">Sample data</span> Every athlete and number here is invented, shaped the way timing-gate, GPS, heart-rate and bar-speed feeds will arrive.</p>
+
+  <main class="grid">
+
+    <div class="col col-left">
+      <section class="card card--session" id="slot-session" aria-label="Session"><div class="card-body"></div></section>
+      <section class="card" id="slot-now"><header class="card-head"><h3 class="card-title"></h3></header><div class="card-body"></div></section>
+      <section class="card" id="slot-board"><header class="card-head"><h3 class="card-title"></h3></header><div class="card-body"></div></section>
+      <section class="card" id="slot-plan"><header class="card-head"><h3 class="card-title">Plan</h3></header><div class="card-body"></div></section>
+    </div>
+
+    <div class="col col-center">
+      <section class="card hero" id="hero" aria-label="Training floor">
+        <header class="hero-head">
+          <div class="hero-title">
+            <p class="eyebrow">Focused surface</p>
+            <h2 id="heroName"></h2>
+            <p class="hero-phase" id="heroPhase" aria-live="off"></p>
+          </div>
+          <div class="hero-ctl">
+            <div class="seg seg--modes" role="group" aria-label="Floor view">
+              <button type="button" data-mode="live"><i class="live-dot" aria-hidden="true"></i>Live</button>
+              <button type="button" data-mode="replay">Replay</button>
+              <button type="button" data-mode="heat">Heat</button>
+              <button type="button" data-mode="plan">Plan</button>
+            </div>
+            <button type="button" id="btnCycle" class="btn btn--ghost only-expanded" title="Rotate through the three surfaces every 20 seconds">Auto-cycle</button>
+            <button type="button" id="btnExpand" class="btn btn--ghost" aria-pressed="false">
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"/></svg>
+              <span>Expand</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="stage-wrap">
+          <div id="stage"></div>
+          <aside class="hud hud-l card" id="hud-now" aria-label="Surface now"><header class="card-head"><h3 class="card-title"></h3></header><div class="card-body"></div></aside>
+          <aside class="hud hud-r card" id="hud-board" aria-label="Surface board"><header class="card-head"><h3 class="card-title"></h3></header><div class="card-body"></div></aside>
+        </div>
+
+        <div class="dock">
+          <div class="minis" id="minis" aria-label="Other surfaces"></div>
+          <div class="dock-side">
+            <p class="dock-note" id="dockNote"></p>
+            <div class="dock-ctl">
+              <div class="seg seg--sm only-heat" role="group" aria-label="Heat shows">
+                <button type="button" data-heat="time">Time on floor</button>
+                <button type="button" data-heat="intensity">Intensity</button>
+              </div>
+              <div class="heat-legend only-heat" aria-hidden="true"><span>Less</span><i></i><span>More</span></div>
+              <button type="button" id="btnNames" class="btn btn--ghost btn--sm only-floor" aria-pressed="false">Names</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline">
+          <button type="button" class="tl-btn" id="tlPlay" aria-label="Pause" data-state="playing">
+            <svg class="i-pause" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 3h3v10H4zM9 3h3v10H9z" fill="currentColor"/></svg>
+            <svg class="i-play" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>
+          </button>
+          <output class="tl-time" id="tlTime" aria-label="Time on screen">00:00</output>
+          <div class="tl-track" id="tlTrack" role="slider" tabindex="0" aria-label="Session time" aria-valuemin="0" aria-valuemax="3600" aria-valuenow="0">
+            <div class="tl-segs" id="tlSegs"></div>
+            <div class="tl-rec" id="tlRec"></div>
+            <div class="tl-marks" id="tlMarks"></div>
+            <div class="tl-head" id="tlHead"></div>
+          </div>
+          <button type="button" class="tl-live" id="tlLive"><i class="live-dot" aria-hidden="true"></i>Back to live</button>
+          <label class="field field--sm"><span class="sr">Sample session speed</span>
+            <select id="tlRate"><option value="1">1×</option><option value="4">4×</option><option value="16">16×</option></select>
+          </label>
+        </div>
+      </section>
+
+      <section class="card" id="slot-chart"><header class="card-head"><h3 class="card-title">Session heart rate</h3></header><div class="card-body"></div></section>
+    </div>
+
+    <div class="col col-right">
+      <section class="card" id="slot-athlete"><header class="card-head"><h3 class="card-title">Athlete</h3></header><div class="card-body"></div></section>
+      <section class="card" id="slot-bowl"><header class="card-head"><h3 class="card-title">Stress Bowl</h3></header><div class="card-body"></div></section>
+      <section class="card" id="slot-actions"><header class="card-head"><h3 class="card-title">Coach actions</h3></header><div class="card-body"></div></section>
+      <section class="card" id="slot-log"><header class="card-head"><h3 class="card-title">Coach log</h3></header><div class="card-body"></div></section>
+    </div>
+  </main>
+
+  <div class="below">
+    <section class="card" id="slot-roster"><header class="card-head"><h3 class="card-title">Roster</h3></header><div class="card-body"></div></section>
+    <section class="card" id="slot-trends"><header class="card-head"><h3 class="card-title">Trends</h3></header><div class="card-body"></div></section>
+  </div>
+  <div class="below below--even">
+    <section class="card" id="slot-engine"><header class="card-head"><h3 class="card-title">Performance engine</h3></header><div class="card-body"></div></section>
+    <section class="card" id="slot-next"><header class="card-head"><h3 class="card-title">Coming next</h3></header><div class="card-body"></div></section>
+  </div>
+
+  <footer class="foot">
+    <p>THE LAB / Performance · coach view. <a href="index.html">Decision Engine</a> · <a href="session-builder.html">Session Builder</a></p>
+  </footer>
+</div>
+
+<script defer src="performance/data.js"></script>
+<script defer src="performance/core.js"></script>
+<script defer src="performance/surface-turf.js"></script>
+<script defer src="performance/surface-weights.js"></script>
+<script defer src="performance/surface-mat.js"></script>
+<script defer src="performance/panel-athlete.js"></script>
+<script defer src="performance/panel-coach.js"></script>
+<script defer src="performance/panel-insights.js"></script>
+<script defer src="performance/panel-next.js"></script>
+</body>
+</html>
