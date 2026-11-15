@@ -229,7 +229,7 @@ module.exports = function planning(r, ctx) {
     if (!owns(user, p)) throw new HttpError(404, 'Plan not found.');
     return p;
   }
-  const blocks = planId => db.prepare('SELECT id, ord, start_time, end_time, court, lead, drill, instructions FROM plan_blocks WHERE plan_id = ? ORDER BY ord').all(planId);
+  const blocks = planId => db.prepare('SELECT id, ord, start_time, end_time, court, lead, drill, instructions, coaching_attribute FROM plan_blocks WHERE plan_id = ? ORDER BY ord').all(planId);
   const playersOf = planId => db.prepare('SELECT * FROM plan_players WHERE plan_id = ? ORDER BY id').all(planId);
   function rsvpCounts(planId) {
     const out = { invited: 0, in: 0, out: 0, maybe: 0, waitlist: 0 };
@@ -247,7 +247,8 @@ module.exports = function planning(r, ctx) {
   const blockList = v => list(v, 'blocks', { max: MAX_BLOCKS, item: (b, f) => ({
     start_time: timeOfDay(b && b.start_time, `${f}.start_time`), end_time: timeOfDay(b && b.end_time, `${f}.end_time`),
     court: str(b && b.court, `${f}.court`, { max: 40 }), lead: str(b && b.lead, `${f}.lead`, { max: 60 }),
-    drill: str(b && b.drill, `${f}.drill`, { max: 120 }), instructions: str(b && b.instructions, `${f}.instructions`, { max: 2000 })
+    drill: str(b && b.drill, `${f}.drill`, { max: 120 }), instructions: str(b && b.instructions, `${f}.instructions`, { max: 2000 }),
+    coaching_attribute: str(b && b.coaching_attribute, `${f}.coaching_attribute`, { max: 120 })
   }) });
   function planInput(b, cur = {}) {
     const v = (k, fn) => (b[k] === undefined ? cur[k] : fn(b[k]));
@@ -273,7 +274,7 @@ module.exports = function planning(r, ctx) {
   const PLAN_COLS = ['title', 'starts_at', 'ends_at', 'timezone', 'location', 'sport', 'coaches', 'message', 'agenda', 'handoff', 'capacity', 'status'];
   function saveBlocks(planId, bs) {
     db.prepare('DELETE FROM plan_blocks WHERE plan_id = ?').run(planId);
-    bs.forEach((b, i) => db.prepare('INSERT INTO plan_blocks (plan_id, ord, start_time, end_time, court, lead, drill, instructions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(planId, i, b.start_time, b.end_time, b.court, b.lead, b.drill, b.instructions));
+    bs.forEach((b, i) => db.prepare('INSERT INTO plan_blocks (plan_id, ord, start_time, end_time, court, lead, drill, instructions, coaching_attribute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(planId, i, b.start_time, b.end_time, b.court, b.lead, b.drill, b.instructions, b.coaching_attribute));
   }
   const playerInput = (user, x, f) => {
     let athleteId = null, name = str(x && x.name, `${f}.name`, { max: 60 });
@@ -405,7 +406,15 @@ module.exports = function planning(r, ctx) {
     if (ctx.mailer && ctx.mailer.enabled && config.publicUrl) {
       targets.filter(x => x.email).forEach(x => {
         const link = `${config.publicUrl}/#/i/${x.token}`;
-        const when = p.starts_at ? new Date(p.starts_at).toUTCString().slice(0, 22) + ' UTC' : '';
+        let when = '';
+        if (p.starts_at) {
+          const start = new Date(p.starts_at);
+          try {
+            when = new Intl.DateTimeFormat('en-US', { timeZone: p.timezone || 'UTC', dateStyle: 'full', timeStyle: 'long' }).format(start);
+          } catch {
+            when = start.toUTCString();
+          }
+        }
         ctx.mailer.sendSoon({ to: x.email, subject: `You’re invited: ${p.title}`, text: `${p.title}\n${when}\n${p.location}\n\n${p.message}\n\nAnswer In, Out or Maybe here:\n${link}`, html: `<p><b>${p.title.replace(/</g, '&lt;')}</b><br>${when}<br>${p.location.replace(/</g, '&lt;')}</p><p><a href="${link}">Answer In, Out or Maybe</a></p>` });
         sent++;
       });

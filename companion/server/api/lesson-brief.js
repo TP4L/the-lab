@@ -6,7 +6,7 @@ function lessonBrief(db,auth,user,id) {
   const plan=db.prepare('SELECT id,title,status,owner_id,starts_at,location,version FROM plans WHERE id=?').get(id);
   if(!plan || (plan.owner_id!==user.id && !auth.has(user,'admin')))throw new HttpError(404,'Lesson plan not found.');
   const session=db.prepare('SELECT id,status FROM training_sessions WHERE source_plan_id=?').get(id);
-  const blocks=db.prepare('SELECT id,ord,drill,instructions,court FROM plan_blocks WHERE plan_id=? ORDER BY ord').all(id);
+  const blocks=db.prepare('SELECT id,ord,drill,instructions,court,coaching_attribute FROM plan_blocks WHERE plan_id=? ORDER BY ord').all(id);
   const players=db.prepare(`SELECT pp.athlete_id AS id,pp.name,pp.rsvp,pp.invitational_arrival AS arrival,pp.court,pp.recap_cue,a.focus,a.training_needs
     FROM plan_players pp LEFT JOIN athletes a ON a.id=pp.athlete_id WHERE pp.plan_id=? ORDER BY pp.id`).all(id)
     .map(p=>{

@@ -957,8 +957,8 @@
       return Promise.all([isNew ? Promise.resolve({ title: '', starts_at: null, ends_at: null, location: '', sport: 'Pickleball', coaches: ME().user.name, message: '', agenda: '', handoff: '', capacity: null, status: 'draft', blocks: [], version: 0 }) : api.get('/api/plans/' + id), api.get('/api/plan-library').then(null, function () { return []; })]).then(function (res) {
         var p = res[0], lib = res[1];
         var drills = lib.filter(function (x) { return x.kind === 'drill'; });
-        var blocks = p.blocks.map(function (b) { return { start_time: b.start_time, end_time: b.end_time, court: b.court, lead: b.lead, drill: b.drill, instructions: b.instructions }; });
-        app.innerHTML = '<a class="back" href="' + (isNew ? '#/coach/plans' : '#/coach/plans/' + id) + '">← ' + (isNew ? 'Team Planner' : 'Plan') + '</a>' + head('Team Planner', isNew ? 'New plan' : 'Edit plan') +
+        var blocks = p.blocks.map(function (b) { return { start_time: b.start_time, end_time: b.end_time, court: b.court, lead: b.lead, drill: b.drill, instructions: b.instructions, coaching_attribute: b.coaching_attribute }; });
+        app.innerHTML = '<a class="back" href="' + (isNew ? '#/coach/plans' : '#/coach/plans/' + id) + '">← ' + (isNew ? 'Team Planner' : 'Plan') + '</a>' + head('Team Planner', isNew ? 'Schedule a session' : 'Edit session', isNew ? 'Set the date and time now. You can add drills, coaching attributes and players later.' : '') +
           '<form class="card form" id="pf" novalidate>' +
           '<div class="field"><label class="flabel" for="pt">Title</label><input type="text" id="pt" maxlength="120" value="' + h(p.title) + '" placeholder="Saturday small-group session"></div>' +
           '<div class="form-grid"><div class="field"><label class="flabel" for="pst">Starts</label><input type="datetime-local" id="pst" value="' + local(p.starts_at) + '"></div>' +
@@ -967,13 +967,16 @@
           '<div class="form-grid"><div class="field"><label class="flabel" for="psp">Sport</label><input type="text" id="psp" maxlength="40" value="' + h(p.sport) + '"></div>' +
           '<div class="field"><label class="flabel" for="pco">Coaches</label><input type="text" id="pco" maxlength="200" value="' + h(p.coaches) + '"></div>' +
           '<div class="field"><label class="flabel" for="pcap">Capacity</label><input type="number" id="pcap" min="1" max="100" value="' + (p.capacity || '') + '" placeholder="No limit"></div>' +
-          '<div class="field"><label class="flabel" for="pstat">Status</label><select id="pstat">' + [['draft', 'Draft (links don’t open yet)'], ['published', 'Published'], ['done', 'Done'], ['cancelled', 'Cancelled']].map(function (o) { return '<option value="' + o[0] + '"' + (p.status === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
+          (isNew ? '' : '<div class="field"><label class="flabel" for="pstat">Status</label><select id="pstat">' + [['draft', 'Draft (links don’t open yet)'], ['published', 'Published'], ['done', 'Done'], ['cancelled', 'Cancelled']].map(function (o) { return '<option value="' + o[0] + '"' + (p.status === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>') + '</div>' +
+          (isNew ? '<details class="stack"><summary>Optional session details</summary>' : '') +
           '<div class="field"><label class="flabel" for="pmsg">Message to players</label><textarea id="pmsg" maxlength="4000" placeholder="What to bring, what we’re working on.">' + h(p.message) + '</textarea></div>' +
           '<div class="field"><label class="flabel" for="pag">Agenda</label><textarea id="pag" maxlength="4000">' + h(p.agenda) + '</textarea></div>' +
           '<div class="stack-sm"><p class="flabel">Court blocks <span class="hint">up to 30</span></p><div id="blocks" class="stack-sm"></div><div class="row"><button class="btn sm ghost" type="button" id="addb">Add a block</button>' +
           (drills.length ? '<label class="sr-only" for="drillpick">Insert a saved drill</label><select id="drillpick"><option value="">Insert a saved drill…</option>' + drills.map(function (d) { return '<option value="' + d.id + '">' + h(d.name) + '</option>'; }).join('') + '</select>' : '') + '</div></div>' +
           '<div class="field private"><label class="flabel" for="pho">Private coaching handoff <span class="hint">only coaches see this</span></label><textarea id="pho" maxlength="4000" placeholder="Notes for the other coach: who needs what.">' + h(p.handoff) + '</textarea></div>' +
-          '<div class="row"><button class="btn primary" type="submit">Save plan</button></div></form>';
+          (isNew ? '</details>' : '') +
+          '<div class="row"><button class="btn primary" type="submit"' + (isNew ? ' value="schedule">Schedule session' : '>Save changes') + '</button>' +
+          (isNew ? '<button class="btn ghost" type="submit" value="draft">Save draft</button>' : '') + '</div></form>';
         function paintBlocks() {
           $('#blocks').innerHTML = blocks.map(function (b, i) {
             return '<div class="block-row card"><div class="form-grid">' +
@@ -982,6 +985,7 @@
               '<div class="field"><label class="flabel" for="bc' + i + '">Court</label><input type="text" id="bc' + i + '" maxlength="40" data-i="' + i + '" data-f="court" value="' + h(b.court) + '"></div>' +
               '<div class="field"><label class="flabel" for="bl' + i + '">Lead</label><input type="text" id="bl' + i + '" maxlength="60" data-i="' + i + '" data-f="lead" value="' + h(b.lead) + '"></div></div>' +
               '<div class="field"><label class="flabel" for="bd' + i + '">Drill</label><input type="text" id="bd' + i + '" maxlength="120" data-i="' + i + '" data-f="drill" value="' + h(b.drill) + '"></div>' +
+              '<div class="field"><label class="flabel" for="ba' + i + '">Coaching attribute</label><input type="text" id="ba' + i + '" maxlength="120" data-i="' + i + '" data-f="coaching_attribute" value="' + h(b.coaching_attribute || '') + '"></div>' +
               '<div class="field"><label class="flabel" for="bi' + i + '">Instructions</label><textarea id="bi' + i + '" maxlength="2000" data-i="' + i + '" data-f="instructions">' + h(b.instructions) + '</textarea></div>' +
               '<div class="row"><button class="btn sm ghost" type="button" data-up="' + i + '"' + (i === 0 ? ' disabled' : '') + '>Move up</button><button class="btn sm ghost" type="button" data-save="' + i + '">Save drill</button><button class="btn sm danger" type="button" data-delb="' + i + '">Remove</button></div></div>';
           }).join('') || '<p class="small muted">No blocks yet. Add a block for each court and time slot.</p>';
@@ -1003,10 +1007,20 @@
         });
         $('#pf').addEventListener('submit', function (ev) {
           ev.preventDefault();
-          var body = { title: $('#pt').value, starts_at: fromLocal($('#pst').value) || null, ends_at: fromLocal($('#pen').value) || null, location: $('#ploc').value, sport: $('#psp').value, coaches: $('#pco').value, capacity: $('#pcap').value || null, status: $('#pstat').value,
+          var body = { title: $('#pt').value, starts_at: fromLocal($('#pst').value) || null, ends_at: fromLocal($('#pen').value) || null, location: $('#ploc').value, sport: $('#psp').value, coaches: $('#pco').value, capacity: $('#pcap').value || null, status: $('#pstat')?.value || 'draft',
             message: $('#pmsg').value, agenda: $('#pag').value, handoff: $('#pho').value, blocks: blocks, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
-          if (!isNew) body.version = p.version;
-          api.request(isNew ? 'POST' : 'PUT', '/api/plans' + (isNew ? '' : '/' + id), body).then(function (r) { L.toast('Plan saved'); location.hash = '#/coach/plans/' + r.id; }, function (err) {
+          if (isNew) {
+            body.status = ev.submitter?.value === 'draft' ? 'draft' : 'published';
+            if (body.status === 'published' && !body.starts_at) {
+              L.formError($('#pf'), 'Choose a start date and time to schedule.');
+              $('#pst').focus();
+              return;
+            }
+          } else body.version = p.version;
+          var submit = ev.submitter;
+          if (submit) submit.disabled = true;
+          api.request(isNew ? 'POST' : 'PUT', '/api/plans' + (isNew ? '' : '/' + id), body).then(function (r) { L.toast(isNew && r.status === 'published' ? 'Session scheduled' : 'Session saved'); location.hash = '#/coach/plans/' + r.id; }, function (err) {
+            if (submit) submit.disabled = false;
             if (err.status === 409) L.formError($('#pf'), err.message + ' Open the plan again to see the changes.'); else L.formError($('#pf'), err.message);
           });
         });
@@ -1019,7 +1033,7 @@
         var p = res[0], groups = res[1].filter(function (x) { return x.kind === 'group'; }), roster = res[2];
         var n = p.counts;
         app.innerHTML = '<a class="back" href="#/coach/plans">← Team Planner</a>' + C.offlineNote(p) +
-          head('Team Planner · ' + p.status, p.title, fmtWhen(p.starts_at) + (p.ends_at ? '–' + fmtTimeOnly(p.ends_at) : '') + (p.location ? ' · ' + p.location : ''), '<div class="row"><a class="btn" href="#/coach/lesson/' + p.id + '">Lesson brief &amp; scoring</a><a class="btn ghost" href="#/coach/plans/' + p.id + '/edit">Edit</a><button class="btn primary" type="button" id="invite">' + (p.status === 'draft' ? 'Publish and invite' : 'Send invitations') + '</button></div>') +
+          head('Team Planner · ' + p.status, p.title, fmtWhen(p.starts_at) + (p.ends_at ? '–' + fmtTimeOnly(p.ends_at) : '') + (p.location ? ' · ' + p.location : ''), '<div class="row"><a class="btn" href="#/coach/lesson/' + p.id + '">Lesson brief &amp; scoring</a><a class="btn ghost" href="#/coach/plans/' + p.id + '/edit">Edit</a>' + (p.players.length && ['draft', 'published'].includes(p.status) ? '<button class="btn primary" type="button" id="invite">' + (p.status === 'draft' ? 'Publish and invite' : 'Email invitations') + '</button>' : '') + '</div>') +
           '<div class="tiles"><div class="tile"><b class="big-num">' + n.in + (p.capacity ? '<span>/' + p.capacity + '</span>' : '') + '</b><span class="small">In</span></div><div class="tile"><b class="big-num">' + n.maybe + '</b><span class="small">Maybe</span></div><div class="tile"><b class="big-num">' + n.out + '</b><span class="small">Out</span></div><div class="tile"><b class="big-num">' + n.waitlist + '</b><span class="small">Waitlist</span></div><div class="tile"><b class="big-num">' + n.invited + '</b><span class="small">No answer</span></div></div>' +
           '<div class="grid-2"><div class="card stack"><p class="section-title">Session</p>' +
           (p.coaches ? '<p class="small">Coaches: ' + h(p.coaches) + '</p>' : '') + (p.message ? '<div class="small">' + L.paras(p.message) + '</div>' : '') + (p.agenda ? '<p class="small"><b>Agenda.</b> ' + h(p.agenda) + '</p>' : '') +
@@ -1027,11 +1041,13 @@
           '<div class="card stack"><p class="section-title">Court blocks</p>' + blocksTable(p.blocks, null) + '</div></div>' +
           '<div class="stack"><p class="section-title">Players · ' + p.players.length + '</p>' + (p.players.length ? '<div class="list">' + p.players.map(function (x) {
             var rec = x.recap_observation || x.recap_cue || x.recap_next;
+            var inviteBody = [p.title, p.starts_at ? fmtWhen(p.starts_at) : '', p.location, p.message, 'RSVP: ' + abs(x.link)].filter(Boolean).join('\n');
+            var smsRecipient = String(x.phone || '').replace(/[^+\d]/g, '');
             return '<div class="li person"><span class="main-col"><span class="t small">' + h(x.name) + ' ' + rsvpTag(x.rsvp) + (x.court ? ' <span class="tag">Court ' + h(x.court) + '</span>' : '') + (x.recap_published_at ? ' <span class="tag ok">Recap shared</span>' : rec ? ' <span class="tag">Recap draft</span>' : '') + '</span>' +
               '<span class="d">' + [x.email, x.phone, x.athlete_id ? 'LAB athlete' : ''].filter(Boolean).map(h).join(' · ') + '</span>' +
-              '<span class="row"><button class="btn sm ghost" type="button" data-copy="' + h(abs(x.link)) + '">Copy invite link</button>' +
-              '<a class="btn sm ghost" href="sms:' + h(x.phone || '') + '?&body=' + encodeURIComponent(p.title + ': ' + abs(x.link)) + '">Text</a>' +
-              (x.email ? '<a class="btn sm ghost" href="mailto:' + h(x.email) + '?subject=' + encodeURIComponent('You’re invited: ' + p.title) + '&body=' + encodeURIComponent(abs(x.link)) + '">Email</a>' : '') +
+              '<span class="row">' + (p.status === 'published' ? '<button class="btn sm ghost" type="button" data-copy="' + h(abs(x.link)) + '">Copy invite link</button>' +
+              '<a class="btn sm ghost" href="sms:' + h(smsRecipient) + (/iPad|iPhone|iPod/i.test(navigator.userAgent) ? '&body=' : '?body=') + encodeURIComponent(inviteBody) + '">Text invite</a>' +
+              '<a class="btn sm ghost" href="mailto:' + encodeURIComponent(x.email || '') + '?subject=' + encodeURIComponent('Session details: ' + p.title) + '&body=' + encodeURIComponent(inviteBody) + '">Email invite</a>' : '') +
               '<button class="btn sm ghost" type="button" data-rec="' + x.id + '">Recap</button></span>' +
               (openRecap[x.id] ? recapForm(x) : '') + '</span>' +
               '<span class="side stack-sm"><label class="sr-only" for="rs' + x.id + '">Answer for ' + h(x.name) + '</label><select id="rs' + x.id + '" data-rsvp="' + x.id + '">' + Object.keys(RSVP).map(function (k) { return '<option value="' + k + '"' + (x.rsvp === k ? ' selected' : '') + '>' + RSVP[k] + '</option>'; }).join('') + '</select>' +
@@ -1048,11 +1064,13 @@
             '<p class="small muted">Turn this plan into a live event for games: everyone who said In is registered, and players without an account get a player link.</p><div class="row"><label class="sr-only" for="evmode">Format</label><select id="evmode">' + Object.keys(MODES).map(function (k) { return '<option value="' + k + '">' + MODES[k] + '</option>'; }).join('') + '</select><button class="btn" type="button" id="mkev">Create live event</button></div>') + '</div>' +
           '<div class="row"><button class="btn sm ghost" type="button" id="pcsv">Export players (CSV)</button><button class="btn sm danger" type="button" id="pdel">Delete plan</button></div>';
         bindShare(app);
-        $('#invite').addEventListener('click', function () {
+        $('#invite')?.addEventListener('click', function () {
+          var button = this;
+          button.disabled = true;
           api.request('POST', '/api/plans/' + p.id + '/invite', {}).then(function (r) {
-            L.toast(r.mail ? r.sent + ' invitation' + (r.sent === 1 ? '' : 's') + ' emailed. Copy links for anyone without email.' : 'Published. Email isn’t set up, so copy or text each player’s link.');
+            L.toast(r.mail ? r.sent + ' invitation' + (r.sent === 1 ? '' : 's') + ' queued for email. You can text individual players below.' : 'Published. Email isn’t set up, so copy or text each player’s link.');
             C.route();
-          }, function (err) { L.toast(err.message); });
+          }, function (err) { button.disabled = false; L.toast(err.message); });
         });
         var putPlayer = function (pid, body, msg) { return api.request('PUT', '/api/plans/' + p.id + '/players/' + pid, body).then(function () { if (msg) L.toast(msg); C.route(); }, function (err) { L.toast(err.message); }); };
         $$('[data-rsvp]').forEach(function (s) { s.addEventListener('change', function () { putPlayer(s.getAttribute('data-rsvp'), { rsvp: s.value }, 'Updated'); }); });
