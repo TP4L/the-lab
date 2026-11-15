@@ -86,3 +86,15 @@ The owner pilot panel provides the signup link, complimentary-pass controls, and
 The app requires an owner-entered refund policy before sales can open. Members can read it alongside the price before Checkout. The exact policy, price, and duration are stored with each order. If the offer changes while a member is reviewing it, they must refresh before opening Checkout.
 
 Use a sandbox account and its restricted key to perform a real Checkout and refund test before live activation. Automated tests cover actual Stripe signature verification, duplicate fulfillment, refunds, disputes and authorization, but do not replace a connected sandbox checkout. In production, keep the existing owner availability and sales switches off until ready. A connector connection alone does not install an API key in Render.
+
+## Houston clubs and courts
+
+`GET /api/discovery/venues` uses the same owner-preview, pause, and paid-pass gate as member discovery. The checked-in catalog at `server/catalog/houston-venues.json` imports the 139 records in Brett's `Houston_Pickleball_Market_Audit.xlsx` (Court inventory and Sources tabs, October 13, 2026). It contains public venue information only; it is not a list of member locations. No changes to athlete records or payment settings are involved.
+
+The default view includes 73 entries marked operating in that research, filtered to the chosen distance. All research entries can be selected explicitly; planned, closed, unresolved, and no-pickleball-verified entries remain labeled. Do not describe the catalog as a live operational check or all 139 records as active clubs. The directory covers Greater Houston; the US view still supports player sessions nationwide. Venue access, availability, and membership requirements must be checked with the venue.
+
+The map and matching list support name/address/ZIP search, category and research-status filters, distances, pin popups, directions, venue source links, and club-name labels. At wider zooms the first six visible names are labeled to avoid collisions; zooming in reveals all names. All, Clubs & courts, and Player sessions control the displayed layers. The Houston clubs button restores the region and clears club search filters.
+
+Coordinates retain source provenance. On November 15, 2026, exact ArcGIS address matches corrected H011 (Life Time Sugar Land), H035 (Ion Pickle Lab, previously incorrectly geocoded to 77045), and H130 (Upside SportsPlex). H124 (Cimarron Park) matched a different street; its pin is withheld and its record remains searchable with a notice. There are 138 mapped records. Remaining pins are the audit's approximate facility coordinates, not surveyed court entrances. The catalog is server-side and excluded from the service-worker cache.
+
+Validation: the Discovery API suite checks access/expiry/pause, search, category, radius, status exclusions, source links, and coordinate corrections. `test/e2e/discovery.js` checks club pins, search, address popups, direction links, label/layer controls, and 320/390/768/1440px layouts, followed by the existing session lifecycle.

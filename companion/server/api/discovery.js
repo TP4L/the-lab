@@ -3,6 +3,7 @@ const { randomUUID, randomBytes } = require('node:crypto');
 const { HttpError, str, int, num, oneOf, isoTime, uuid } = require('../http');
 const { tx, now } = require('../db');
 const { limiter } = require('../auth');
+const venueCatalog = require('../catalog/houston-venues.json');
 const DAY = 86400000;
 
 module.exports = function discovery(r, ctx) {
@@ -55,6 +56,24 @@ module.exports = function discovery(r, ctx) {
       refund_policy:s.refund_policy,settings_version:s.version,checkout_enabled:!!(s.enabled&&s.sales_enabled&&s.amount&&s.refund_policy&&billingReady),profile:u?profile(u.id)||null:null};
   }
   r.get('/api/discovery',({user})=>{auth.require(user);return state(user);});
+  r.get('/api/discovery/venues',({user,query})=>{
+    access(user);
+    const lat=query.has('lat')?num(query.get('lat'),'Latitude',{min:-85,max:85}):29.7604;
+    const lng=query.has('lng')?num(query.get('lng'),'Longitude',{min:-180,max:180}):-95.3698;
+    const radius=query.has('radius')?num(query.get('radius'),'Distance',{min:1,max:7000}):25;
+    const status=oneOf(query.get('status')||'operating',['operating','all'],'Venue status');
+    const category=query.get('category')||'';
+    if(category)oneOf(category,['lifetime','clubs','parks','community'],'Venue category');
+    const words=str(query.get('q')||'','Club search',{max:120}).toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const rad=x=>x*Math.PI/180;
+    const items=venueCatalog.venues.filter(x=>(status==='all'||x.status==='operating')&&(!category||category===x.category)&&words.every(word=>(x.name+' '+x.address).toLowerCase().includes(word))).map(x=>{
+      const a=x.lat===null?null:Math.sin(rad(x.lat-lat)/2)**2+Math.cos(rad(lat))*Math.cos(rad(x.lat))*Math.sin(rad(x.lng-lng)/2)**2;
+      // Keep uncertain coordinates out of the map; these records remain searchable by name.
+      return {...x,distance_miles:a===null?null:Math.round(3958.8*2*Math.asin(Math.min(1,Math.sqrt(a)))*10)/10};
+    }).filter(x=>x.distance_miles===null?words.length>0||radius===7000:x.distance_miles<=radius)
+      .sort((a,b)=>(a.distance_miles??Infinity)-(b.distance_miles??Infinity)||a.name.localeCompare(b.name));
+    return {items,total:venueCatalog.venues.length,research_date:venueCatalog.research_date,note:venueCatalog.note};
+  });
   r.put('/api/discovery/profile',({user,body})=>{
     auth.require(user);limit(user);
     if(typeof body.visible!=='boolean')throw new HttpError(400,'Choose whether to join Discovery.');
