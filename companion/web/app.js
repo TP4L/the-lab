@@ -726,7 +726,7 @@
       function tabs() {
         $('#tabs').innerHTML = s.items.map(function (it, i) { return '<button type="button" aria-pressed="' + (i === cur) + '" data-i="' + i + '">' + (i + 1) + '. ' + h(it.name) + '</button>'; }).join('');
         var it = s.items[cur];
-        $('#info').innerHTML = '<b>' + h(MEASURES[it.measure]) + '</b>' + (it.target ? ' · Target ' + h(it.target) : '') + (it.instructions ? ' · ' + h(it.instructions) : '');
+        $('#info').innerHTML = '<b>' + h(MEASURES[it.measure]) + '</b>' + (it.coaching_attribute ? ' · Coach ' + h(it.coaching_attribute) : '') + (it.target ? ' · Target ' + h(it.target) : '') + (it.instructions ? ' · ' + h(it.instructions) : '');
       }
       function board() {
         var it = s.items[cur], cells = summarize(s.items, s.athletes.map(function (a) { return a.id; }), s.events);
@@ -866,7 +866,7 @@
           coach && s.status === 'live' ? '<a class="btn primary" href="#/train/' + h(id) + '/live">Resume counting</a>' : '') +
         '<div class="table-wrap card" style="padding:0"><table class="summary-table"><thead><tr><th>Drill</th>' + s.athletes.map(function (a) { return '<th>' + h(a.name) + '</th>'; }).join('') + '</tr></thead><tbody>' +
         s.items.map(function (it) {
-          return '<tr><td><b>' + h(it.name) + '</b><br><span class="small muted">' + h(MEASURES[it.measure]) + (it.target ? ' · target ' + h(it.target) : '') + '</span></td>' +
+          return '<tr><td><b>' + h(it.name) + '</b><br><span class="small muted">' + h(MEASURES[it.measure]) + (it.coaching_attribute ? ' · Coach ' + h(it.coaching_attribute) : '') + (it.target ? ' · target ' + h(it.target) : '') + '</span></td>' +
             s.athletes.map(function (a) { return '<td class="n">' + h(cellText(it, cells[it.idx + ':' + a.id])) + '</td>'; }).join('') + '</tr>';
         }).join('') + '</tbody></table></div>' +
         (s.items.some(function (it) { return it.measure === 'reps'; }) ? '<div class="tiles">' + s.athletes.map(function (a) {

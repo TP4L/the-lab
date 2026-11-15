@@ -50,7 +50,7 @@ function athleteResults(db, athleteId) {
   const sessions = db.prepare(`SELECT s.* FROM training_athletes ta JOIN training_sessions s ON s.id = ta.session_id
     WHERE ta.athlete_id = ? ORDER BY s.started_at DESC LIMIT 50`).all(athleteId);
   return sessions.map(s => {
-    const items = db.prepare('SELECT idx, name, measure, target FROM training_items WHERE session_id = ? ORDER BY idx').all(s.id);
+    const items = db.prepare('SELECT idx, name, measure, target, coaching_attribute FROM training_items WHERE session_id = ? ORDER BY idx').all(s.id);
     const events = db.prepare('SELECT id, item_idx, athlete_id, kind, value, undoes, at FROM score_events WHERE session_id = ? AND athlete_id = ?').all(s.id, athleteId);
     // Undo events carry the athlete of the event they cancel, so filtering by athlete is safe.
     const cells = summarize(items, [athleteId], events);
@@ -81,7 +81,8 @@ module.exports = function training(r, { db, auth, notifier }) {
       name: str(x.name, `${f}.name`, { required: true, max: 120 }),
       measure: oneOf(x.measure || 'reps', MEASURES, `${f}.measure`),
       target: str(x.target, `${f}.target`, { max: 120 }),
-      instructions: str(x.instructions, `${f}.instructions`, { max: 2000 })
+      instructions: str(x.instructions, `${f}.instructions`, { max: 2000 }),
+      coaching_attribute: str(x.coaching_attribute, `${f}.coaching_attribute`, { max: 120 })
     };
   }
 
@@ -120,7 +121,16 @@ module.exports = function training(r, { db, auth, notifier }) {
     if (brief) {
       const choices=list(body.blocks,'drills',{max:MAX_ITEMS,item:(x,f)=>int(x,f,{required:true,min:1})});
       if(new Set(choices).size!==choices.length || choices.some(id=>!brief.blocks.some(b=>b.id===id))) throw new HttpError(400,'Reopen the lesson to select its drills.');
-      drills=brief.blocks.filter(b=>choices.includes(b.id)).map(b=>({name:b.drill||b.instructions?.slice(0,120)||'Lesson block',measure:'reps',instructions:b.instructions}));
+      const attributes=body.coaching_attributes ?? {};
+      if (typeof attributes !== 'object' || Array.isArray(attributes) || Object.keys(attributes).some(id=>!choices.includes(Number(id)))) {
+        throw new HttpError(400,'Choose coaching attributes for selected drills.');
+      }
+      drills=brief.blocks.filter(b=>choices.includes(b.id)).map(b=>({
+        name:b.drill||b.instructions?.slice(0,120)||'Lesson block',
+        measure:'reps',
+        instructions:b.instructions,
+        coaching_attribute:attributes[b.id]
+      }));
     }
     const items = list(drills, 'items', { max: MAX_ITEMS, item: itemFields });
     if (!items.length) throw new HttpError(400, 'Add at least one drill.');
@@ -130,8 +140,8 @@ module.exports = function training(r, { db, auth, notifier }) {
     tx(db, () => {
       db.prepare('INSERT INTO training_sessions (id, coach_id, title, started_at,source_plan_id) VALUES (?, ?, ?, ?,?)').run(id, user.id, title, startedAt,planId);
       athleteIds.forEach((aid, i) => db.prepare('INSERT INTO training_athletes (session_id, athlete_id, slot,lesson_cue) VALUES (?, ?, ?,?)').run(id, aid, i + 1,brief?.players.find(p=>p.id===aid)?.cue || ''));
-      items.forEach((it, i) => db.prepare('INSERT INTO training_items (session_id, idx, name, measure, target, instructions) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(id, i, it.name, it.measure, it.target, it.instructions));
+      items.forEach((it, i) => db.prepare('INSERT INTO training_items (session_id, idx, name, measure, target, instructions, coaching_attribute) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(id, i, it.name, it.measure, it.target, it.instructions, it.coaching_attribute));
       if (assignment) {
         db.prepare("UPDATE assignments SET status = 'done', session_id = ?, completed_at = ? WHERE id = ?").run(id, now(), assignment.id);
         db.prepare("UPDATE development_blocks SET session_id = ?, status = CASE WHEN status = 'assigned' THEN 'in_progress' ELSE status END, updated_at = ? WHERE assignment_id = ?")
